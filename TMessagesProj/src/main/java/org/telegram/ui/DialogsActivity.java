@@ -13237,7 +13237,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     Bundle args = new Bundle();
                     args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
                     args.putBoolean("my_profile", true);
-                    presentFragment(new ProfileActivityReplacement(args, null));
+                    presentFragment(new ProfileActivityReplacement(args));
                 }
 
                 @Override

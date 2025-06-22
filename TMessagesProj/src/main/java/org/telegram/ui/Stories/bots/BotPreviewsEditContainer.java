@@ -898,7 +898,7 @@ public class BotPreviewsEditContainer extends FrameLayout implements Notificatio
                             obj.getId(),
                             list,
                             StoriesListPlaceProvider.of(listView)
-                                .addBottomClip(fragment instanceof ProfileActivityReplacement && ((ProfileActivityReplacement) fragment).myProfile ? dp(68) : 0)
+                                .addBottomClip(fragment instanceof ProfileActivityReplacement && ((ProfileActivityReplacement) fragment).isMyProfile() ? dp(68) : 0)
                         );
                     }
                 }

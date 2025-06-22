@@ -573,7 +573,8 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
                 }
                 args.putBoolean("reportSpam", parentFragment.hasReportSpam());
                 args.putInt("actionBarColor", getThemedColor(Theme.key_actionBarDefault));
-                ProfileActivityReplacement fragment = new ProfileActivityReplacement(args, sharedMediaPreloader);
+                ProfileActivityReplacement fragment = new ProfileActivityReplacement(args);
+                fragment.setSharedMediaPreloader(sharedMediaPreloader);
                 if (!monoforum) {
                     fragment.setUserInfo(parentFragment.getCurrentUserInfo(), parentFragment.profileChannelMessageFetcher, parentFragment.birthdayAssetsFetcher);
                 }
@@ -590,7 +591,8 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
             } else if (parentFragment.isTopic) {
                 args.putLong("topic_id", parentFragment.getThreadMessage().getId());
             }
-            ProfileActivityReplacement fragment = new ProfileActivityReplacement(args, sharedMediaPreloader);
+            ProfileActivityReplacement fragment = new ProfileActivityReplacement(args);
+            fragment.setSharedMediaPreloader(sharedMediaPreloader);
             if (!monoforum) {
                 fragment.setChatInfo(parentFragment.getCurrentChatInfo());
             }

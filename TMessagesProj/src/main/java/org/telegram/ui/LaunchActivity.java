@@ -651,7 +651,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     Bundle args = new Bundle();
                     args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
                     args.putBoolean("my_profile", true);
-                    presentFragment(new ProfileActivityReplacement(args, null));
+                    presentFragment(new ProfileActivityReplacement(args));
                 } else if (id == 17) {
                     drawerLayoutContainer.closeDrawer(true);
                     Bundle args = new Bundle();

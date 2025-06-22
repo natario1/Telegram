@@ -2643,7 +2643,7 @@ public class StarsController {
                         if (((ProfileActivityReplacement) fragment).sharedMediaLayout != null) {
                             ((ProfileActivityReplacement) fragment).sharedMediaLayout.updateTabs(true);
                             ((ProfileActivityReplacement) fragment).sharedMediaLayout.scrollToPage(SharedMediaLayout.TAB_GIFTS);
-                            ((ProfileActivityReplacement) fragment).scrollToSharedMedia();
+                            ((ProfileActivityReplacement) fragment).scrollToSharedMedia(false);
                         }
                         BulletinFactory.of(fragment).createEmojiBulletin(gift.sticker, getString(R.string.StarsGiftCompleted), AndroidUtilities.replaceTags(formatPluralString("StarsGiftCompletedChannelText", (int) stars, name))).show(false);
                     } else {
@@ -2655,7 +2655,7 @@ public class StarsController {
                             AndroidUtilities.runOnUIThread(() -> {
                                 if (profileActivity.sharedMediaLayout != null) {
                                     profileActivity.sharedMediaLayout.scrollToPage(SharedMediaLayout.TAB_GIFTS);
-                                    profileActivity.scrollToSharedMedia();
+                                    profileActivity.scrollToSharedMedia(false);
                                 }
                             }, 200);
                             BulletinFactory.of(profileActivity).createEmojiBulletin(gift.sticker, getString(R.string.StarsGiftCompleted), AndroidUtilities.replaceTags(formatPluralString("StarsGiftCompletedChannelText", (int) stars, name))).show(false);

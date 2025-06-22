@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.widget.Toast;
+import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 import org.telegram.messenger.*;
 import org.telegram.tgnet.TLRPC;
@@ -28,7 +29,6 @@ public class ProfileActivityReplacement extends BaseFragment {
 
     private SharedMediaLayout.SharedMediaPreloader sharedMediaPreloader;
     public SharedMediaLayout sharedMediaLayout;
-    public ProfileGiftsView giftsView;
 
     public static ProfileActivityReplacement of(long dialogId) {
         Bundle bundle = new Bundle();
@@ -41,31 +41,73 @@ public class ProfileActivityReplacement extends BaseFragment {
     }
 
     public ProfileActivityReplacement(Bundle args) {
-        this(args, null);
+        super(args);
     }
 
-    public ProfileActivityReplacement(Bundle args, SharedMediaLayout.SharedMediaPreloader preloader) {
-        super(args);
+    // Called before presenting
+    public void setSharedMediaPreloader(SharedMediaLayout.SharedMediaPreloader preloader) {
         sharedMediaPreloader = preloader;
     }
 
-    public int birthdayRow;
-    public RecyclerListView getListView() {
-        throw new RuntimeException("TODO: not implemented");
-    }
-    public boolean myProfile;
-    public boolean saved;
-
-    public UndoView getUndoView() {
-        throw new RuntimeException("TODO: not implemented");
-    }
-
+    // Called before presenting
     public void setPlayProfileAnimation(int type) {
 
     }
 
-    public void scrollToSharedMedia() {
+    // Called before presenting
+    public void setUserInfo(
+        TLRPC.UserFull value,
+        ProfileChannelCell.ChannelMessageFetcher channelMessageFetcher,
+        ProfileBirthdayEffect.BirthdayEffectFetcher birthdayAssetsFetcher
+    ) {
 
+    }
+
+    public TLRPC.User getCurrentUser() {
+        throw new RuntimeException("TODO: not implemented");
+    }
+
+    // Called before presenting
+    public void setChatInfo(TLRPC.ChatFull value) {
+
+    }
+
+    public TLRPC.Chat getCurrentChat() {
+        throw new RuntimeException("TODO: not implemented");
+    }
+
+    @Nullable
+    public UndoView getUndoView() {
+        throw new RuntimeException("TODO: not implemented");
+    }
+
+    public long getDialogId() {
+        throw new RuntimeException("TODO: not implemented");
+    }
+
+    public long getTopicId() {
+        throw new RuntimeException("TODO: not implemented");
+    }
+
+    public boolean isChat() {
+        throw new RuntimeException("TODO: not implemented");
+    }
+
+    public boolean isSettings() {
+        throw new RuntimeException("TODO: not implemented");
+        // return imageUpdater != null && !myProfile;
+    }
+
+    public boolean isMyProfile() {
+        throw new RuntimeException("TODO: not implemented");
+    }
+
+    public boolean isSaved() {
+        throw new RuntimeException("TODO: not implemented");
+    }
+
+    public void updateGifts() {
+        // giftsView.update()
     }
 
     public void scrollToSharedMedia(boolean animated) {
@@ -74,49 +116,5 @@ public class ProfileActivityReplacement extends BaseFragment {
 
     public void prepareBlurBitmap() {
 
-    }
-
-    public boolean isChat() {
-        throw new RuntimeException("TODO: not implemented");
-    }
-
-    public long getDialogId() {
-        throw new RuntimeException("TODO: not implemented");
-        /* if (dialogId != 0) {
-            return dialogId;
-        } else if (userId != 0) {
-            return userId;
-        } else {
-            return -chatId;
-        } */
-    }
-
-    public void setUserInfo(
-            TLRPC.UserFull value,
-            ProfileChannelCell.ChannelMessageFetcher channelMessageFetcher,
-            ProfileBirthdayEffect.BirthdayEffectFetcher birthdayAssetsFetcher
-    ) {
-
-    }
-
-    public TLRPC.UserFull getUserInfo() {
-        throw new RuntimeException("TODO: not implemented");
-    }
-
-    public TLRPC.Chat getCurrentChat() {
-        throw new RuntimeException("TODO: not implemented");
-    }
-
-    public void setChatInfo(TLRPC.ChatFull value) {
-
-    }
-
-    public long getTopicId() {
-        throw new RuntimeException("TODO: not implemented");
-    }
-
-    public boolean isSettings() {
-        throw new RuntimeException("TODO: not implemented");
-        // return imageUpdater != null && !myProfile;
     }
 }

@@ -40,21 +40,9 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.database.DataSetObserver;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.ColorFilter;
-import android.graphics.LinearGradient;
-import android.graphics.Outline;
-import android.graphics.Paint;
-import android.graphics.Path;
+import android.graphics.*;
 import android.graphics.Point;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
-import android.graphics.RectF;
-import android.graphics.Shader;
-import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -261,7 +249,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-public class ProfileActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate, DialogsActivity.DialogsActivityDelegate, SharedMediaLayout.SharedMediaPreloaderDelegate, ImageUpdater.ImageUpdaterDelegate, SharedMediaLayout.Delegate {
+public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffect.Delegate, NotificationCenter.NotificationCenterDelegate, DialogsActivity.DialogsActivityDelegate, SharedMediaLayout.SharedMediaPreloaderDelegate, ImageUpdater.ImageUpdaterDelegate, SharedMediaLayout.Delegate {
     private final static int PHONE_OPTION_CALL = 0,
         PHONE_OPTION_COPY = 1,
         PHONE_OPTION_TELEGRAM_CALL = 2,
@@ -13679,8 +13667,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             return;
         }
 
-        // birthdayEffect = new ProfileBirthdayEffect(this, birthdayFetcher);
-        // ((FrameLayout) fragmentView).addView(birthdayEffect, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
+        birthdayEffect = new ProfileBirthdayEffect(getContext(), this, birthdayFetcher);
+        ((FrameLayout) fragmentView).addView(birthdayEffect, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
     }
 
     private void openLocation(boolean inMapsApp) {
@@ -14067,4 +14055,21 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
     }
 
+    @Override
+    public void getBirthdayEffectSourcePoint(PointF outPoint) {
+        final int position = birthdayRow;
+        if (position < 0) return;
+        for (int i = 0; i < listView.getChildCount(); ++i) {
+            View child = listView.getChildAt(i);
+            final int childPosition = listView.getChildAdapterPosition(child);
+            if (position == childPosition && child instanceof TextDetailCell) {
+                TextView textView = ((TextDetailCell) child).textView;
+                outPoint.set(
+                        listView.getX() + child.getX() + textView.getX() + dp(12),
+                        listView.getY() + child.getY() + textView.getY() + textView.getMeasuredHeight() / 2f
+                );
+                return;
+            }
+        }
+    }
 }

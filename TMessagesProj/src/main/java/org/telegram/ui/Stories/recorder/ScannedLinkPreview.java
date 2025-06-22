@@ -358,7 +358,7 @@ public class ScannedLinkPreview extends View {
                         Bundle args = new Bundle();
                         args.putLong("user_id", user.id);
                         args.putBoolean("my_profile", true);
-                        fragment.presentFragment(new ProfileActivityReplacement(args, null));
+                        fragment.presentFragment(new ProfileActivityReplacement(args));
                     } else {
                         fragment.presentFragment(ProfileActivityReplacement.of(user.id));
                     }

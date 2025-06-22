@@ -430,7 +430,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                 profileActivity.getContext(),
                 dialogCell.getDialogId(),
                 StoriesListPlaceProvider.of((RecyclerListView) dialogCell.getParent())
-                    .addBottomClip(profileActivity instanceof ProfileActivityReplacement && ((ProfileActivityReplacement) profileActivity).myProfile ? dp(68) : 0)
+                    .addBottomClip(profileActivity instanceof ProfileActivityReplacement && ((ProfileActivityReplacement) profileActivity).isMyProfile() ? dp(68) : 0)
             );
         }
     }
@@ -755,7 +755,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                 }
             } else if (fragment instanceof ProfileActivityReplacement) {
                 ProfileActivityReplacement profileActivity = (ProfileActivityReplacement) fragment;
-                if (profileActivity.saved) {
+                if (profileActivity.isSaved()) {
                     dialogId = profileActivity.getUserConfig().getClientUserId();
                     topicId = profileActivity.getDialogId();
                 } else {
@@ -6843,7 +6843,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                     if (forward) {
                         storiesList.load(false, 30);
                     }
-                }).addBottomClip(profileActivity instanceof ProfileActivityReplacement && ((ProfileActivityReplacement) profileActivity).myProfile ? dp(68) : 0));
+                }).addBottomClip(profileActivity instanceof ProfileActivityReplacement && ((ProfileActivityReplacement) profileActivity).isMyProfile() ? dp(68) : 0));
             }
         }
         updateForwardItem();

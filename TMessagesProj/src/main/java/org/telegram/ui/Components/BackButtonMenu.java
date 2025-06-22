@@ -353,7 +353,7 @@ public class BackButtonMenu {
                     ProfileActivityReplacement profileActivity = (ProfileActivityReplacement) fragment;
                     chat = profileActivity.getCurrentChat();
                     try {
-                        user = profileActivity.getUserInfo().user;
+                        user = profileActivity.getCurrentUser();
                     } catch (Exception ignore) {}
                     dialogId = profileActivity.getDialogId();
                     folderId = 0;

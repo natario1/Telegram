@@ -35,7 +35,11 @@ import java.util.Map;
 
 public class ProfileBirthdayEffect extends View {
 
-    private final ProfileActivityReplacement profileActivity;
+    public interface Delegate {
+        void getBirthdayEffectSourcePoint(PointF outPoint);
+    }
+
+    private final Delegate delegate;
     private BirthdayEffectFetcher fetcher;
     private BirthdayEffectFetcher fetcherToSet;
 
@@ -48,9 +52,9 @@ public class ProfileBirthdayEffect extends View {
 
     public PointF sourcePoint = new PointF();
 
-    public ProfileBirthdayEffect(ProfileActivityReplacement profileActivity, BirthdayEffectFetcher fetcher) {
-        super(profileActivity.getContext());
-        this.profileActivity = profileActivity;
+    public ProfileBirthdayEffect(Context context, Delegate delegate, BirthdayEffectFetcher fetcher) {
+        super(context);
+        this.delegate = delegate;
         this.fetcher = fetcher;
     }
 
@@ -180,21 +184,7 @@ public class ProfileBirthdayEffect extends View {
     }
 
     private void updateSourcePoint() {
-        RecyclerListView listView = profileActivity.getListView();
-        final int position = profileActivity.birthdayRow;
-        if (position < 0) return;
-        for (int i = 0; i < listView.getChildCount(); ++i) {
-            View child = listView.getChildAt(i);
-            final int childPosition = listView.getChildAdapterPosition(child);
-            if (position == childPosition && child instanceof TextDetailCell) {
-                TextView textView = ((TextDetailCell) child).textView;
-                sourcePoint.set(
-                        listView.getX() + child.getX() + textView.getX() + dp(12),
-                        listView.getY() + child.getY() + textView.getY() + textView.getMeasuredHeight() / 2f
-                );
-                return;
-            }
-        }
+        delegate.getBirthdayEffectSourcePoint(sourcePoint);
     }
 
     @Override

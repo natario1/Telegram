@@ -40083,7 +40083,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
             Bundle args = new Bundle();
             args.putLong("user_id", uid);
             args.putBoolean("my_profile", true);
-            presentFragment(new ProfileActivityReplacement(args, null));
+            presentFragment(new ProfileActivityReplacement(args));
         }
     }
 
