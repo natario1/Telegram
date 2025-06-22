@@ -41,12 +41,7 @@ import androidx.dynamicanimation.animation.SpringForce;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.R;
-import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.*;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.Theme;
@@ -536,7 +531,7 @@ public class FloatingDebugView extends FrameLayout implements NotificationCenter
                 NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.needSetDayNightTheme, finalThemeInfo, true, null, -1);
             }, 200);
         }));
-        items.add(new FloatingDebugController.DebugItem(LocaleController.getString(R.string.DebugSendLogs), () -> ProfileActivity.sendLogs((Activity) getContext(), false)));
+        items.add(new FloatingDebugController.DebugItem(LocaleController.getString(R.string.DebugSendLogs), () -> LogSender.sendLogs((Activity) getContext(), false)));
         return items;
     }
 
