@@ -65,19 +65,15 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.Vector;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
 import org.telegram.ui.ActionBar.ActionBarPopupWindow;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.Premium.PremiumButtonView;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
-import org.telegram.ui.ContentPreviewViewer;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
 
 import java.util.ArrayList;
 import java.util.regex.Matcher;
@@ -1486,8 +1482,8 @@ public class EmojiPacksAlert extends BottomSheet implements NotificationCenter.N
                         UndoView undoView;
                         if (fragment instanceof ChatActivity) {
                             undoView = ((ChatActivity) fragment).getUndoView();
-                        } else if (fragment instanceof ProfileActivity) {
-                            undoView = ((ProfileActivity) fragment).getUndoView();
+                        } else if (fragment instanceof ProfileActivityReplacement) {
+                            undoView = ((ProfileActivityReplacement) fragment).getUndoView();
                         } else {
                             undoView = null;
                         }

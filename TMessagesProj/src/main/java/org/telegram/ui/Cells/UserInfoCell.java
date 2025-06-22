@@ -47,7 +47,7 @@ import org.telegram.ui.Components.ButtonBounce;
 import org.telegram.ui.Components.ColoredImageSpan;
 import org.telegram.ui.Components.Text;
 import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.ProfileActivity;
+import org.telegram.ui.ProfileActivityReplacement;
 
 import java.text.DateFormatSymbols;
 import java.text.SimpleDateFormat;
@@ -433,7 +433,7 @@ public class UserInfoCell extends View implements NotificationCenter.Notificatio
                         args.putLong("chat_id", -dialogId);
                     }
                     args.putBoolean("open_common", true);
-                    fragment.presentFragment(new ProfileActivity(args));
+                    fragment.presentFragment(new ProfileActivityReplacement(args));
                 }
                 invalidate();
             }

@@ -66,13 +66,12 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stars;
-import org.telegram.ui.AccountFrozenAlert;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.ChatActionCell;
 import org.telegram.ui.Cells.ChatMessageCell;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AnimatedFloat;
 import org.telegram.ui.Components.AnimatedTextView;
 import org.telegram.ui.Components.AvatarDrawable;
@@ -90,8 +89,6 @@ import org.telegram.ui.Components.Premium.GLIcon.Icon3D;
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble;
 import org.telegram.ui.Components.ScaleStateListAnimator;
 import org.telegram.ui.Components.Text;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 import java.util.ArrayList;
@@ -412,7 +409,7 @@ public class StarsReactionsSheet extends BottomSheet implements NotificationCent
                     if (senderDialogId == UserConfig.getInstance(currentAccount).getClientUserId()) {
                         args.putBoolean("my_profile", true);
                     }
-                    chatActivity.presentFragment(new ProfileActivity(args) {
+                    chatActivity.presentFragment(new ProfileActivityReplacement(args) {
                         @Override
                         public void onFragmentDestroy() {
                             super.onFragmentDestroy();

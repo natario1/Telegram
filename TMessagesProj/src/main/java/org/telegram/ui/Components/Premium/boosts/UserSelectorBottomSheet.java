@@ -52,11 +52,11 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.TextCell;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.BottomSheetWithRecyclerListView;
 import org.telegram.ui.Components.Bulletin;
@@ -76,9 +76,6 @@ import org.telegram.ui.Components.Premium.boosts.cells.selector.SelectorUserCell
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.ScaleStateListAnimator;
 import org.telegram.ui.Gifts.GiftSheet;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PrivacyControlActivity;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stars.StarsController;
 import org.telegram.ui.Stars.StarsIntroActivity;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
@@ -1048,7 +1045,7 @@ public class UserSelectorBottomSheet extends BottomSheetWithRecyclerListView imp
                     Bundle args = new Bundle();
                     args.putLong("user_id", user.id);
 //                    fragment.showAsSheet(new ProfileActivity(args), bottomSheetParams);
-                    fragment.presentFragment(new ProfileActivity(args));
+                    fragment.presentFragment(new ProfileActivityReplacement(args));
                 })
                 .show();
         };

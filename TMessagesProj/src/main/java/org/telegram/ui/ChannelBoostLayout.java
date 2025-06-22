@@ -374,7 +374,7 @@ public class ChannelBoostLayout extends FrameLayout {
                     layout.textView.setMaxLines(2);
                     Bulletin.make(fragment, layout, Bulletin.DURATION_LONG).show();
                 } else if (!boost.gift && !boost.giveaway) {
-                    fragment.presentFragment(ProfileActivity.of(cell.getDialogId()));
+                    fragment.presentFragment(ProfileActivityReplacement.of(cell.getDialogId()));
                 }
             }
             if (view instanceof TextCell) {

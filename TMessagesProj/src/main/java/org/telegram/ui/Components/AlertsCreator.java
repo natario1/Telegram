@@ -100,6 +100,7 @@ import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_phone;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.ActionBarPopupWindow;
 import org.telegram.ui.ActionBar.AlertDialog;
@@ -108,30 +109,17 @@ import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Business.TimezonesController;
-import org.telegram.ui.CacheControlActivity;
 import org.telegram.ui.Cells.AccountSelectCell;
 import org.telegram.ui.Cells.CheckBoxCell;
 import org.telegram.ui.Cells.RadioColorCell;
 import org.telegram.ui.Cells.TextColorCell;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.Forum.ForumUtilities;
 import org.telegram.ui.Components.Premium.LimitReachedBottomSheet;
 import org.telegram.ui.Components.voip.VoIPHelper;
-import org.telegram.ui.LanguageSelectActivity;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.LoginActivity;
-import org.telegram.ui.NotificationsCustomSettingsActivity;
-import org.telegram.ui.NotificationsSettingsActivity;
-import org.telegram.ui.PhotoViewer;
-import org.telegram.ui.PrivacyControlActivity;
-import org.telegram.ui.ProfileActivity;
-import org.telegram.ui.ProfileNotificationsActivity;
 import org.telegram.ui.Stars.StarsController;
 import org.telegram.ui.Stars.StarsIntroActivity;
 import org.telegram.ui.Stories.DarkThemeResourceProvider;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
-import org.telegram.ui.ThemePreviewActivity;
-import org.telegram.ui.TooManyCommunitiesActivity;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -1542,7 +1530,7 @@ public class AlertsCreator {
             Bundle args = new Bundle();
             args.putLong("user_id", user.id);
             if (fragment.getMessagesController().checkCanOpenChat(args, fragment)) {
-                fragment.presentFragment(new ProfileActivity(args));
+                fragment.presentFragment(new ProfileActivityReplacement(args));
             }
 
             builder.getDismissRunnable().run();
@@ -1663,7 +1651,7 @@ public class AlertsCreator {
             Bundle args = new Bundle();
             args.putLong("user_id", user.id);
             if (fragment.getMessagesController().checkCanOpenChat(args, fragment)) {
-                fragment.presentFragment(new ProfileActivity(args));
+                fragment.presentFragment(new ProfileActivityReplacement(args));
             }
 
             builder.getDismissRunnable().run();

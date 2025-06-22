@@ -149,6 +149,7 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_bots;
 import org.telegram.tgnet.tl.TL_stories;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
 import org.telegram.ui.ActionBar.ActionBarPopupWindow;
@@ -158,24 +159,12 @@ import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.BasePermissionsActivity;
 import org.telegram.ui.Business.BusinessLinksController;
 import org.telegram.ui.Business.QuickRepliesController;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.Premium.boosts.BoostRepository;
-import org.telegram.ui.ContentPreviewViewer;
-import org.telegram.ui.DialogsActivity;
 import org.telegram.ui.Gifts.GiftSheet;
-import org.telegram.ui.GroupStickersActivity;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.MessageSendPreview;
-import org.telegram.ui.MultiContactsSelectorBottomSheet;
-import org.telegram.ui.PhotoViewer;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stars.StarsIntroActivity;
-import org.telegram.ui.StickersActivity;
 import org.telegram.ui.Stories.recorder.CaptionContainerView;
 import org.telegram.ui.Stories.recorder.HintView2;
 import org.telegram.ui.bots.BotCommandsMenuContainer;
@@ -10239,7 +10228,7 @@ public class ChatActivityEnterView extends BlurredFrameLayout implements Notific
             if (MessagesController.getInstance(currentAccount).getUser(button.user_id) != null) {
                 Bundle args = new Bundle();
                 args.putLong("user_id", button.user_id);
-                ProfileActivity fragment = new ProfileActivity(args);
+                ProfileActivityReplacement fragment = new ProfileActivityReplacement(args);
                 parentFragment.presentFragment(fragment);
             }
         } else if (button instanceof TLRPC.TL_keyboardButtonRequestPeer) {

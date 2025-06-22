@@ -48,6 +48,7 @@ import org.telegram.messenger.UserObject;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stories;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
 import org.telegram.ui.ActionBar.ActionBarPopupWindow;
@@ -56,7 +57,6 @@ import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.FixedHeightEmptyCell;
 import org.telegram.ui.Cells.ReactedUserHolderView;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.Bulletin;
 import org.telegram.ui.Components.BulletinFactory;
@@ -77,10 +77,6 @@ import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.ReplaceableIconDrawable;
 import org.telegram.ui.Components.SearchField;
 import org.telegram.ui.Components.StickerEmptyView;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
-import org.telegram.ui.RecyclerListViewScroller;
 import org.telegram.ui.Stories.recorder.StoryPrivacyBottomSheet;
 
 import java.util.ArrayList;
@@ -241,11 +237,11 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
             }
             Item item = listAdapter.items.get(position);
             if (item.view instanceof TL_stories.TL_storyView) {
-                storyViewer.presentFragment(ProfileActivity.of(item.view.user_id));
+                storyViewer.presentFragment(ProfileActivityReplacement.of(item.view.user_id));
             } else if (item.view instanceof TL_stories.TL_storyViewPublicRepost) {
                 storyViewer.fragment.createOverlayStoryViewer().open(getContext(), ((TL_stories.TL_storyViewPublicRepost) item.view).story, StoriesListPlaceProvider.of(recyclerListView));
             } else if (item.reaction instanceof TL_stories.TL_storyReaction) {
-                storyViewer.presentFragment(ProfileActivity.of(DialogObject.getPeerDialogId(item.reaction.peer_id)));
+                storyViewer.presentFragment(ProfileActivityReplacement.of(DialogObject.getPeerDialogId(item.reaction.peer_id)));
             } else if (item.reaction instanceof TL_stories.TL_storyReactionPublicRepost) {
                 storyViewer.fragment.createOverlayStoryViewer().open(getContext(), ((TL_stories.TL_storyReactionPublicRepost) item.reaction).story, StoriesListPlaceProvider.of(recyclerListView));
             } else if (item.reaction instanceof TL_stories.TL_storyReactionPublicForward || item.view instanceof TL_stories.TL_storyViewPublicForward) {

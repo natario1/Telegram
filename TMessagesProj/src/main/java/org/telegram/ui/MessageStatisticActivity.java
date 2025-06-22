@@ -364,7 +364,7 @@ public class MessageStatisticActivity extends BaseFragment implements Notificati
                 actions.add(0);
                 builder.setItems(items.toArray(new CharSequence[actions.size()]), AndroidUtilities.toIntArray(icons), (dialogInterface, i) -> {
                     if (message.isStory()) {
-                        presentFragment(isDialog ? ProfileActivity.of(did) : ChatActivity.of(did));
+                        presentFragment(isDialog ? ProfileActivityReplacement.of(did) : ChatActivity.of(did));
                     } else {
                         Bundle args = new Bundle();
                         if (isDialog) {

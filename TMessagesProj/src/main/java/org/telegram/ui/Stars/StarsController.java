@@ -53,18 +53,15 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.Vector;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_stars;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.Bulletin;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.SharedMediaLayout;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PaymentFormActivity;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.bots.BotWebViewSheet;
 
 import java.util.ArrayList;
@@ -2642,18 +2639,18 @@ public class StarsController {
                         chatFull.flags2 |= 262144;
                         MessagesController.getInstance(currentAccount).putChatFull(chatFull);
                     }
-                    if (fragment instanceof ProfileActivity && ((ProfileActivity) fragment).getDialogId() == dialogId) {
-                        if (((ProfileActivity) fragment).sharedMediaLayout != null) {
-                            ((ProfileActivity) fragment).sharedMediaLayout.updateTabs(true);
-                            ((ProfileActivity) fragment).sharedMediaLayout.scrollToPage(SharedMediaLayout.TAB_GIFTS);
-                            ((ProfileActivity) fragment).scrollToSharedMedia();
+                    if (fragment instanceof ProfileActivityReplacement && ((ProfileActivityReplacement) fragment).getDialogId() == dialogId) {
+                        if (((ProfileActivityReplacement) fragment).sharedMediaLayout != null) {
+                            ((ProfileActivityReplacement) fragment).sharedMediaLayout.updateTabs(true);
+                            ((ProfileActivityReplacement) fragment).sharedMediaLayout.scrollToPage(SharedMediaLayout.TAB_GIFTS);
+                            ((ProfileActivityReplacement) fragment).scrollToSharedMedia();
                         }
                         BulletinFactory.of(fragment).createEmojiBulletin(gift.sticker, getString(R.string.StarsGiftCompleted), AndroidUtilities.replaceTags(formatPluralString("StarsGiftCompletedChannelText", (int) stars, name))).show(false);
                     } else {
                         final Bundle args = new Bundle();
                         args.putLong("chat_id", -dialogId);
                         args.putBoolean("open_gifts", true);
-                        final ProfileActivity profileActivity = new ProfileActivity(args);
+                        final ProfileActivityReplacement profileActivity = new ProfileActivityReplacement(args);
                         profileActivity.whenFullyVisible(() -> {
                             AndroidUtilities.runOnUIThread(() -> {
                                 if (profileActivity.sharedMediaLayout != null) {

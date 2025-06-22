@@ -110,6 +110,7 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_bots;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarLayout;
 import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
@@ -119,8 +120,6 @@ import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.BottomSheetTabs;
 import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.ArticleViewer;
-import org.telegram.ui.CameraScanActivity;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AnimatedColor;
 import org.telegram.ui.Components.AnimatedFileDrawable;
@@ -135,12 +134,8 @@ import org.telegram.ui.Components.Paint.Views.LinkPreview;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.TypefaceSpan;
 import org.telegram.ui.Components.voip.CellFlickerDrawable;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stories.recorder.StoryEntry;
 import org.telegram.ui.Stories.recorder.StoryRecorder;
-import org.telegram.ui.WrappedResourceProvider;
 import org.telegram.ui.bots.BotBiometry;
 import org.telegram.ui.bots.BotBiometrySettings;
 import org.telegram.ui.bots.BotDownloads;
@@ -2155,7 +2150,7 @@ public abstract class BotWebViewContainer extends FrameLayout implements Notific
                 BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();
                 if (lastFragment == null || lastFragment.getParentLayout() == null) return;
                 final INavigationLayout parentLayout = lastFragment.getParentLayout();
-                lastFragment.presentFragment(ProfileActivity.of(botUser.id));
+                lastFragment.presentFragment(ProfileActivityReplacement.of(botUser.id));
                 AndroidUtilities.scrollToFragmentRow(parentLayout, "botPermissionBiometry");
                 if (delegate != null) {
                     delegate.onCloseToTabs();
@@ -2500,7 +2495,7 @@ public abstract class BotWebViewContainer extends FrameLayout implements Notific
                 BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();
                 if (lastFragment == null || lastFragment.getParentLayout() == null) return;
                 final INavigationLayout parentLayout = lastFragment.getParentLayout();
-                lastFragment.presentFragment(ProfileActivity.of(botUser.id));
+                lastFragment.presentFragment(ProfileActivityReplacement.of(botUser.id));
                 AndroidUtilities.scrollToFragmentRow(parentLayout, "botPermissionLocation");
                 if (delegate != null) {
                     delegate.onCloseToTabs();

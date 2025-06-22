@@ -1486,7 +1486,7 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
                 } else {
                     args.putLong("chat_id", -entities.dialogId);
                 }
-                presentFragment(new ProfileActivity(args, null));
+                presentFragment(new ProfileActivityReplacement(args, null));
             }
 
             @Override

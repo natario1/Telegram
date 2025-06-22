@@ -13971,7 +13971,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             MessageObject openingObject = imagesArr.get(index);
             if (!openingObject.scheduled && !openingObject.isQuickReply() && !openingObject.isSponsored() && (parentChatActivity == null || !parentChatActivity.isThreadChat())) {
                 opennedFromMedia = parentChatActivity == null;
-                if (parentFragment instanceof ProfileActivity) {
+                if (parentFragment instanceof ProfileActivityReplacement) {
                     openedFromProfile = true;
                 }
                 if (object != null) {

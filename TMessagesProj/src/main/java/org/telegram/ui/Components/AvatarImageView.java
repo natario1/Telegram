@@ -10,7 +10,6 @@ import android.util.Property;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
-import org.telegram.ui.ProfileActivity;
 
 public class AvatarImageView extends BackupImageView {
 

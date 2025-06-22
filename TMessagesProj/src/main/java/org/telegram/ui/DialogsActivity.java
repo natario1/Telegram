@@ -5003,7 +5003,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                                 presentFragment(ChatActivity.of(dialogId));
                             })
                             .addIf(dialogId > 0, R.drawable.msg_openprofile, LocaleController.getString(R.string.OpenProfile), () -> {
-                                presentFragment(ProfileActivity.of(dialogId));
+                                presentFragment(ProfileActivityReplacement.of(dialogId));
                             })
                             .addIf(dialogId < 0, R.drawable.msg_channel, LocaleController.getString(ChatObject.isChannelAndNotMegaGroup(chat) ? R.string.OpenChannel2 : R.string.OpenGroup2), () -> {
                                 presentFragment(ChatActivity.of(dialogId));
@@ -13092,7 +13092,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         searchViewPager.botsSearchListView.setOnItemClickListener((view, position, x, y) -> {
             Object obj = searchViewPager.botsSearchAdapter.getObject(position);
             if (obj instanceof TLRPC.User) {
-                presentFragment(ProfileActivity.of(((TLRPC.User) obj).id));
+                presentFragment(ProfileActivityReplacement.of(((TLRPC.User) obj).id));
             } else if (obj instanceof MessageObject) {
                 MessageObject msg = (MessageObject) obj;
                 Bundle args = new Bundle();
@@ -13237,7 +13237,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     Bundle args = new Bundle();
                     args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
                     args.putBoolean("my_profile", true);
-                    presentFragment(new ProfileActivity(args, null));
+                    presentFragment(new ProfileActivityReplacement(args, null));
                 }
 
                 @Override

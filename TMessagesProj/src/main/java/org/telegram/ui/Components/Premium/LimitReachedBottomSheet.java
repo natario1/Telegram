@@ -62,6 +62,7 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_stories;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.SimpleTextView;
@@ -71,9 +72,6 @@ import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.Cells.GroupCreateUserCell;
 import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.ShadowSectionCell;
-import org.telegram.ui.ChannelColorActivity;
-import org.telegram.ui.ChatActivity;
-import org.telegram.ui.ChatEditActivity;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.AvatarsImageView;
@@ -99,12 +97,6 @@ import org.telegram.ui.Components.RecyclerItemsEnterAnimator;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.ScaleStateListAnimator;
 import org.telegram.ui.Components.TypefaceSpan;
-import org.telegram.ui.DialogsActivity;
-import org.telegram.ui.GroupColorActivity;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
-import org.telegram.ui.StatisticActivity;
 import org.telegram.ui.Stories.ChannelBoostUtilities;
 import org.telegram.ui.Stories.DarkThemeResourceProvider;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
@@ -1149,7 +1141,7 @@ public class LimitReachedBottomSheet extends BottomSheetWithRecyclerListView imp
                 }
                 dismiss();
                 if (isGiveaway) {
-                    if (profileFragment instanceof ProfileActivity) {
+                    if (profileFragment instanceof ProfileActivityReplacement) {
                         getBaseFragment().getParentLayout().removeFragmentFromStack(profileFragment);
                     }
                     lastFragment.finishFragment();

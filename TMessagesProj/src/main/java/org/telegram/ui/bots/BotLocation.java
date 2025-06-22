@@ -57,7 +57,6 @@ import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.PermissionRequest;
 import org.telegram.ui.Components.Text;
 import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.ProfileActivity;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;

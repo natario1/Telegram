@@ -81,6 +81,7 @@ import org.telegram.tgnet.RequestDelegate;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.Vector;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
 import org.telegram.ui.ActionBar.ActionBarPopupWindow;
@@ -92,14 +93,8 @@ import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Cells.EmptyCell;
 import org.telegram.ui.Cells.FeaturedStickerSetInfoCell;
 import org.telegram.ui.Cells.StickerEmojiCell;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.Premium.PremiumButtonView;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
-import org.telegram.ui.ContentPreviewViewer;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PhotoViewer;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stories.recorder.StoryEntry;
 
 import java.io.File;
@@ -1355,8 +1350,8 @@ public class StickersAlert extends BottomSheet implements NotificationCenter.Not
                         UndoView undoView;
                         if (parentFragment instanceof ChatActivity) {
                             undoView = ((ChatActivity) parentFragment).getUndoView();
-                        } else if (parentFragment instanceof ProfileActivity) {
-                            undoView = ((ProfileActivity) parentFragment).getUndoView();
+                        } else if (parentFragment instanceof ProfileActivityReplacement) {
+                            undoView = ((ProfileActivityReplacement) parentFragment).getUndoView();
                         } else {
                             undoView = null;
                         }

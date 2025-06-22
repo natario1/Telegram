@@ -576,7 +576,7 @@ public class BoostsActivity extends GradientHeaderActivity implements Notificati
             BaseFragment secondFragment = fragmentStack.size() >= 2 ? fragmentStack.get(fragmentStack.size() - 2) : null;
             if (isGiveaway) {
                 BaseFragment thirdFragment = fragmentStack.size() >= 3 ? fragmentStack.get(fragmentStack.size() - 3) : null;
-                if (secondFragment instanceof ProfileActivity) {
+                if (secondFragment instanceof ProfileActivityReplacement) {
                     getParentLayout().removeFragmentFromStack(secondFragment);
                 }
                 finishFragment();
@@ -588,7 +588,7 @@ public class BoostsActivity extends GradientHeaderActivity implements Notificati
                 }
             } else {
                 finishFragment();
-                if (secondFragment instanceof ProfileActivity || secondFragment instanceof ChatActivity) {
+                if (secondFragment instanceof ProfileActivityReplacement || secondFragment instanceof ChatActivity) {
                     BoostDialogs.showBulletin(secondFragment, chat, false);
                 }
             }
@@ -838,7 +838,7 @@ public class BoostsActivity extends GradientHeaderActivity implements Notificati
                     layout.textView.setMaxLines(2);
                     Bulletin.make(this, layout, Bulletin.DURATION_LONG).show();
                 } else if (!boost.gift && !boost.giveaway) {
-                    presentFragment(ProfileActivity.of(cell.getDialogId()));
+                    presentFragment(ProfileActivityReplacement.of(cell.getDialogId()));
                 }
             }
             if (view instanceof TextCell) {

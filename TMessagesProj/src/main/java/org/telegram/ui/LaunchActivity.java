@@ -651,7 +651,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     Bundle args = new Bundle();
                     args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
                     args.putBoolean("my_profile", true);
-                    presentFragment(new ProfileActivity(args, null));
+                    presentFragment(new ProfileActivityReplacement(args, null));
                 } else if (id == 17) {
                     drawerLayoutContainer.closeDrawer(true);
                     Bundle args = new Bundle();
@@ -842,7 +842,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                                 break;
                             case "settings": {
                                 args.putLong("user_id", UserConfig.getInstance(currentAccount).clientUserId);
-                                ProfileActivity settings = new ProfileActivity(args);
+                                ProfileActivityReplacement settings = new ProfileActivityReplacement(args);
                                 actionBarLayout.addFragmentToStack(settings);
                                 settings.restoreSelfArgs(savedInstanceState);
                                 break;
@@ -865,7 +865,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                                 break;
                             case "chat_profile":
                                 if (args != null) {
-                                    ProfileActivity profile = new ProfileActivity(args);
+                                    ProfileActivityReplacement profile = new ProfileActivityReplacement(args);
                                     if (actionBarLayout.addFragmentToStack(profile)) {
                                         profile.restoreSelfArgs(savedInstanceState);
                                     }
@@ -1356,7 +1356,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         if (expanded) {
             args.putBoolean("expandPhoto", true);
         }
-        ProfileActivity fragment = new ProfileActivity(args);
+        ProfileActivityReplacement fragment = new ProfileActivityReplacement(args);
         presentFragment(fragment);
         drawerLayoutContainer.closeDrawer(false);
     }
@@ -3221,7 +3221,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 if (open_settings == 1) {
                     Bundle args = new Bundle();
                     args.putLong("user_id", UserConfig.getInstance(currentAccount).clientUserId);
-                    fragment = new ProfileActivity(args);
+                    fragment = new ProfileActivityReplacement(args);
                 } else if (open_settings == 2) {
                     fragment = new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC);
                 } else if (open_settings == 3) {
@@ -4617,7 +4617,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                                         } else {
                                             profile_args.putLong("user_id", peerId);
                                         }
-                                        getActionBarLayout().presentFragment(new ProfileActivity(profile_args));
+                                        getActionBarLayout().presentFragment(new ProfileActivityReplacement(profile_args));
                                     } else if (chat != null && chat.forum) {
                                         Long topicId = threadId;
                                         if (topicId == null && messageId != null) {
@@ -6974,9 +6974,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         } else if (id == NotificationCenter.didSetPasscode) {
             flagSecureReason.invalidate();
         } else if (id == NotificationCenter.reloadInterface) {
-            boolean last = mainFragmentsStack.size() > 1 && mainFragmentsStack.get(mainFragmentsStack.size() - 1) instanceof ProfileActivity;
+            boolean last = mainFragmentsStack.size() > 1 && mainFragmentsStack.get(mainFragmentsStack.size() - 1) instanceof ProfileActivityReplacement;
             if (last) {
-                ProfileActivity profileActivity = (ProfileActivity) mainFragmentsStack.get(mainFragmentsStack.size() - 1);
+                ProfileActivityReplacement profileActivity = (ProfileActivityReplacement) mainFragmentsStack.get(mainFragmentsStack.size() - 1);
                 if (!profileActivity.isSettings()) {
                     last = false;
                 }
@@ -7472,8 +7472,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         } else if (fragment instanceof DialogsActivity) {
             DialogsActivity dialogsActivity = (DialogsActivity) fragment;
             undoView = dialogsActivity.getUndoView();
-        } else if (fragment instanceof ProfileActivity) {
-            ProfileActivity profileActivity = (ProfileActivity) fragment;
+        } else if (fragment instanceof ProfileActivityReplacement) {
+            ProfileActivityReplacement profileActivity = (ProfileActivityReplacement) fragment;
             undoView = profileActivity.getUndoView();
         }
         if (undoView != null) {
@@ -7918,8 +7918,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     outState.putString("fragment", "group");
                 } else if (lastFragment instanceof WallpapersListActivity) {
                     outState.putString("fragment", "wallpapers");
-                } else if (lastFragment instanceof ProfileActivity) {
-                    ProfileActivity profileActivity = (ProfileActivity) lastFragment;
+                } else if (lastFragment instanceof ProfileActivityReplacement) {
+                    ProfileActivityReplacement profileActivity = (ProfileActivityReplacement) lastFragment;
                     if (profileActivity.isSettings()) {
                         outState.putString("fragment", "settings");
                     } else if (profileActivity.isChat() && args != null) {

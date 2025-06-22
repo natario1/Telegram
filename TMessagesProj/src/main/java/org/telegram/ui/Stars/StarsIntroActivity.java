@@ -94,17 +94,14 @@ import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stars;
 import org.telegram.tgnet.tl.TL_stories;
-import org.telegram.ui.AccountFrozenAlert;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.AvatarSpan;
 import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.SessionCell;
-import org.telegram.ui.ChatActivity;
-import org.telegram.ui.ChatUsersActivity;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AnimatedEmojiSpan;
 import org.telegram.ui.Components.AnimatedFloat;
@@ -143,13 +140,6 @@ import org.telegram.ui.Components.UniversalRecyclerView;
 import org.telegram.ui.Components.ViewPagerFixed;
 import org.telegram.ui.Components.spoilers.SpoilerEffect2;
 import org.telegram.ui.Gifts.GiftSheet;
-import org.telegram.ui.GradientHeaderActivity;
-import org.telegram.ui.ImageReceiverSpan;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PhotoViewer;
-import org.telegram.ui.PostSuggestionsEditActivity;
-import org.telegram.ui.PrivacyControlActivity;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 import org.telegram.ui.Stories.recorder.HintView2;
 import org.telegram.ui.bots.AffiliateProgramFragment;
@@ -3885,7 +3875,7 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
                                 args.putBoolean("my_profile", true);
                             }
                             args.putBoolean("open_gifts", true);
-                            lastFragment.presentFragment(new ProfileActivity(args));
+                            lastFragment.presentFragment(new ProfileActivityReplacement(args));
                         }
                     });
                 }
@@ -3900,7 +3890,7 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
                                 args.putBoolean("my_profile", true);
                             }
                             args.putBoolean("open_gifts", true);
-                            lastFragment.presentFragment(new ProfileActivity(args));
+                            lastFragment.presentFragment(new ProfileActivityReplacement(args));
                         }
                     });
                 }
@@ -3936,7 +3926,7 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
                             args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
                             args.putBoolean("my_profile", true);
                             args.putBoolean("open_gifts", true);
-                            lastFragment.presentFragment(new ProfileActivity(args));
+                            lastFragment.presentFragment(new ProfileActivityReplacement(args));
                         }
                     });
                 } else { // sent
@@ -3949,7 +3939,7 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
                                 args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
                                 args.putBoolean("my_profile", true);
                                 args.putBoolean("open_gifts", true);
-                                lastFragment.presentFragment(new ProfileActivity(args));
+                                lastFragment.presentFragment(new ProfileActivityReplacement(args));
                             }
                         });
                     }
@@ -3997,14 +3987,14 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
                     sheet[0].dismiss();
                     final BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();
                     if (lastFragment != null) {
-                        lastFragment.presentFragment(ProfileActivity.of(channelId));
+                        lastFragment.presentFragment(ProfileActivityReplacement.of(channelId));
                     }
                 });
                 tableView.addRowUser(getString(R.string.StarAffiliateReferredUser), currentAccount, referredUserId, () -> {
                     sheet[0].dismiss();
                     final BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();
                     if (lastFragment != null) {
-                        lastFragment.presentFragment(ProfileActivity.of(referredUserId));
+                        lastFragment.presentFragment(ProfileActivityReplacement.of(referredUserId));
                     }
                 });
                 tableView.addRow(getString(R.string.StarAffiliateCommission), percents(transaction.starref_commission_permille));
@@ -4021,7 +4011,7 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
                     sheet[0].dismiss();
                     final BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();
                     if (lastFragment != null) {
-                        lastFragment.presentFragment(ProfileActivity.of(botId));
+                        lastFragment.presentFragment(ProfileActivityReplacement.of(botId));
                     }
                 });
             } else if (giveaway) {
@@ -4043,7 +4033,7 @@ public class StarsIntroActivity extends GradientHeaderActivity implements Notifi
                         final Bundle args = new Bundle();
                         args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
                         args.putBoolean("my_profile", true);
-                        lastFragment.presentFragment(new ProfileActivity(args));
+                        lastFragment.presentFragment(new ProfileActivityReplacement(args));
                     }
                 });
                 tableView.addRowLink(getString(R.string.StarGiveawayReason), getString(R.string.StarGiveawayReasonLink), () -> {

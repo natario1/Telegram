@@ -503,7 +503,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
             BaseFragment profileFragment = fragmentStack.size() >= 2 ? fragmentStack.get(fragmentStack.size() - 2) : null;
             if (isGiveaway) {
                 BaseFragment chatFragment = fragmentStack.size() >= 3 ? fragmentStack.get(fragmentStack.size() - 3) : null;
-                if (profileFragment instanceof ProfileActivity) {
+                if (profileFragment instanceof ProfileActivityReplacement) {
                     getParentLayout().removeFragmentFromStack(profileFragment);
                 }
                 finishFragment();
@@ -512,7 +512,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                 }
             } else {
                 finishFragment();
-                if (profileFragment instanceof ProfileActivity) {
+                if (profileFragment instanceof ProfileActivityReplacement) {
                     BoostDialogs.showBulletin(profileFragment, chat, false);
                 }
             }
@@ -3180,7 +3180,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
             Bundle bundle = new Bundle();
             bundle.putLong("user_id", user.id);
             MessagesController.getInstance(UserConfig.selectedAccount).putUser(user, false);
-            fragment.presentFragment(new ProfileActivity(bundle));
+            fragment.presentFragment(new ProfileActivityReplacement(bundle));
         }
 
         public void onLongClick(TLRPC.ChatFull chat, StatisticActivity fragment, AlertDialog[] progressDialog) {

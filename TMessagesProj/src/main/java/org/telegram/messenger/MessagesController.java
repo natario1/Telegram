@@ -68,16 +68,13 @@ import org.telegram.tgnet.tl.TL_phone;
 import org.telegram.tgnet.tl.TL_stars;
 import org.telegram.tgnet.tl.TL_stories;
 import org.telegram.tgnet.tl.TL_chatlists;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBarLayout;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Business.QuickRepliesController;
 import org.telegram.ui.Cells.CheckBoxCell;
-import org.telegram.ui.ChannelMonetizationLayout;
-import org.telegram.ui.ChatActivity;
-import org.telegram.ui.ChatReactionsEditActivity;
-import org.telegram.ui.ChatRightsEditActivity;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.BulletinFactory;
@@ -89,18 +86,9 @@ import org.telegram.ui.Components.Premium.LimitReachedBottomSheet;
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble;
 import org.telegram.ui.Components.SwipeGestureSettingsView;
 import org.telegram.ui.Components.TranscribeButton;
-import org.telegram.ui.DialogsActivity;
-import org.telegram.ui.EditWidgetActivity;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.LoginActivity;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
-import org.telegram.ui.SecretMediaViewer;
 import org.telegram.ui.Stars.BotStarsController;
 import org.telegram.ui.Stars.StarsController;
 import org.telegram.ui.Stories.StoriesController;
-import org.telegram.ui.ThemeActivity;
-import org.telegram.ui.TopicsFragment;
 import org.telegram.ui.bots.BotWebViewAttachedSheet;
 import org.telegram.ui.bots.BotWebViewSheet;
 import org.telegram.ui.bots.WebViewRequestProps;
@@ -21000,7 +20988,7 @@ public class MessagesController extends BaseController implements NotificationCe
                 args.putLong("user_id", user.id);
             }
             if (type == 0) {
-                fragment.presentFragment(new ProfileActivity(args));
+                fragment.presentFragment(new ProfileActivityReplacement(args));
             } else if (type == 2) {
                 if (ChatObject.isForum(chat)) {
                     fragment.presentFragment(TopicsFragment.getTopicsOrChat(fragment, args), !doNotCloseLast, true);

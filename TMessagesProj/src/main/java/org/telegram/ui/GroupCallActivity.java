@@ -3673,7 +3673,7 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
                 if (cell.hasAvatarSet()) {
                     args.putBoolean("expandPhoto", true);
                 }
-                parentActivity.presentFragment(new ProfileActivity(args));
+                parentActivity.presentFragment(new ProfileActivityReplacement(args));
                 dismiss();
             } else if (position == listAdapter.addMemberRow) {
                 if (ChatObject.isChannel(currentChat) && currentChat != null && !currentChat.megagroup && ChatObject.isPublic(currentChat)) {

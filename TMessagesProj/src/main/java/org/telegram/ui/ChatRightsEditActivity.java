@@ -598,7 +598,7 @@ public class ChatRightsEditActivity extends BaseFragment implements Notification
             if (position == 0) {
                 Bundle args = new Bundle();
                 args.putLong("user_id", currentUser.id);
-                presentFragment(new ProfileActivity(args));
+                presentFragment(new ProfileActivityReplacement(args));
             } else if (position == removeAdminRow) {
                 if (currentType == TYPE_ADMIN) {
                     MessagesController.getInstance(currentAccount).setUserAdminRole(chatId, currentUser, new TLRPC.TL_chatAdminRights(), currentRank, isChannel, getFragmentForAlert(0), isAddingNew, false, null, null);

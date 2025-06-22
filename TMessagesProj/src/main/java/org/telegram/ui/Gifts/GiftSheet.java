@@ -71,11 +71,10 @@ import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stars;
-import org.telegram.ui.AccountFrozenAlert;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AnimatedEmojiSpan;
 import org.telegram.ui.Components.AnimatedFloat;
@@ -104,9 +103,6 @@ import org.telegram.ui.Components.TypefaceSpan;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.Components.UniversalRecyclerView;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stars.ExplainStarsSheet;
 import org.telegram.ui.Stars.StarGiftPatterns;
 import org.telegram.ui.Stars.StarGiftSheet;
@@ -233,7 +229,7 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
             BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();
             if (lastFragment == null) return;
             dismiss();
-            lastFragment.presentFragment(ProfileActivity.of(dialogId));
+            lastFragment.presentFragment(ProfileActivityReplacement.of(dialogId));
         });
         topView.addView(balanceView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.RIGHT | Gravity.TOP, 0, -3, -10, 0));
 
@@ -348,7 +344,7 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
                         final Bundle args = new Bundle();
                         args.putLong("user_id", dialogId);
                         args.putBoolean("open_gifts", true);
-                        lastFragment.presentFragment(new ProfileActivity(args));
+                        lastFragment.presentFragment(new ProfileActivityReplacement(args));
                     }), true));
                 } else {
                     subtitle.append(AndroidUtilities.replaceArrows(AndroidUtilities.makeClickable(getString(R.string.Gift2StarsInfoLink), () -> {
@@ -555,7 +551,7 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
                     if (lastChatActivity.getDialogId() != dialogId) {
                         fragment.removeSelfFromStack();
                     }
-                } else if (fragment instanceof ProfileActivity) {
+                } else if (fragment instanceof ProfileActivityReplacement) {
                     if (fromGooglePlay && layout.getLastFragment() == fragment) {
                         fragment.finishFragment();
                     } else {

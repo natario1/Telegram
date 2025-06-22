@@ -45,7 +45,7 @@ import org.telegram.ui.Components.ColoredImageSpan;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.Point;
 import org.telegram.ui.Components.Text;
-import org.telegram.ui.ProfileActivity;
+import org.telegram.ui.ProfileActivityReplacement;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -358,9 +358,9 @@ public class ScannedLinkPreview extends View {
                         Bundle args = new Bundle();
                         args.putLong("user_id", user.id);
                         args.putBoolean("my_profile", true);
-                        fragment.presentFragment(new ProfileActivity(args, null));
+                        fragment.presentFragment(new ProfileActivityReplacement(args, null));
                     } else {
-                        fragment.presentFragment(ProfileActivity.of(user.id));
+                        fragment.presentFragment(ProfileActivityReplacement.of(user.id));
                     }
                 }
             };

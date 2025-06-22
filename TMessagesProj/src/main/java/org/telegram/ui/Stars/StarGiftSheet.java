@@ -83,14 +83,13 @@ import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_stars;
-import org.telegram.ui.AccountFrozenAlert;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.SessionCell;
 import org.telegram.ui.Cells.ShareDialogCell;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
@@ -121,16 +120,10 @@ import org.telegram.ui.Components.ViewPagerFixed;
 import org.telegram.ui.Components.spoilers.SpoilersTextView;
 import org.telegram.ui.Gifts.GiftSheet;
 import org.telegram.ui.Gifts.ProfileGiftsContainer;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
-import org.telegram.ui.StatisticActivity;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 import org.telegram.ui.Stories.recorder.HintView2;
 import org.telegram.ui.Stories.recorder.StoryEntry;
 import org.telegram.ui.Stories.recorder.StoryRecorder;
-import org.telegram.ui.TwoStepVerificationActivity;
-import org.telegram.ui.TwoStepVerificationSetupActivity;
 import org.telegram.ui.bots.AffiliateProgramFragment;
 import org.telegram.ui.bots.BotWebViewSheet;
 
@@ -2991,7 +2984,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                 args.putLong("chat_id", -did);
             }
             args.putBoolean("open_gifts", true);
-            lastFragment.presentFragment(new ProfileActivity(args));
+            lastFragment.presentFragment(new ProfileActivityReplacement(args));
         }
     }
 
@@ -3192,7 +3185,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                         .createEmojiBulletin(
                             sticker,
                             LocaleController.getString(unsave ? R.string.Gift2MadePrivateTitle : R.string.Gift2MadePublicTitle),
-                            AndroidUtilities.replaceSingleTag(LocaleController.getString(unsave ? R.string.Gift2MadePrivate : R.string.Gift2MadePublic), lastFragment instanceof ProfileActivity ? null : () -> {
+                            AndroidUtilities.replaceSingleTag(LocaleController.getString(unsave ? R.string.Gift2MadePrivate : R.string.Gift2MadePublic), lastFragment instanceof ProfileActivityReplacement ? null : () -> {
                                 final Bundle args = new Bundle();
                                 if (did >= 0) {
                                     args.putLong("user_id", did);
@@ -3201,7 +3194,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                                 }
                                 args.putBoolean("my_profile", true);
                                 args.putBoolean("open_gifts", true);
-                                final ProfileActivity profileActivity = new ProfileActivity(args);
+                                final ProfileActivityReplacement profileActivity = new ProfileActivityReplacement(args);
                                 lastFragment.presentFragment(profileActivity);
                             })
                         )

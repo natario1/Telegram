@@ -94,6 +94,7 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stories;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
@@ -106,7 +107,6 @@ import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Adapters.SearchAdapterHelper;
-import org.telegram.ui.CalendarActivity;
 import org.telegram.ui.Cells.ChatActionCell;
 import org.telegram.ui.Cells.ContextLinkCell;
 import org.telegram.ui.Cells.DialogCell;
@@ -122,17 +122,10 @@ import org.telegram.ui.Cells.SharedMediaSectionCell;
 import org.telegram.ui.Cells.SharedPhotoVideoCell;
 import org.telegram.ui.Cells.SharedPhotoVideoCell2;
 import org.telegram.ui.Cells.UserCell;
-import org.telegram.ui.ChatActivity;
-import org.telegram.ui.ChatActivityContainer;
 import org.telegram.ui.Components.Forum.ForumUtilities;
 import org.telegram.ui.Components.Premium.LimitReachedBottomSheet;
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble;
-import org.telegram.ui.DialogsActivity;
 import org.telegram.ui.Gifts.ProfileGiftsContainer;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PhotoViewer;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stars.StarsController;
 import org.telegram.ui.Stories.StoriesController;
 import org.telegram.ui.Stories.StoriesListPlaceProvider;
@@ -141,7 +134,6 @@ import org.telegram.ui.Stories.ViewsForPeerStoriesRequester;
 import org.telegram.ui.Stories.bots.BotPreviewsEditContainer;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 import org.telegram.ui.Stories.recorder.StoryRecorder;
-import org.telegram.ui.TopicsFragment;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -438,7 +430,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                 profileActivity.getContext(),
                 dialogCell.getDialogId(),
                 StoriesListPlaceProvider.of((RecyclerListView) dialogCell.getParent())
-                    .addBottomClip(profileActivity instanceof ProfileActivity && ((ProfileActivity) profileActivity).myProfile ? dp(68) : 0)
+                    .addBottomClip(profileActivity instanceof ProfileActivityReplacement && ((ProfileActivityReplacement) profileActivity).myProfile ? dp(68) : 0)
             );
         }
     }
@@ -761,8 +753,8 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                         }
                     });
                 }
-            } else if (fragment instanceof ProfileActivity) {
-                ProfileActivity profileActivity = (ProfileActivity) fragment;
+            } else if (fragment instanceof ProfileActivityReplacement) {
+                ProfileActivityReplacement profileActivity = (ProfileActivityReplacement) fragment;
                 if (profileActivity.saved) {
                     dialogId = profileActivity.getUserConfig().getClientUserId();
                     topicId = profileActivity.getDialogId();
@@ -2439,7 +2431,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                     return startedTrackingX;
                 }
             };
-        } else if (profileActivity instanceof ProfileActivity) {
+        } else if (profileActivity instanceof ProfileActivityReplacement) {
             saveItem = new TextView(context);
             saveItem.setText(getString(R.string.Save).toUpperCase());
             saveItem.setTypeface(AndroidUtilities.bold());
@@ -2458,7 +2450,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
             saveItem.setScaleX(0.4f);
             saveItem.setScaleY(0.4f);
 
-            giftsContainer = new ProfileGiftsContainer(profileActivity, context, profileActivity.getCurrentAccount(), ((ProfileActivity) profileActivity).getDialogId(), resourcesProvider) {
+            giftsContainer = new ProfileGiftsContainer(profileActivity, context, profileActivity.getCurrentAccount(), ((ProfileActivityReplacement) profileActivity).getDialogId(), resourcesProvider) {
                 @Override
                 protected int processColor(int color) {
                     return SharedMediaLayout.this.processColor(color);
@@ -2959,7 +2951,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                         }
                         Bundle args = new Bundle();
                         args.putLong("user_id", user_id);
-                        profileActivity.presentFragment(new ProfileActivity(args));
+                        profileActivity.presentFragment(new ProfileActivityReplacement(args));
                     }
                 } else if (mediaPage.selectedType == TAB_COMMON_GROUPS && view instanceof ProfileSearchCell) {
                     TLRPC.Chat chat = ((ProfileSearchCell) view).getChat();
@@ -4671,8 +4663,8 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                     }
                     fragment1.finishFragment();
                     UndoView undoView = null;
-                    if (profileActivity instanceof ProfileActivity) {
-                        undoView = ((ProfileActivity) profileActivity).getUndoView();
+                    if (profileActivity instanceof ProfileActivityReplacement) {
+                        undoView = ((ProfileActivityReplacement) profileActivity).getUndoView();
                     }
                     if (undoView != null) {
                         if (dids.size() == 1) {
@@ -6851,7 +6843,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                     if (forward) {
                         storiesList.load(false, 30);
                     }
-                }).addBottomClip(profileActivity instanceof ProfileActivity && ((ProfileActivity) profileActivity).myProfile ? dp(68) : 0));
+                }).addBottomClip(profileActivity instanceof ProfileActivityReplacement && ((ProfileActivityReplacement) profileActivity).myProfile ? dp(68) : 0));
             }
         }
         updateForwardItem();
@@ -8696,8 +8688,8 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                 return;
             }
             final BaseFragment fragment = new ChatActivity(args);
-            if (profileActivity instanceof ProfileActivity) {
-                ((ProfileActivity) profileActivity).prepareBlurBitmap();
+            if (profileActivity instanceof ProfileActivityReplacement) {
+                ((ProfileActivityReplacement) profileActivity).prepareBlurBitmap();
             }
 
             ActionBarPopupWindow.ActionBarPopupWindowLayout previewMenu = new ActionBarPopupWindow.ActionBarPopupWindowLayout(getContext(), R.drawable.popup_fixed_alert, resourcesProvider, ActionBarPopupWindow.ActionBarPopupWindowLayout.FLAG_SHOWN_FROM_BOTTOM);

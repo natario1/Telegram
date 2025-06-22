@@ -13679,8 +13679,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             return;
         }
 
-        birthdayEffect = new ProfileBirthdayEffect(this, birthdayFetcher);
-        ((FrameLayout) fragmentView).addView(birthdayEffect, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
+        // birthdayEffect = new ProfileBirthdayEffect(this, birthdayFetcher);
+        // ((FrameLayout) fragmentView).addView(birthdayEffect, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
     }
 
     private void openLocation(boolean inMapsApp) {

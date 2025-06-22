@@ -1482,7 +1482,7 @@ public class TopicsFragment extends BaseFragment implements NotificationCenter.N
         }
         Bundle args = new Bundle();
         args.putLong("chat_id", chatId);
-        ProfileActivity fragment = new ProfileActivity(args, avatarContainer.getSharedMediaPreloader());
+        ProfileActivityReplacement fragment = new ProfileActivityReplacement(args, avatarContainer.getSharedMediaPreloader());
         fragment.setChatInfo(chatFull);
         fragment.setPlayProfileAnimation(fragmentView.getMeasuredHeight() > fragmentView.getMeasuredWidth() && avatarContainer.getAvatarImageView().getImageReceiver().hasImageLoaded() && byAvatar ? 2 : 1);
         presentFragment(fragment);

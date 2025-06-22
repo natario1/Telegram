@@ -95,7 +95,7 @@ import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_stories;
-import org.telegram.ui.AccountFrozenAlert;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.ActionBarMenuSubItem;
@@ -107,10 +107,7 @@ import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.AvatarSpan;
 import org.telegram.ui.Cells.TextSelectionHelper;
-import org.telegram.ui.ChatActivity;
-import org.telegram.ui.ChooseSpeedLayout;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AnimatedEmojiSpan;
@@ -161,15 +158,6 @@ import org.telegram.ui.Components.URLSpanNoUnderline;
 import org.telegram.ui.Components.URLSpanReplacement;
 import org.telegram.ui.Components.URLSpanUserMention;
 import org.telegram.ui.Components.voip.CellFlickerDrawable;
-import org.telegram.ui.DialogsActivity;
-import org.telegram.ui.EmojiAnimationsOverlay;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.MessageStatisticActivity;
-import org.telegram.ui.NotificationsCustomSettingsActivity;
-import org.telegram.ui.PinchToZoomHelper;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
-import org.telegram.ui.ReportBottomSheet;
 import org.telegram.ui.Stars.StarsIntroActivity;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 import org.telegram.ui.Stories.recorder.CaptionContainerView;
@@ -177,7 +165,6 @@ import org.telegram.ui.Stories.recorder.HintView2;
 import org.telegram.ui.Stories.recorder.StoryEntry;
 import org.telegram.ui.Stories.recorder.StoryPrivacyBottomSheet;
 import org.telegram.ui.Stories.recorder.StoryRecorder;
-import org.telegram.ui.WrappedResourceProvider;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -1129,7 +1116,7 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                 storyViewer.presentFragment(mediaActivity);
             } else {
                 if (dialogId > 0) {
-                    storyViewer.presentFragment(ProfileActivity.of(dialogId));
+                    storyViewer.presentFragment(ProfileActivityReplacement.of(dialogId));
                 } else {
                     storyViewer.presentFragment(ChatActivity.of(dialogId));
                 }
@@ -4354,7 +4341,7 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                                 args.putInt("message_id", reply.messageId);
                                 storyViewer.presentFragment(new ChatActivity(args));
                             } else {
-                                storyViewer.presentFragment(new ProfileActivity(args));
+                                storyViewer.presentFragment(new ProfileActivityReplacement(args));
                             }
                         } else {
                             BulletinFactory.of(storyContainer, resourcesProvider)
@@ -4398,7 +4385,7 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                         } else {
                             args.putLong("chat_id", -peerId);
                         }
-                        storyViewer.presentFragment(new ProfileActivity(args));
+                        storyViewer.presentFragment(new ProfileActivityReplacement(args));
                     });
 
                     SpannableString dot = new SpannableString(".");

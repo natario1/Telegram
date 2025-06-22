@@ -35,9 +35,7 @@ import java.util.Map;
 
 public class ProfileBirthdayEffect extends View {
 
-    private final int currentAccount;
-    private final long dialogId;
-    private final ProfileActivity profileActivity;
+    private final ProfileActivityReplacement profileActivity;
     private BirthdayEffectFetcher fetcher;
     private BirthdayEffectFetcher fetcherToSet;
 
@@ -50,11 +48,8 @@ public class ProfileBirthdayEffect extends View {
 
     public PointF sourcePoint = new PointF();
 
-    public ProfileBirthdayEffect(ProfileActivity profileActivity, BirthdayEffectFetcher fetcher) {
+    public ProfileBirthdayEffect(ProfileActivityReplacement profileActivity, BirthdayEffectFetcher fetcher) {
         super(profileActivity.getContext());
-
-        this.currentAccount = profileActivity.getCurrentAccount();
-        this.dialogId = profileActivity.getDialogId();
         this.profileActivity = profileActivity;
         this.fetcher = fetcher;
     }

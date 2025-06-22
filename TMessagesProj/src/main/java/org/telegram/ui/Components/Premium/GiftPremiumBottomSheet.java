@@ -35,18 +35,15 @@ import org.telegram.messenger.R;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.BottomSheetWithRecyclerListView;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -280,7 +277,7 @@ public class GiftPremiumBottomSheet extends BottomSheetWithRecyclerListView impl
                     if (lastChatActivity.getDialogId() != user.id) {
                         fragment.removeSelfFromStack();
                     }
-                } else if (fragment instanceof ProfileActivity) {
+                } else if (fragment instanceof ProfileActivityReplacement) {
                     if (fromGooglePlay && layout.getLastFragment() == fragment) {
                         fragment.finishFragment();
                     } else {

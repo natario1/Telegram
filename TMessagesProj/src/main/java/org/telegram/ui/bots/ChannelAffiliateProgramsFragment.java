@@ -50,12 +50,12 @@ import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_payments;
+import org.telegram.ui.*;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.HeaderCell;
-import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.BulletinFactory;
@@ -75,10 +75,6 @@ import org.telegram.ui.Components.TypefaceSpan;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.Components.UniversalRecyclerView;
-import org.telegram.ui.FilterCreateActivity;
-import org.telegram.ui.GradientHeaderActivity;
-import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stars.BotStarsController;
 import org.telegram.ui.Stars.StarsIntroActivity;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
@@ -834,7 +830,7 @@ public class ChannelAffiliateProgramsFragment extends GradientHeaderActivity imp
             final BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();
             if (lastFragment != null) {
                 sheet.dismiss();
-                lastFragment.presentFragment(ProfileActivity.of(bot.bot_id));
+                lastFragment.presentFragment(ProfileActivityReplacement.of(bot.bot_id));
             }
         });
         button.setOnClickListener(v -> {
@@ -1212,7 +1208,7 @@ public class ChannelAffiliateProgramsFragment extends GradientHeaderActivity imp
             sheet.dismiss();
             BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();
             if (lastFragment != null) {
-                lastFragment.presentFragment(ProfileActivity.of(bot.bot_id));
+                lastFragment.presentFragment(ProfileActivityReplacement.of(bot.bot_id));
             }
         });
 
