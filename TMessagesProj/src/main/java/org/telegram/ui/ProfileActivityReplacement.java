@@ -112,7 +112,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (flagSecure != null) {
             flagSecure.invalidate();
         }
-        updateTtlIndicator();
+        updateTtlData();
     }
 
     public TLRPC.User getCurrentUser() {
@@ -139,7 +139,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (flagSecure != null) {
             flagSecure.invalidate();
         }
-        updateTtlIndicator();
+        updateTtlData();
         // WIP more
     }
 
@@ -218,11 +218,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
     }
 
-    private void updateTtlIndicator() {
+    private void updateTtlData() {
         if (rootLayout == null) return;
         int ttl = userInfo != null ? userInfo.ttl_period : chatInfo != null ? chatInfo.ttl_period : 0;
         boolean visible = chatEncrypted == null && ttl > 0 && (chat == null || ChatObject.canUserDoAdminAction(chat, ChatObject.ACTION_DELETE_MESSAGES));
-        rootLayout.updateTtl(visible, isOpen);
+        rootLayout.updateTtlIndicator(visible, isOpen);
+        rootLayout.updateTtlPopup(ttl);
     }
 
     // LIFECYCLE
@@ -257,10 +258,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
             TLRPC.User user = getMessagesController().getUser(userId);
             if (user == null) return false;
             subscribeToNotifications();
-            getMessagesController().loadFullUser(user, classGuid, true);
+            if (user.bot) {
+                getMediaDataController().loadBotInfo(user.id, user.id, true, classGuid);
+            }
             if (userInfo == null) {
                 userInfo = getMessagesController().getUserFull(userId);
             }
+            getMessagesController().loadFullUser(user, classGuid, true);
             if (UserObject.isUserSelf(user)) {
                 imageUpdater = new ImageUpdater(true, ImageUpdater.FOR_TYPE_USER, true);
                 imageUpdater.setOpenWithFrontfaceCamera(true);
@@ -556,7 +560,52 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (rootLayout == null) return;
         ActionBarMenuItem menu = rootLayout.actionBarMenuItem;
         menu.removeAllSubItems();
+        if (userId != 0) {
+            TLRPC.User user = getMessagesController().getUser(userId);
+            if (user == null) return;
+            if (UserObject.isUserSelf(user)) {
+                // WIP
+            } else {
+                if ((user.bot || getContactsController().contactsDict.get(userId) == null)) {
+                    if (MessagesController.isSupportUser(user)) {
+                        // WIP
+                    } else if (getDialogId() != UserObject.VERIFY) {
+                        if (chatEncrypted == null) createActionBarMenuAutoDeleteItem(rootLayout);
+                    }
+                } else {
+                    if (chatEncrypted == null) createActionBarMenuAutoDeleteItem(rootLayout);
+                }
+            }
+        } else if (chatId != 0) {
+            TLRPC.Chat chat = getMessagesController().getChat(chatId);
+            if (chat == null) return;
+            if (topicId == 0 && ChatObject.canChangeChatInfo(chat)) {
+                createActionBarMenuAutoDeleteItem(rootLayout);
+            }
+
+        }
         // WIP
+    }
+
+    private void createActionBarMenuAutoDeleteItem(RootLayout rootLayout) {
+        rootLayout.appendTtlMenuItem(dialogId > 0 || userId > 0, new AutoDeletePopupWrapper.Callback() {
+            @Override
+            public void dismiss() {
+                rootLayout.actionBarMenuItem.toggleSubMenu();
+            }
+            @Override
+            public void setAutoDeleteHistory(int time, int action) {
+                long did = getDialogId();
+                getMessagesController().setDialogHistoryTTL(did, time);
+                rootLayout.undoView.showWithAction(did, action, getMessagesController().getUser(did), time, null, null);
+            }
+            @Override
+            public void showGlobalAutoDeleteScreen() {
+                presentFragment(new AutoDeleteMessagesActivity());
+                dismiss();
+            }
+        });
+        updateTtlData();
     }
 
     @Override
@@ -584,7 +633,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout.setBackgroundColor(Color.BLACK);
 
         updateProfileData(true);
-        updateTtlIndicator();
+        updateTtlData();
 
         return rootLayout;
     }
@@ -769,11 +818,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
             final TLRPC.ChatFull full = (TLRPC.ChatFull) args[0];
             if (full.id != chatId) return;
             setChatInfo(full);
+            updateTtlData();
         } else if (id == NotificationCenter.userInfoDidLoad) {
             final long uid = (Long) args[0];
             if (uid != userId) return;
             final TLRPC.UserFull full = (TLRPC.UserFull) args[1];
             setUserInfo(full);
+            updateTtlData();
         } else if (id == NotificationCenter.closeChats) {
             removeSelfFromStack(true);
         }
@@ -793,7 +844,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
         private final ActionBar actionBar;
         private final ActionBarMenuItem actionBarMenuItem;
         private final Paint actionBarScrimBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final ImageView actionBarTtlIcon;
+
+        private final ImageView ttlIndicator;
+        private AutoDeletePopupWrapper ttlPopupWrapper;
+        private TimerDrawable ttlTimerDrawable;
 
         private final Theme.ResourcesProvider resourceProvider;
 
@@ -807,10 +861,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
             actionBarMenuItem = actionBar.createMenu().addItem(10, R.drawable.ic_ab_other, resourceProvider);
             actionBarMenuItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
             actionBarScrimBackgroundPaint.setColor(getColor(Theme.key_listSelector));
-            actionBarTtlIcon = new ImageView(context);
-            actionBarTtlIcon.setImageResource(R.drawable.msg_mini_autodelete_timer);
-            actionBarMenuItem.addView(actionBarTtlIcon, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
-            updateTtl(false, false);
+            ttlIndicator = new ImageView(context);
+            ttlIndicator.setImageResource(R.drawable.msg_mini_autodelete_timer);
+            actionBarMenuItem.addView(ttlIndicator, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
+            updateTtlIndicator(false, false);
 
             //noinspection deprecation
             undoView = new UndoView(context, null, false, resourceProvider);
@@ -906,11 +960,29 @@ public class ProfileActivityReplacement extends BaseFragment implements
             actionBar.setItemsBackgroundColor(ColorUtils.blendARGB(rawBackground, getColor(Theme.key_actionBarActionModeDefaultSelector), actionModeProgress), false);
             actionBar.setItemsColor(foreground, false);
             actionBarMenuItem.setIconColor(rawForeground);
-            actionBarTtlIcon.setColorFilter(new PorterDuffColorFilter(foreground, PorterDuff.Mode.MULTIPLY));
+            ttlIndicator.setColorFilter(new PorterDuffColorFilter(foreground, PorterDuff.Mode.MULTIPLY));
+            if (ttlPopupWrapper != null && ttlPopupWrapper.textView != null) {
+                ttlPopupWrapper.textView.invalidate();
+            }
         }
 
-        void updateTtl(boolean visible, boolean animated) {
-            AndroidUtilities.updateViewVisibilityAnimated(actionBarTtlIcon, visible, 0.8f, animated);
+        void updateTtlIndicator(boolean visible, boolean animated) {
+            AndroidUtilities.updateViewVisibilityAnimated(ttlIndicator, visible, 0.8f, animated);
+        }
+
+        void updateTtlPopup(int ttl) {
+            if (ttlTimerDrawable != null) ttlTimerDrawable.setTime(ttl);
+            if (ttlPopupWrapper != null) ttlPopupWrapper.updateItems(ttl);
+        }
+
+        void appendTtlMenuItem(boolean allowExtendedLink, AutoDeletePopupWrapper.Callback callback) {
+            ttlPopupWrapper = new AutoDeletePopupWrapper(getContext(), actionBarMenuItem.getPopupLayout().getSwipeBack(), callback, false, 0, resourceProvider);
+            if (allowExtendedLink) {
+                ttlPopupWrapper.allowExtendedHint(getColor(Theme.key_windowBackgroundWhiteBlueText));
+            }
+            ttlTimerDrawable = TimerDrawable.getTtlIcon(0);
+            actionBarMenuItem.addSwipeBackItem(0, ttlTimerDrawable, LocaleController.getString(R.string.AutoDeletePopupTitle), ttlPopupWrapper.windowLayout);
+            actionBarMenuItem.addColoredGap();
         }
 
         @Override
