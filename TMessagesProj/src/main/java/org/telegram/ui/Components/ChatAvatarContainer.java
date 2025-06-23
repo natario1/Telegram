@@ -576,7 +576,8 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
                 ProfileActivityReplacement fragment = new ProfileActivityReplacement(args);
                 fragment.setSharedMediaPreloader(sharedMediaPreloader);
                 if (!monoforum) {
-                    fragment.setUserInfo(parentFragment.getCurrentUserInfo(), parentFragment.profileChannelMessageFetcher, parentFragment.birthdayAssetsFetcher);
+                    fragment.setFetchers(parentFragment.profileChannelMessageFetcher, parentFragment.birthdayAssetsFetcher);
+                    fragment.setUserInfo(parentFragment.getCurrentUserInfo());
                 }
                 if (fromChatAnimation) {
                     fragment.setPlayProfileAnimation(byAvatar ? 2 : 1);

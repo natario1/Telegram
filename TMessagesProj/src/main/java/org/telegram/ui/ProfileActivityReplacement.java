@@ -9,10 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
+import android.graphics.*;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -24,7 +21,6 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import androidx.annotation.NonNull;
 import androidx.core.graphics.ColorUtils;
-import com.google.android.exoplayer2.util.Log;
 import org.telegram.messenger.*;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
@@ -93,24 +89,40 @@ public class ProfileActivityReplacement extends BaseFragment implements
     }
 
     // Called before presenting
-    public void setUserInfo(
-        TLRPC.UserFull value,
+    public void setFetchers(
         ProfileChannelCell.ChannelMessageFetcher channelMessageFetcher,
         ProfileBirthdayEffect.BirthdayEffectFetcher birthdayAssetsFetcher
     ) {
+        // WIP
+    }
+
+    public void setUserInfo(TLRPC.UserFull value) {
         this.userInfo = value;
         if (sharedMediaLayout != null) {
             sharedMediaLayout.setUserInfo(value);
         }
-        // WIP fetchers
+        if (imageUpdater == null) {
+            if (sharedMediaLayout != null) {
+                sharedMediaLayout.setCommonGroupsCount(userInfo.common_chats_count);
+            }
+            if (sharedMediaPreloader == null || sharedMediaPreloader.isMediaWasLoaded()) {
+                resumeDelayedFragmentAnimation();
+            }
+        }
+        if (flagSecure != null) {
+            flagSecure.invalidate();
+        }
+        updateTtlIndicator();
     }
 
     public TLRPC.User getCurrentUser() {
         return userInfo == null ? null : userInfo.user;
     }
 
-    // Called before presenting
     public void setChatInfo(TLRPC.ChatFull value) {
+        if (chatInfo instanceof TLRPC.TL_channelFull && value.participants == null) {
+            value.participants = chatInfo.participants;
+        }
         long previousMigrationId = chatInfo != null ? chatInfo.migrated_from_chat_id : 0;
         this.chatInfo = value;
         if (value != null && value.migrated_from_chat_id != 0 && value.migrated_from_chat_id != previousMigrationId) {
@@ -119,6 +131,15 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (sharedMediaLayout != null) {
             sharedMediaLayout.setChatInfo(value);
         }
+        TLRPC.Chat newChat = getMessagesController().getChat(chatId);
+        if (newChat != null) {
+            chat = newChat;
+            createActionBarMenu(true);
+        }
+        if (flagSecure != null) {
+            flagSecure.invalidate();
+        }
+        updateTtlIndicator();
         // WIP more
     }
 
@@ -195,6 +216,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 sharedMediaLayout.giftsContainer.updateColors();
             }
         }
+    }
+
+    private void updateTtlIndicator() {
+        if (rootLayout == null) return;
+        int ttl = userInfo != null ? userInfo.ttl_period : chatInfo != null ? chatInfo.ttl_period : 0;
+        boolean visible = chatEncrypted == null && ttl > 0 && (chat == null || ChatObject.canUserDoAdminAction(chat, ChatObject.ACTION_DELETE_MESSAGES));
+        rootLayout.updateTtl(visible, isOpen);
     }
 
     // LIFECYCLE
@@ -549,12 +577,15 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout.updateColors(peerColor, 0F);
         createActionBarMenu(false);
 
+
         // Decorations
         rootLayout.blurredView.setOnClickListener(e -> { finishPreviewFragment(); });
         rootLayout.addDecorationViews();
         rootLayout.setBackgroundColor(Color.BLACK);
 
         updateProfileData(true);
+        updateTtlIndicator();
+
         return rootLayout;
     }
 
@@ -734,6 +765,17 @@ public class ProfileActivityReplacement extends BaseFragment implements
             updateProfileData(false);
         } else if (id == NotificationCenter.contactsDidLoad || id == NotificationCenter.channelRightsUpdated) {
             createActionBarMenu(true);
+        } else if (id == NotificationCenter.chatInfoDidLoad) {
+            final TLRPC.ChatFull full = (TLRPC.ChatFull) args[0];
+            if (full.id != chatId) return;
+            setChatInfo(full);
+        } else if (id == NotificationCenter.userInfoDidLoad) {
+            final long uid = (Long) args[0];
+            if (uid != userId) return;
+            final TLRPC.UserFull full = (TLRPC.UserFull) args[1];
+            setUserInfo(full);
+        } else if (id == NotificationCenter.closeChats) {
+            removeSelfFromStack(true);
         }
     }
 
@@ -743,12 +785,16 @@ public class ProfileActivityReplacement extends BaseFragment implements
         /** @noinspection deprecation*/
         private final UndoView undoView;
         private final View blurredView;
+
         private AnimatorSet scrimAnimatorSet;
         private View scrimView;
         private final Paint scrimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
         private final ActionBar actionBar;
         private final ActionBarMenuItem actionBarMenuItem;
         private final Paint actionBarScrimBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final ImageView actionBarTtlIcon;
+
         private final Theme.ResourcesProvider resourceProvider;
 
         RootLayout(Context context, Theme.ResourcesProvider resourceProvider, ActionBar actionBar) {
@@ -758,9 +804,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
             // Action bar
             this.actionBar = actionBar;
-            this.actionBarMenuItem = actionBar.createMenu().addItem(10, R.drawable.ic_ab_other, resourceProvider);
-            this.actionBarMenuItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
-            this.actionBarScrimBackgroundPaint.setColor(getColor(Theme.key_listSelector));
+            actionBarMenuItem = actionBar.createMenu().addItem(10, R.drawable.ic_ab_other, resourceProvider);
+            actionBarMenuItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
+            actionBarScrimBackgroundPaint.setColor(getColor(Theme.key_listSelector));
+            actionBarTtlIcon = new ImageView(context);
+            actionBarTtlIcon.setImageResource(R.drawable.msg_mini_autodelete_timer);
+            actionBarMenuItem.addView(actionBarTtlIcon, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
+            updateTtl(false, false);
 
             //noinspection deprecation
             undoView = new UndoView(context, null, false, resourceProvider);
@@ -850,11 +900,17 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
 
         void updateColors(MessagesController.PeerColor peerColor, float actionModeProgress) {
-            int bg = peerColor != null ? Theme.ACTION_BAR_WHITE_SELECTOR_COLOR : getColor(Theme.key_avatar_actionBarSelectorBlue);
-            int fg = peerColor != null ? Color.WHITE : getColor(Theme.key_actionBarDefaultIcon);
-            actionBar.setItemsBackgroundColor(ColorUtils.blendARGB(bg, getColor(Theme.key_actionBarActionModeDefaultSelector), actionModeProgress), false);
-            actionBar.setItemsColor(ColorUtils.blendARGB(fg, getColor(Theme.key_actionBarActionModeDefaultIcon), actionModeProgress), false);
-            actionBarMenuItem.setIconColor(fg);
+            int rawBackground = peerColor != null ? Theme.ACTION_BAR_WHITE_SELECTOR_COLOR : getColor(Theme.key_avatar_actionBarSelectorBlue);
+            int rawForeground = peerColor != null ? Color.WHITE : getColor(Theme.key_actionBarDefaultIcon);
+            int foreground = ColorUtils.blendARGB(rawForeground, getColor(Theme.key_actionBarActionModeDefaultIcon), actionModeProgress);
+            actionBar.setItemsBackgroundColor(ColorUtils.blendARGB(rawBackground, getColor(Theme.key_actionBarActionModeDefaultSelector), actionModeProgress), false);
+            actionBar.setItemsColor(foreground, false);
+            actionBarMenuItem.setIconColor(rawForeground);
+            actionBarTtlIcon.setColorFilter(new PorterDuffColorFilter(foreground, PorterDuff.Mode.MULTIPLY));
+        }
+
+        void updateTtl(boolean visible, boolean animated) {
+            AndroidUtilities.updateViewVisibilityAnimated(actionBarTtlIcon, visible, 0.8f, animated);
         }
 
         @Override
