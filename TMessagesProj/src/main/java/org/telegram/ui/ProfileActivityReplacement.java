@@ -1,27 +1,16 @@
 package org.telegram.ui;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.animation.AnimatorSet;
-import android.animation.ValueAnimator;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.*;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
-import androidx.annotation.NonNull;
-import androidx.core.graphics.ColorUtils;
 import org.telegram.messenger.*;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
@@ -29,9 +18,13 @@ import org.telegram.ui.ActionBar.*;
 import org.telegram.ui.Cells.ProfileChannelCell;
 import org.telegram.ui.Components.*;
 import org.telegram.ui.Components.voip.VoIPHelper;
+import org.telegram.ui.Profile.ProfileActivityMenus;
+import org.telegram.ui.Profile.ProfileActivityRootLayout;
 
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
+
+import static org.telegram.ui.Profile.ProfileActivityMenus.*;
 
 public class ProfileActivityReplacement extends BaseFragment implements
         SharedMediaLayout.SharedMediaPreloaderDelegate,
@@ -59,7 +52,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private boolean isOpen;
 
     public SharedMediaLayout sharedMediaLayout;
-    private RootLayout rootLayout;
+    private ProfileActivityRootLayout rootLayout;
+    private ProfileActivityMenus menuHandler;
 
     private float mediaHeaderAnimationProgress = 0F;
     private boolean mediaHeaderVisible = false;
@@ -136,7 +130,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         TLRPC.Chat newChat = getMessagesController().getChat(chatId);
         if (newChat != null) {
             chat = newChat;
-            updateActionBarMenuItems(true);
+            updateMenuData(true);
         }
         if (flagSecure != null) {
             flagSecure.invalidate();
@@ -211,6 +205,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (rootLayout != null) {
                 rootLayout.updateColors(peerColor, mediaHeaderAnimationProgress);
             }
+            if (menuHandler != null) {
+                menuHandler.updateColors(peerColor, mediaHeaderAnimationProgress);
+            }
             if (sharedMediaLayout != null && sharedMediaLayout.scrollSlidingTextTabStrip != null) {
                 sharedMediaLayout.scrollSlidingTextTabStrip.updateColors();
             }
@@ -220,12 +217,75 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
     }
 
+    private void updateMenuData(boolean animated) {
+        if (menuHandler == null) return;
+        menuHandler.clearMainMenu();
+        boolean editMenuItemVisible = false;
+        if (userId != 0) {
+            TLRPC.User user = getMessagesController().getUser(userId);
+            if (user == null) return;
+            if (UserObject.isUserSelf(user)) {
+                editMenuItemVisible = isMyProfile;
+                menuHandler.appendEditInfoItem();
+                if (imageUpdater != null) menuHandler.appendPhotoItem();
+            } else {
+                editMenuItemVisible = user.bot && user.bot_can_edit;
+                if (user.bot || getContactsController().contactsDict.get(user.id) == null) {
+                    if (MessagesController.isSupportUser(user)) {
+                        // WIP
+                    } else if (getDialogId() != UserObject.VERIFY) {
+                        if (chatEncrypted == null) updateMenuAutoDelete();
+                    }
+                } else {
+                    if (chatEncrypted == null) updateMenuAutoDelete();
+                }
+            }
+        } else if (chatId != 0) {
+            TLRPC.Chat chat = getMessagesController().getChat(chatId);
+            if (chat == null) return;
+            if (topicId == 0 && ChatObject.canChangeChatInfo(chat)) {
+                updateMenuAutoDelete();
+            }
+            if (ChatObject.isChannel(chat)) {
+                if (topicId != 0) {
+                    editMenuItemVisible = ChatObject.canManageTopic(currentAccount, chat, topicId);
+                } else {
+                    editMenuItemVisible = ChatObject.hasAdminRights(chat) || chat.megagroup && ChatObject.canChangeChatInfo(chat);
+                }
+            } else {
+                editMenuItemVisible = ChatObject.canChangeChatInfo(chat);
+            }
+        }
+        menuHandler.updateEditItem(editMenuItemVisible && !mediaHeaderVisible, animated);
+        // WIP
+    }
+
+    private void updateMenuAutoDelete() {
+        if (menuHandler == null) return;
+        menuHandler.appendAutoDeleteItem(dialogId > 0 || userId > 0, new AutoDeletePopupWrapper.Callback() {
+            @Override public void dismiss() {}
+            @Override
+            public void setAutoDeleteHistory(int time, int action) {
+                long did = getDialogId();
+                //noinspection deprecation
+                UndoView undo = getUndoView();
+                getMessagesController().setDialogHistoryTTL(did, time);
+                if (undo != null) undo.showWithAction(did, action, getMessagesController().getUser(did), time, null, null);
+            }
+            @Override
+            public void showGlobalAutoDeleteScreen() {
+                presentFragment(new AutoDeleteMessagesActivity());
+            }
+        });
+        updateTtlData();
+    }
+
     private void updateTtlData() {
-        if (rootLayout == null) return;
+        if (menuHandler == null) return;
         int ttl = userInfo != null ? userInfo.ttl_period : chatInfo != null ? chatInfo.ttl_period : 0;
         boolean visible = chatEncrypted == null && ttl > 0 && (chat == null || ChatObject.canUserDoAdminAction(chat, ChatObject.ACTION_DELETE_MESSAGES));
-        rootLayout.updateTtlIndicator(visible, isOpen);
-        rootLayout.updateTtlPopup(ttl);
+        menuHandler.updateTtlIndicator(visible, isOpen);
+        menuHandler.updateTtlPopup(ttl);
     }
 
     // LIFECYCLE
@@ -550,12 +610,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 if (getParentActivity() == null) return;
                 if (id == -1) {
                     finishFragment();
-                } else if (id == RootLayout.EDIT_INFO_ID) {
+                } else if (id == AB_EDIT_INFO_ID) {
                     presentFragment(new UserInfoActivity());
-                } else if (id == RootLayout.ADD_PHOTO_ID) {
+                } else if (id == AB_ADD_PHOTO_ID) {
                     uploadUserImage(null, null);
-                } else if (id == RootLayout.EDIT_ID) {
-                    if (isMyProfile) {
+                } else if (id == AB_EDIT_ID) {
+                    if (isMyProfile()) {
                         presentFragment(new UserInfoActivity());
                     } else if (topicId != 0) {
                         Bundle args = new Bundle();
@@ -582,88 +642,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         return actionBar;
     }
 
-    private void updateActionBarMenuItems(boolean animated) {
-        if (rootLayout == null) return;
-        ActionBarMenuItem mainMenuItem = rootLayout.mainMenuItem;
-        mainMenuItem.removeAllSubItems();
-        boolean editMenuItemVisible = false;
-        if (userId != 0) {
-            TLRPC.User user = getMessagesController().getUser(userId);
-            if (user == null) return;
-            if (UserObject.isUserSelf(user)) {
-                editMenuItemVisible = isMyProfile;
-                mainMenuItem.addSubItem(RootLayout.EDIT_INFO_ID, R.drawable.msg_edit, LocaleController.getString(R.string.EditInfo));
-                if (imageUpdater != null) {
-                    mainMenuItem.addSubItem(RootLayout.ADD_PHOTO_ID, R.drawable.msg_addphoto, LocaleController.getString(R.string.AddPhoto));
-                }
-            } else {
-                editMenuItemVisible = user.bot && user.bot_can_edit;
-                if (user.bot || getContactsController().contactsDict.get(userId) == null) {
-                    if (MessagesController.isSupportUser(user)) {
-                        // WIP
-                    } else if (getDialogId() != UserObject.VERIFY) {
-                        if (chatEncrypted == null) updateActionBarAutoDeleteMenuItem(rootLayout);
-                    }
-                } else {
-                    if (chatEncrypted == null) updateActionBarAutoDeleteMenuItem(rootLayout);
-                }
-            }
-        } else if (chatId != 0) {
-            TLRPC.Chat chat = getMessagesController().getChat(chatId);
-            if (chat == null) return;
-            if (topicId == 0 && ChatObject.canChangeChatInfo(chat)) {
-                updateActionBarAutoDeleteMenuItem(rootLayout);
-            }
-            if (ChatObject.isChannel(chat)) {
-                if (topicId != 0) {
-                    editMenuItemVisible = ChatObject.canManageTopic(currentAccount, chat, topicId);
-                } else {
-                    editMenuItemVisible = ChatObject.hasAdminRights(chat) || chat.megagroup && ChatObject.canChangeChatInfo(chat);
-                }
-            } else {
-                editMenuItemVisible = ChatObject.canChangeChatInfo(chat);
-            }
-        }
-        updateActionBarEditMenuItem(rootLayout, editMenuItemVisible, animated);
-        // WIP
-    }
-
-    private void updateActionBarEditMenuItem(RootLayout rootLayout, boolean visible, boolean animated) {
-        boolean actuallyVisible = visible && !mediaHeaderVisible;
-        ActionBarMenuItem editMenuItem = rootLayout.editMenuItem;
-        if (actuallyVisible && editMenuItem.getVisibility() != View.VISIBLE) {
-            editMenuItem.setVisibility(View.VISIBLE);
-            if (animated) {
-                editMenuItem.setAlpha(0);
-                editMenuItem.animate().alpha(1f).setDuration(150).start();
-            }
-        } else if (!actuallyVisible && editMenuItem.getVisibility() != View.GONE) {
-            editMenuItem.setVisibility(View.GONE);
-        }
-    }
-
-    private void updateActionBarAutoDeleteMenuItem(RootLayout rootLayout) {
-        rootLayout.appendTtlMenuItem(dialogId > 0 || userId > 0, new AutoDeletePopupWrapper.Callback() {
-            @Override
-            public void dismiss() {
-                rootLayout.mainMenuItem.toggleSubMenu();
-            }
-            @Override
-            public void setAutoDeleteHistory(int time, int action) {
-                long did = getDialogId();
-                getMessagesController().setDialogHistoryTTL(did, time);
-                rootLayout.undoView.showWithAction(did, action, getMessagesController().getUser(did), time, null, null);
-            }
-            @Override
-            public void showGlobalAutoDeleteScreen() {
-                presentFragment(new AutoDeleteMessagesActivity());
-                dismiss();
-            }
-        });
-        updateTtlData();
-    }
-
-    private boolean uploadUserImage(Runnable onDismiss, Runnable onDelete) {
+    public boolean uploadUserImage(Runnable onDismiss, Runnable onDelete) {
         if (imageUpdater == null) return false;
         TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
         if (user == null) user = UserConfig.getInstance(currentAccount).getCurrentUser();
@@ -690,11 +669,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
 
         // Root view
-        rootLayout = new RootLayout(context, resourceProvider, actionBar);
+        rootLayout = new ProfileActivityRootLayout(context, resourceProvider, actionBar);
+        menuHandler = new ProfileActivityMenus(context, resourceProvider, actionBar);
 
         rootLayout.updateColors(peerColor, 0F);
-        updateActionBarMenuItems(false);
-
+        menuHandler.updateColors(peerColor, 0F);
 
         // Decorations
         rootLayout.blurredView.setOnClickListener(e -> { finishPreviewFragment(); });
@@ -702,7 +681,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout.setBackgroundColor(Color.BLACK);
 
         updateProfileData(true);
-        updateTtlData();
+        updateMenuData(false);
 
         return rootLayout;
     }
@@ -722,7 +701,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
         return drawable != null ? drawable : super.getThemedDrawable(drawableKey);
     }
 
-    /** @noinspection deprecation*/
     @Override
     public ArrayList<ThemeDescription> getThemeDescriptions() {
         if (getResourceProvider() != null) return null;
@@ -735,6 +713,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         ThemeDescription.ThemeDescriptionDelegate themeDelegate = () -> {
             // WIP
             if (rootLayout != null) rootLayout.updateColors(peerColor, mediaHeaderAnimationProgress);
+            if (menuHandler != null) menuHandler.updateColors(peerColor, mediaHeaderAnimationProgress);
         };
         arrayList.add(new ThemeDescription(null, 0, null, null, null, themeDelegate, Theme.key_actionBarDefaultIcon));
         arrayList.add(new ThemeDescription(null, 0, null, null, null, themeDelegate, Theme.key_avatar_actionBarSelectorBlue));
@@ -752,15 +731,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
         arrayList.add(new ThemeDescription(null, 0, null, null, null, themeDelegate, Theme.key_avatar_backgroundBlue));
         arrayList.add(new ThemeDescription(null, 0, null, null, null, themeDelegate, Theme.key_avatar_backgroundPink));
 
-        UndoView undoView = getUndoView();
-        arrayList.add(new ThemeDescription(undoView, ThemeDescription.FLAG_BACKGROUNDFILTER, null, null, null, null, Theme.key_undo_background));
-        arrayList.add(new ThemeDescription(undoView, 0, new Class[]{UndoView.class}, new String[]{"undoImageView"}, null, null, null, Theme.key_undo_cancelColor));
-        arrayList.add(new ThemeDescription(undoView, 0, new Class[]{UndoView.class}, new String[]{"undoTextView"}, null, null, null, Theme.key_undo_cancelColor));
-        arrayList.add(new ThemeDescription(undoView, 0, new Class[]{UndoView.class}, new String[]{"infoTextView"}, null, null, null, Theme.key_undo_infoColor));
-        arrayList.add(new ThemeDescription(undoView, 0, new Class[]{UndoView.class}, new String[]{"textPaint"}, null, null, null, Theme.key_undo_infoColor));
-        arrayList.add(new ThemeDescription(undoView, 0, new Class[]{UndoView.class}, new String[]{"progressPaint"}, null, null, null, Theme.key_undo_infoColor));
-        arrayList.add(new ThemeDescription(undoView, ThemeDescription.FLAG_IMAGECOLOR, new Class[]{UndoView.class}, new String[]{"leftImageView"}, null, null, null, Theme.key_undo_infoColor));
-
+        if (rootLayout != null) {
+            rootLayout.getThemeDescriptions(arrayList);
+        }
         return arrayList;
     }
 
@@ -882,7 +855,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         } else if (id == NotificationCenter.reloadDialogPhotos) {
             updateProfileData(false);
         } else if (id == NotificationCenter.contactsDidLoad || id == NotificationCenter.channelRightsUpdated) {
-            updateActionBarMenuItems(true);
+            updateMenuData(true);
         } else if (id == NotificationCenter.chatInfoDidLoad) {
             final TLRPC.ChatFull full = (TLRPC.ChatFull) args[0];
             if (full.id != chatId) return;
@@ -899,209 +872,4 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
     }
 
-    // Views
-
-    private static class RootLayout extends FrameLayout {
-        private final static int MAIN_ID = 10;
-        private final static int EDIT_ID = 41;
-        private final static int EDIT_INFO_ID = 30;
-        private final static int ADD_PHOTO_ID = 36;
-
-        /** @noinspection deprecation*/
-        private final UndoView undoView;
-        private final View blurredView;
-
-        private AnimatorSet scrimAnimatorSet;
-        private View scrimView;
-        private final Paint scrimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-
-        private final ActionBar actionBar;
-        private final Paint actionBarBackButtonBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-
-        private final ActionBarMenuItem mainMenuItem;
-        private final ActionBarMenuItem editMenuItem;
-
-        private final ImageView ttlIndicator;
-        private AutoDeletePopupWrapper ttlPopupWrapper;
-        private TimerDrawable ttlTimerDrawable;
-
-        private final Theme.ResourcesProvider resourceProvider;
-
-        RootLayout(Context context, Theme.ResourcesProvider resourceProvider, ActionBar actionBar) {
-            super(context);
-            setWillNotDraw(false);
-            this.resourceProvider = resourceProvider;
-
-            // Action bar
-            this.actionBar = actionBar;
-            this.actionBarBackButtonBackgroundPaint.setColor(getColor(Theme.key_listSelector));
-
-            editMenuItem = actionBar.createMenu().addItem(EDIT_ID, R.drawable.group_edit_profile, resourceProvider);
-            editMenuItem.setContentDescription(LocaleController.getString(R.string.Edit));
-            mainMenuItem = actionBar.createMenu().addItem(MAIN_ID, R.drawable.ic_ab_other, resourceProvider);
-            mainMenuItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
-            ttlIndicator = new ImageView(context);
-            ttlIndicator.setImageResource(R.drawable.msg_mini_autodelete_timer);
-            mainMenuItem.addView(ttlIndicator, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
-            updateTtlIndicator(false, false);
-
-            //noinspection deprecation
-            undoView = new UndoView(context, null, false, resourceProvider);
-            blurredView = new View(context) {
-                @Override
-                public void setAlpha(float alpha) {
-                    super.setAlpha(alpha);
-                    RootLayout.this.invalidate(); // Is this really needed?
-                }
-            };
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                int color = getColor(Theme.key_windowBackgroundWhite);
-                blurredView.setForeground(new ColorDrawable(ColorUtils.setAlphaComponent(color, 100)));
-            }
-            blurredView.setFocusable(false);
-            blurredView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            blurredView.setVisibility(View.GONE);
-            blurredView.setFitsSystemWindows(true);
-            scrimPaint.setAlpha(0);
-        }
-
-        void addDecorationViews() {
-            if (actionBar.getParent() != null) {
-                ((ViewGroup) actionBar.getParent()).removeView(actionBar);
-            }
-            addView(actionBar);
-            addView(undoView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 8, 0, 8, 8));
-            addView(blurredView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-        }
-
-        void prepareBlurredView() {
-            int w = (int) (getMeasuredWidth() / 6.0f);
-            int h = (int) (getMeasuredHeight() / 6.0f);
-            Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(bitmap);
-            canvas.scale(1.0f / 6.0f, 1.0f / 6.0f);
-            draw(canvas);
-            Utilities.stackBlurBitmap(bitmap, Math.max(7, Math.max(w, h) / 180));
-            blurredView.setBackground(new BitmapDrawable(bitmap));
-            blurredView.setAlpha(0.0f);
-            blurredView.setVisibility(View.VISIBLE);
-        }
-
-        void animateBlurredView(boolean isOpen, float progress) {
-            if (blurredView.getVisibility() == View.VISIBLE) {
-                blurredView.setAlpha(isOpen ? 1.0f - progress : progress);
-            }
-        }
-
-        void hideBlurredView() {
-            if (blurredView.getVisibility() == View.VISIBLE) {
-                blurredView.setVisibility(View.GONE);
-                blurredView.setBackground(null);
-            }
-        }
-
-        void hideUndoView(int animatedFlag) {
-            undoView.hide(true, animatedFlag);
-        }
-
-        void dimBehindView(float value, View view) {
-            if (view != null) scrimView = view;
-            boolean enable = value > 0;
-            invalidate();
-            if (scrimAnimatorSet != null) scrimAnimatorSet.cancel();
-            scrimAnimatorSet = new AnimatorSet();
-            final float startValue = enable ? 0 : scrimPaint.getAlpha() / 255F;
-            final float endValue = enable ? value : 0F;
-            ValueAnimator scrimPaintAlphaAnimator = ValueAnimator.ofFloat(startValue, endValue);
-            scrimPaintAlphaAnimator.addUpdateListener(a -> {
-                scrimPaint.setAlpha((int) (255 * (float) a.getAnimatedValue()));
-                invalidate();
-            });
-            scrimAnimatorSet.playTogether(scrimPaintAlphaAnimator);
-            scrimAnimatorSet.setDuration(enable ? 150 : 220);
-            if (!enable) {
-                scrimAnimatorSet.addListener(new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        scrimView = null;
-                        invalidate();
-                    }
-                });
-            }
-            scrimAnimatorSet.start();
-        }
-
-        int getColor(int key) {
-            return Theme.getColor(key, resourceProvider);
-        }
-
-        void updateColors(MessagesController.PeerColor peerColor, float actionModeProgress) {
-            int rawBackground = peerColor != null ? Theme.ACTION_BAR_WHITE_SELECTOR_COLOR : getColor(Theme.key_avatar_actionBarSelectorBlue);
-            int rawForeground = peerColor != null ? Color.WHITE : getColor(Theme.key_actionBarDefaultIcon);
-            int foreground = ColorUtils.blendARGB(rawForeground, getColor(Theme.key_actionBarActionModeDefaultIcon), actionModeProgress);
-            actionBar.setItemsBackgroundColor(ColorUtils.blendARGB(rawBackground, getColor(Theme.key_actionBarActionModeDefaultSelector), actionModeProgress), false);
-            actionBar.setItemsColor(foreground, false);
-            mainMenuItem.setIconColor(rawForeground);
-            ttlIndicator.setColorFilter(new PorterDuffColorFilter(foreground, PorterDuff.Mode.MULTIPLY));
-            if (ttlPopupWrapper != null && ttlPopupWrapper.textView != null) {
-                ttlPopupWrapper.textView.invalidate();
-            }
-        }
-
-        void updateTtlIndicator(boolean visible, boolean animated) {
-            AndroidUtilities.updateViewVisibilityAnimated(ttlIndicator, visible, 0.8f, animated);
-        }
-
-        void updateTtlPopup(int ttl) {
-            if (ttlTimerDrawable != null) ttlTimerDrawable.setTime(ttl);
-            if (ttlPopupWrapper != null) ttlPopupWrapper.updateItems(ttl);
-        }
-
-        void appendTtlMenuItem(boolean allowExtendedLink, AutoDeletePopupWrapper.Callback callback) {
-            ttlPopupWrapper = new AutoDeletePopupWrapper(getContext(), mainMenuItem.getPopupLayout().getSwipeBack(), callback, false, 0, resourceProvider);
-            if (allowExtendedLink) {
-                ttlPopupWrapper.allowExtendedHint(getColor(Theme.key_windowBackgroundWhiteBlueText));
-            }
-            ttlTimerDrawable = TimerDrawable.getTtlIcon(0);
-            mainMenuItem.addSwipeBackItem(0, ttlTimerDrawable, LocaleController.getString(R.string.AutoDeletePopupTitle), ttlPopupWrapper.windowLayout);
-            mainMenuItem.addColoredGap();
-        }
-
-        @Override
-        protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
-            if (child == blurredView) return true;
-            return super.drawChild(canvas, child, drawingTime);
-        }
-
-        @Override
-        protected void dispatchDraw(@NonNull Canvas canvas) {
-            super.dispatchDraw(canvas);
-            if (scrimPaint.getAlpha() > 0) {
-                canvas.drawRect(0, 0, getWidth(), getHeight(), scrimPaint);
-            }
-            if (scrimView != null) {
-                int c = canvas.save();
-                canvas.translate(scrimView.getLeft(), scrimView.getTop());
-                if (scrimView == actionBar.getBackButton()) {
-                    int r = Math.max(scrimView.getMeasuredWidth(), scrimView.getMeasuredHeight()) / 2;
-                    int wasAlpha = actionBarBackButtonBackgroundPaint.getAlpha();
-                    actionBarBackButtonBackgroundPaint.setAlpha((int) (wasAlpha * (scrimPaint.getAlpha() / 255f) / 0.3f));
-                    canvas.drawCircle(r, r, r * 0.7f, actionBarBackButtonBackgroundPaint);
-                    actionBarBackButtonBackgroundPaint.setAlpha(wasAlpha);
-                }
-                scrimView.draw(canvas);
-                canvas.restoreToCount(c);
-            }
-            if (blurredView.getVisibility() == View.VISIBLE) {
-                if (blurredView.getAlpha() != 1f && blurredView.getAlpha() != 0) {
-                    canvas.saveLayerAlpha(blurredView.getLeft(), blurredView.getTop(), blurredView.getRight(), blurredView.getBottom(), (int) (255 * blurredView.getAlpha()), Canvas.ALL_SAVE_FLAG);
-                } else {
-                    canvas.save();
-                }
-                canvas.translate(blurredView.getLeft(), blurredView.getTop());
-                blurredView.draw(canvas);
-                canvas.restore();
-            }
-        }
-    }
 }
