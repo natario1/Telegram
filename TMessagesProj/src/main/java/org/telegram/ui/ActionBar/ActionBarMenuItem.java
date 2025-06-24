@@ -1963,6 +1963,7 @@ public class ActionBarMenuItem extends FrameLayout {
     }
 
     public View getSubItem(int id) {
+        if (popupLayout == null) return null;
         return popupLayout.findViewWithTag(id);
     }
     public void showSubItem(int id, boolean animated) {

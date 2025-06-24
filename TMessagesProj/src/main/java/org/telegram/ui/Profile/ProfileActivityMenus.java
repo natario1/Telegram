@@ -1,7 +1,6 @@
 package org.telegram.ui.Profile;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
+
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
@@ -15,13 +14,12 @@ import android.widget.ImageView;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import org.telegram.messenger.*;
+import org.telegram.tgnet.tl.TL_account;
 import org.telegram.ui.ActionBar.*;
 import org.telegram.ui.Components.AutoDeletePopupWrapper;
 import org.telegram.ui.Components.CombinedDrawable;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.TimerDrawable;
-
-import java.util.ArrayList;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
 
@@ -34,12 +32,24 @@ public class ProfileActivityMenus {
     public final static int AB_CONTACT_DELETE_ID = 5;
     public final static int AB_GROUP_LEAVE_ID = 7; // TODO: move to header
     public final static int AB_SHARE_ID = 10; // TODO: move to header
+    public final static int AB_SHORTCUT_ID = 14;
+    public final static int AB_SEARCH_MEMBERS_ID = 17;
+    public final static int AB_STATISTICS_ID = 19;
+    public final static int AB_START_SECRET_CHAT_ID = 20;
+    public final static int AB_VIEW_DISCUSSION_ID = 22; // TODO: move to header
+    public final static int AB_DELETE_TOPIC_ID = 23;
+    public final static int AB_REPORT_ID = 24; // TODO: move to header (at least in some cases)
     public final static int AB_EDIT_INFO_ID = 30;
     public final static int AB_LOGOUT_ID = 31;
     public final static int AB_ADD_PHOTO_ID = 36;
     public final static int AB_QR_ID = 37;
+    public final static int AB_SEND_GIFTS_ID = 38;
+    public final static int AB_CHANNEL_STORIES_ID = 39;
     public final static int AB_EDIT_COLOR_ID = 40;
     public final static int AB_EDIT_ID = 41;
+    public final static int AB_PROFILE_COPY_LINK_ID = 42;
+    public final static int AB_PROFILE_SET_USERNAME_ID = 43;
+    public final static int AB_BOT_VIEW_PRIVACY_ID = 44;
     public final static int AB_BOT_BLOCK_ID = 50;
     public final static int AB_BOT_UNBLOCK_ID = 51;
     public final static int AB_USER_BLOCK_ID = 52;
@@ -174,6 +184,32 @@ public class ProfileActivityMenus {
         }
     }
 
+    public void updateStartSecretChatItem(TL_account.RequirementToContact requirementToContact) {
+        // Starting a secret chat is only allowed if contact is not restricted, e.g., premium only
+        mainMenuItem.setSubItemShown(AB_START_SECRET_CHAT_ID, DialogObject.isEmpty(requirementToContact));
+    }
+
+    public void updateUsernameRelatedItems(boolean hasUsername) {
+        ActionBarMenuSubItem linkItem = (ActionBarMenuSubItem) mainMenuItem.getSubItem(AB_PROFILE_COPY_LINK_ID);
+        ActionBarMenuSubItem usernameItem = (ActionBarMenuSubItem) mainMenuItem.getSubItem(AB_PROFILE_SET_USERNAME_ID);
+        if (linkItem != null) {
+            linkItem.setVisibility(hasUsername ? View.VISIBLE : View.GONE);
+        }
+        if (usernameItem != null) {
+            int text = hasUsername ? R.string.ProfileUsernameEdit : R.string.ProfileUsernameSet;
+            usernameItem.setIcon(hasUsername ? R.drawable.menu_username_change : R.drawable.menu_username_set);
+            usernameItem.setText(LocaleController.getString(text));
+        }
+    }
+
+    public void updateBotViewPrivacyItem(boolean hasPrivacyPolicy) {
+        mainMenuItem.setSubItemShown(AB_BOT_VIEW_PRIVACY_ID, hasPrivacyPolicy);
+    }
+
+    public void updateSendGiftsItem(boolean canSendGifts) {
+        mainMenuItem.setSubItemShown(AB_SEND_GIFTS_ID, canSendGifts);
+    }
+
     public void clearMainMenu() {
         mainMenuItem.removeAllSubItems();
     }
@@ -197,7 +233,35 @@ public class ProfileActivityMenus {
             mainMenuItem.addSubItem(id, R.drawable.msg_addcontact, LocaleController.getString(R.string.AddContact));
         } else if (id == AB_SHARE_ID) {
             mainMenuItem.addSubItem(id, R.drawable.msg_share, LocaleController.getString(R.string.BotShare));
+        } else if (id == AB_SHORTCUT_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_home, LocaleController.getString(R.string.AddShortcut));
+        } else if (id == AB_STATISTICS_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_stats, LocaleController.getString(R.string.Statistics));
+        } else if (id == AB_START_SECRET_CHAT_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_secret, LocaleController.getString(R.string.StartEncryptedChat));
+        } else if (id == AB_PROFILE_COPY_LINK_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_link2, LocaleController.getString(R.string.ProfileCopyLink));
+        } else if (id == AB_PROFILE_SET_USERNAME_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.menu_username_change, LocaleController.getString(R.string.ProfileUsernameEdit));
+        } else if (id == AB_VIEW_DISCUSSION_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_discussion, LocaleController.getString(R.string.ViewDiscussion));
+        } else if (id == AB_REPORT_ID) {
+            ActionBarMenuSubItem item = mainMenuItem.addSubItem(id, R.drawable.msg_report, LocaleController.getString(R.string.ReportBot));
+            item.setColors(getColor(Theme.key_text_RedRegular), getColor(Theme.key_text_RedRegular));
+        } else if (id == AB_BOT_VIEW_PRIVACY_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.menu_privacy_policy, LocaleController.getString(R.string.BotPrivacyPolicy));
+        } else if (id == AB_DELETE_TOPIC_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_delete, LocaleController.getPluralString("DeleteTopics", 1));
+        } else if (id == AB_CHANNEL_STORIES_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_archive, LocaleController.getString(R.string.OpenChannelArchiveStories));
+        } else if (id == AB_SEARCH_MEMBERS_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_search, LocaleController.getString(R.string.SearchMembers));
         }
+    }
+
+    public void appendSendGiftsItem(boolean channel) {
+        int text = channel ? R.string.ProfileSendAGiftToChannel : R.string.ProfileSendAGift;
+        mainMenuItem.addSubItem(AB_SEND_GIFTS_ID, R.drawable.msg_gift_premium, LocaleController.getString(text));
     }
 
     public void appendBlockUnblockItem(boolean bot, boolean blocked) {

@@ -22,8 +22,11 @@ import org.telegram.ui.Cells.ProfileChannelCell;
 import org.telegram.ui.Components.*;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.voip.VoIPHelper;
+import org.telegram.ui.Gifts.GiftSheet;
 import org.telegram.ui.Profile.ProfileActivityMenus;
 import org.telegram.ui.Profile.ProfileActivityRootLayout;
+import org.telegram.ui.Stars.StarsController;
+import org.telegram.ui.bots.BotWebViewAttachedSheet;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +63,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private boolean isOpen;
     private boolean isReportSpam;
     private boolean isUserBlocked;
+    private boolean isCreatingEncryptedChat;
+    private boolean isBotWithPrivacyPolicy;
 
     public SharedMediaLayout sharedMediaLayout;
     private ProfileActivityRootLayout rootLayout;
@@ -118,7 +123,16 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (flagSecure != null) {
             flagSecure.invalidate();
         }
+        if (userInfo != null && userInfo.bot_info != null) {
+            isBotWithPrivacyPolicy = userInfo.bot_info.privacy_policy_url != null || userInfo.bot_info.commands.stream().anyMatch((c) -> "privacy".equals(c.command));
+        } else {
+            isBotWithPrivacyPolicy = false;
+        }
+        if (menuHandler != null) {
+            menuHandler.updateBotViewPrivacyItem(isBotWithPrivacyPolicy);
+        }
         updateTtlData();
+        updatePremiumData();
     }
 
     public TLRPC.User getCurrentUser() {
@@ -131,11 +145,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
         long previousMigrationId = chatInfo != null ? chatInfo.migrated_from_chat_id : 0;
         this.chatInfo = value;
-        if (value != null && value.migrated_from_chat_id != 0 && value.migrated_from_chat_id != previousMigrationId) {
+        if (chatInfo != null && chatInfo.migrated_from_chat_id != 0 && chatInfo.migrated_from_chat_id != previousMigrationId) {
             getMediaDataController().getMediaCounts(-chatInfo.migrated_from_chat_id, topicId, classGuid);
         }
         if (sharedMediaLayout != null) {
-            sharedMediaLayout.setChatInfo(value);
+            sharedMediaLayout.setChatInfo(chatInfo);
         }
         TLRPC.Chat newChat = getMessagesController().getChat(chatId);
         if (newChat != null) {
@@ -146,7 +160,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
             flagSecure.invalidate();
         }
         updateTtlData();
-        // WIP more
+        if (menuHandler != null) {
+            boolean canPurchase = !BuildVars.IS_BILLING_UNAVAILABLE && !getMessagesController().premiumPurchaseBlocked();
+            boolean canSendGifts = chatInfo != null && chatInfo.stargifts_available;
+            menuHandler.updateSendGiftsItem(canPurchase && canSendGifts);
+        }
     }
 
     public TLRPC.Chat getCurrentChat() {
@@ -193,6 +211,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (user == null) return;
             peerColorEmojiStatus = user.emoji_status;
             peerColorFallbackId = UserObject.getProfileColorId(user);
+            if (menuHandler != null) {
+                menuHandler.updateUsernameRelatedItems(UserObject.getPublicUsername(user) != null);
+            }
         } else if (chatId != 0) {
             TLRPC.Chat newChat = getMessagesController().getChat(chatId);
             chat = newChat != null ? newChat : chat;
@@ -249,14 +270,20 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 if (imageUpdater != null) menuHandler.appendMainMenuSubItem(AB_ADD_PHOTO_ID);
                 menuHandler.appendMainMenuSubItem(AB_EDIT_COLOR_ID);
                 updatePremiumData(); // AB_EDIT_COLOR_ID has different icons
+                if (isMyProfile) {
+                    menuHandler.appendMainMenuSubItem(AB_PROFILE_COPY_LINK_ID);
+                    menuHandler.appendMainMenuSubItem(AB_PROFILE_SET_USERNAME_ID);
+                    menuHandler.updateUsernameRelatedItems(UserObject.getPublicUsername(user) != null);
+                }
             } else {
                 editMenuItemVisible = user.bot && user.bot_can_edit;
                 if (user.bot || getContactsController().contactsDict.get(user.id) == null) {
                     if (MessagesController.isSupportUser(user)) {
                         menuHandler.appendBlockUnblockItem(false, isUserBlocked);
-                        // WIP: add_shortcut
+                        menuHandler.appendMainMenuSubItem(AB_SHORTCUT_ID);
                     } else if (getDialogId() != UserObject.VERIFY) {
                         if (chatEncrypted == null) appendMenuAutoDelete();
+                        menuHandler.appendMainMenuSubItem(AB_SHORTCUT_ID);
                         if (!user.bot) {
                             menuHandler.appendMainMenuSubItem(AB_CONTACT_ADD_ID);
                         }
@@ -266,6 +293,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
                         if (!TextUtils.isEmpty(user.phone)) {
                             menuHandler.appendMainMenuSubItem(AB_CONTACT_SHARE_ID);
                         }
+                        if (user.bot) {
+                            menuHandler.appendMainMenuSubItem(AB_BOT_VIEW_PRIVACY_ID);
+                            menuHandler.updateBotViewPrivacyItem(isBotWithPrivacyPolicy);
+                            menuHandler.appendMainMenuSubItem(AB_REPORT_ID);
+                        }
                         menuHandler.appendBlockUnblockItem(user.bot, isUserBlocked);
                     }
                 } else {
@@ -274,6 +306,17 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     menuHandler.appendBlockUnblockItem(false, isUserBlocked);
                     menuHandler.appendMainMenuSubItem(AB_CONTACT_EDIT_ID);
                     menuHandler.appendMainMenuSubItem(AB_CONTACT_DELETE_ID);
+                }
+                if (!UserObject.isDeleted(user) && !user.bot && chatEncrypted == null && !isUserBlocked && userId != 333000 && userId != 777000 && userId != 42777) {
+                    if (!BuildVars.IS_BILLING_UNAVAILABLE && !user.self && !MessagesController.isSupportUser(user) && !getMessagesController().premiumPurchaseBlocked()) {
+                        StarsController.getInstance(currentAccount).loadStarGifts();
+                        menuHandler.appendSendGiftsItem(false);
+                    }
+                    menuHandler.appendMainMenuSubItem(AB_START_SECRET_CHAT_ID);
+                    menuHandler.updateStartSecretChatItem(getMessagesController().isUserContactBlocked(userId));
+                }
+                if (!user.bot && getContactsController().contactsDict.get(userId) != null) {
+                    menuHandler.appendMainMenuSubItem(AB_SHORTCUT_ID);
                 }
             }
         } else if (chatId != 0) {
@@ -288,22 +331,47 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 } else {
                     editMenuItemVisible = ChatObject.hasAdminRights(chat) || chat.megagroup && ChatObject.canChangeChatInfo(chat);
                 }
+                if (topicId == 0 && chatInfo != null && (chatInfo.can_view_stats || chatInfo.can_view_revenue || chatInfo.can_view_stars_revenue || getMessagesController().getStoriesController().canPostStories(getDialogId()))) {
+                    menuHandler.appendMainMenuSubItem(AB_STATISTICS_ID);
+                }
                 if (chat.megagroup) {
+
+                    if (chatInfo == null || !chatInfo.participants_hidden || ChatObject.hasAdminRights(chat)) {
+                        menuHandler.appendMainMenuSubItem(AB_SEARCH_MEMBERS_ID);
+                    }
                     if (!chat.creator && !chat.left && !chat.kicked && topicId == 0) {
                         menuHandler.appendLeaveGroupItem(true, true);
                     }
-                    // WIP
+                    if (topicId != 0 && ChatObject.canDeleteTopic(currentAccount, chat, topicId)) {
+                        menuHandler.appendMainMenuSubItem(AB_DELETE_TOPIC_ID);
+                    }
                 } else {
+                    if (chat.creator || chat.admin_rights != null && chat.admin_rights.edit_stories) {
+                        menuHandler.appendMainMenuSubItem(AB_CHANNEL_STORIES_ID);
+                    }
                     if (ChatObject.isPublic(chat)) menuHandler.appendMainMenuSubItem(AB_SHARE_ID);
+                    if (!BuildVars.IS_BILLING_UNAVAILABLE && !getMessagesController().premiumPurchaseBlocked()) {
+                        StarsController.getInstance(currentAccount).loadStarGifts();
+                        menuHandler.appendSendGiftsItem(true);
+                        menuHandler.updateSendGiftsItem(chatInfo != null && chatInfo.stargifts_available);
+                    }
+                    if (chatInfo != null && chatInfo.linked_chat_id != 0) menuHandler.appendMainMenuSubItem(AB_VIEW_DISCUSSION_ID);
                     if (!chat.creator && !chat.left && !chat.kicked) menuHandler.appendLeaveGroupItem(false, true);
                 }
             } else {
                 editMenuItemVisible = ChatObject.canChangeChatInfo(chat);
+                if (!ChatObject.isKickedFromChat(chat) && !ChatObject.isLeftFromChat(chat)) {
+                    if (chatInfo == null || !chatInfo.participants_hidden || ChatObject.hasAdminRights(chat)) {
+                        menuHandler.appendMainMenuSubItem(AB_SEARCH_MEMBERS_ID);
+                    }
+                }
                 menuHandler.appendLeaveGroupItem(false, false);
+            }
+            if (topicId == 0) {
+                menuHandler.appendMainMenuSubItem(AB_SHORTCUT_ID);
             }
         }
         menuHandler.updateEditItem(editMenuItemVisible && !mediaHeaderVisible, animated);
-        // WIP
         if (appendLogout) {
             menuHandler.appendMainMenuSubItem(AB_LOGOUT_ID);
         }
@@ -330,9 +398,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
     }
 
     private void updatePremiumData() {
-        boolean isPremium = getUserConfig().isPremium();
         if (menuHandler != null) {
-            menuHandler.updateEditColorItem(isPremium);
+            menuHandler.updateEditColorItem(getUserConfig().isPremium());
+            menuHandler.updateStartSecretChatItem(getMessagesController().isUserContactBlocked(userId));
         }
     }
 
@@ -478,9 +546,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
         if (!parentLayout.isInPreviewMode() && rootLayout != null) {
             rootLayout.hideBlurredView();
-        }
-        if (flagSecure != null) {
-            flagSecure.attach();
         }
         if (imageUpdater != null) {
             imageUpdater.onResume();
@@ -923,7 +988,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
             final TLRPC.ChatFull full = (TLRPC.ChatFull) args[0];
             if (full.id != chatId) return;
             setChatInfo(full);
-            updateTtlData();
+        } else if (id == NotificationCenter.groupCallUpdated) {
+            Long chatId = (Long) args[0];
+            if (chat != null && chatId == chat.id && ChatObject.canManageCalls(chat)) {
+                TLRPC.ChatFull chatFull = MessagesController.getInstance(currentAccount).getChatFull(chatId);
+                setChatInfo(chatFull);
+            }
         } else if (id == NotificationCenter.userInfoDidLoad) {
             final long uid = (Long) args[0];
             if (uid != userId) return;
@@ -945,6 +1015,16 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 updateMenuData(true);
                 // WIP: updateListAnimated(false);
             }
+        } else if (id == NotificationCenter.encryptedChatCreated) {
+            if (!isCreatingEncryptedChat) return;
+            AndroidUtilities.runOnUIThread(() -> {
+                getNotificationCenter().removeObserver(this, NotificationCenter.closeChats);
+                getNotificationCenter().postNotificationName(NotificationCenter.closeChats);
+                TLRPC.EncryptedChat encryptedChat = (TLRPC.EncryptedChat) args[0];
+                Bundle args2 = new Bundle();
+                args2.putInt("enc_id", encryptedChat.id);
+                presentFragment(new ChatActivity(args2), true);
+            });
         }
     }
 
@@ -1109,6 +1189,110 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 finishFragment();
                 getNotificationCenter().postNotificationName(NotificationCenter.needDeleteDialog, -chat.id, null, chat, param);
             }, getResourceProvider());
+        } else if (id == AB_SHORTCUT_ID) {
+            try {
+                long did;
+                if (chatEncrypted != null) did = DialogObject.makeEncryptedDialogId(chatEncrypted.id);
+                else if (userId != 0) did = userId;
+                else if (chatId != 0) did = -chatId;
+                else return;
+                getMediaDataController().installShortcut(did, MediaDataController.SHORTCUT_TYPE_USER_OR_CHAT);
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        } else if (id == AB_STATISTICS_ID) {
+            TLRPC.Chat chat = getMessagesController().getChat(chatId);
+            if (chat == null) return;
+            presentFragment(StatisticActivity.create(chat, false));
+        } else if (id == AB_START_SECRET_CHAT_ID) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), getResourceProvider());
+            builder.setTitle(LocaleController.getString(R.string.AreYouSureSecretChatTitle));
+            builder.setMessage(LocaleController.getString(R.string.AreYouSureSecretChat));
+            builder.setPositiveButton(LocaleController.getString(R.string.Start), (dialogInterface, i) -> {
+                if (MessagesController.getInstance(currentAccount).isFrozen()) {
+                    AccountFrozenAlert.show(currentAccount);
+                    return;
+                }
+                isCreatingEncryptedChat = true;
+                getSecretChatHelper().startSecretChat(getParentActivity(), getMessagesController().getUser(userId));
+            });
+            builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+            showDialog(builder.create());
+        } else if (id == AB_PROFILE_COPY_LINK_ID) {
+            TLRPC.User user = getMessagesController().getUser(userId);
+            if (user == null) return;
+            AndroidUtilities.addToClipboard(getMessagesController().linkPrefix + "/" + UserObject.getPublicUsername(user));
+        } else if (id == AB_PROFILE_SET_USERNAME_ID) {
+            presentFragment(new ChangeUsernameActivity());
+        } else if (id == AB_VIEW_DISCUSSION_ID) {
+            if (chatInfo == null || chatInfo.linked_chat_id == 0) return;
+            Bundle args = new Bundle();
+            args.putLong("chat_id", chatInfo.linked_chat_id);
+            if (!getMessagesController().checkCanOpenChat(args, this)) return;
+            presentFragment(new ChatActivity(args));
+        } else if (id == AB_REPORT_ID) {
+            ReportBottomSheet.openChat(this, getDialogId());
+        } else if (id == AB_BOT_VIEW_PRIVACY_ID) {
+            BotWebViewAttachedSheet.openPrivacy(currentAccount, userId);
+        } else if (id == AB_DELETE_TOPIC_ID) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+            builder.setTitle(LocaleController.getPluralString("DeleteTopics", 1));
+            TLRPC.TL_forumTopic topic = MessagesController.getInstance(currentAccount).getTopicsController().findTopic(chatId, topicId);
+            builder.setMessage(formatString("DeleteSelectedTopic", R.string.DeleteSelectedTopic, topic == null ? "topic" : topic.title));
+            builder.setPositiveButton(LocaleController.getString(R.string.Delete), (dialog, which) -> {
+                ArrayList<Integer> topicIds = new ArrayList<>();
+                topicIds.add((int) topicId);
+                getMessagesController().getTopicsController().deleteTopics(chatId, topicIds);
+                // WIP: playProfileAnimation = 0;
+                if (parentLayout != null && parentLayout.getFragmentStack() != null) {
+                    for (int i = 0; i < parentLayout.getFragmentStack().size(); ++i) {
+                        BaseFragment fragment = parentLayout.getFragmentStack().get(i);
+                        if (fragment instanceof ChatActivity && ((ChatActivity) fragment).getTopicId() == topicId) {
+                            fragment.removeSelfFromStack();
+                        }
+                    }
+                }
+                finishFragment();
+                Context context = getContext();
+                if (context != null) {
+                    BulletinFactory.of(Bulletin.BulletinWindow.make(context), getResourceProvider())
+                            .createSimpleBulletin(R.raw.ic_delete, LocaleController.getPluralString("TopicsDeleted", 1))
+                            .show();
+                }
+                dialog.dismiss();
+            });
+            builder.setNegativeButton(LocaleController.getString(R.string.Cancel), (dialog, which) -> dialog.dismiss());
+            AlertDialog alertDialog = builder.create();
+            alertDialog.show();
+            TextView button = (TextView) alertDialog.getButton(DialogInterface.BUTTON_POSITIVE);
+            if (button != null) button.setTextColor(Theme.getColor(Theme.key_text_RedBold));
+        } else if (id == AB_CHANNEL_STORIES_ID) {
+            Bundle args = new Bundle();
+            args.putInt("type", MediaActivity.TYPE_ARCHIVED_CHANNEL_STORIES);
+            args.putLong("dialog_id", -chatId);
+            MediaActivity fragment = new MediaActivity(args, null);
+            fragment.setChatInfo(chatInfo);
+            presentFragment(fragment);
+        } else if (id == AB_SEARCH_MEMBERS_ID) {
+            Bundle args = new Bundle();
+            args.putLong("chat_id", chatId);
+            args.putInt("type", ChatUsersActivity.TYPE_USERS);
+            args.putBoolean("open_search", true);
+            ChatUsersActivity fragment = new ChatUsersActivity(args);
+            fragment.setInfo(chatInfo);
+            presentFragment(fragment);
+        } else if (id == AB_SEND_GIFTS_ID) {
+            if (UserObject.areGiftsDisabled(userInfo)) {
+                BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();
+                if (lastFragment != null) {
+                    BulletinFactory.of(lastFragment).createSimpleBulletin(R.raw.error, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserDisallowedGifts, DialogObject.getShortName(getDialogId())))).show();
+                }
+                return;
+            }
+            if (chat != null) {
+                MessagesController.getGlobalMainSettings().edit().putInt("channelgifthint", 3).apply();
+            }
+            showDialog(new GiftSheet(getContext(), currentAccount, getDialogId(), null, null));
         }
     }
 
@@ -1116,7 +1300,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
         ContactAddActivity contactAddActivity = new ContactAddActivity(args, getResourceProvider());
         contactAddActivity.setDelegate(() -> {
             // WIP: Expand profile & update list
-            if (getUndoView() != null) getUndoView().showWithAction(dialogId, UndoView.ACTION_CONTACT_ADDED, user);
+            if (getUndoView() != null) //noinspection deprecation
+                getUndoView().showWithAction(dialogId, UndoView.ACTION_CONTACT_ADDED, user);
         });
         presentFragment(contactAddActivity);
     }
