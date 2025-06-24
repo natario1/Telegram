@@ -2,6 +2,7 @@ package org.telegram.ui;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -9,8 +10,10 @@ import android.graphics.*;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
 import org.telegram.messenger.*;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
@@ -23,15 +26,18 @@ import org.telegram.ui.Profile.ProfileActivityMenus;
 import org.telegram.ui.Profile.ProfileActivityRootLayout;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import static org.telegram.messenger.ContactsController.PRIVACY_RULES_TYPE_ADDED_BY_PHONE;
+import static org.telegram.messenger.LocaleController.formatString;
 import static org.telegram.ui.Profile.ProfileActivityMenus.*;
 
 public class ProfileActivityReplacement extends BaseFragment implements
         SharedMediaLayout.SharedMediaPreloaderDelegate,
         ImageUpdater.ImageUpdaterDelegate,
-        NotificationCenter.NotificationCenterDelegate {
+        NotificationCenter.NotificationCenterDelegate,
+        DialogsActivity.DialogsActivityDelegate {
 
     private SharedMediaLayout.SharedMediaPreloader sharedMediaPreloader;
     private ImageUpdater imageUpdater;
@@ -52,6 +58,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private boolean isSaved;
     private boolean isMyProfile;
     private boolean isOpen;
+    private boolean isReportSpam;
+    private boolean isUserBlocked;
 
     public SharedMediaLayout sharedMediaLayout;
     private ProfileActivityRootLayout rootLayout;
@@ -237,27 +245,39 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (UserObject.isUserSelf(user)) {
                 editMenuItemVisible = isMyProfile;
                 appendLogout = !isMyProfile;
-                menuHandler.appendEditInfoItem();
-                if (imageUpdater != null) menuHandler.appendPhotoItem();
-                menuHandler.appendEditColorItem();
-                updatePremiumData();
+                menuHandler.appendMainMenuSubItem(AB_EDIT_INFO_ID);
+                if (imageUpdater != null) menuHandler.appendMainMenuSubItem(AB_ADD_PHOTO_ID);
+                menuHandler.appendMainMenuSubItem(AB_EDIT_COLOR_ID);
+                updatePremiumData(); // AB_EDIT_COLOR_ID has different icons
             } else {
                 editMenuItemVisible = user.bot && user.bot_can_edit;
                 if (user.bot || getContactsController().contactsDict.get(user.id) == null) {
                     if (MessagesController.isSupportUser(user)) {
-                        // WIP
+                        menuHandler.appendBlockUnblockItem(false, isUserBlocked);
+                        // WIP: add_shortcut
                     } else if (getDialogId() != UserObject.VERIFY) {
-                        if (chatEncrypted == null) updateMenuAutoDelete();
+                        if (chatEncrypted == null) appendMenuAutoDelete();
+                        if (!user.bot) {
+                            menuHandler.appendMainMenuSubItem(AB_CONTACT_ADD_ID);
+                        }
+                        if (!TextUtils.isEmpty(user.phone)) {
+                            menuHandler.appendMainMenuSubItem(AB_CONTACT_SHARE_ID);
+                        }
+                        menuHandler.appendBlockUnblockItem(user.bot, isUserBlocked);
                     }
                 } else {
-                    if (chatEncrypted == null) updateMenuAutoDelete();
+                    if (chatEncrypted == null) appendMenuAutoDelete();
+                    if (!TextUtils.isEmpty(user.phone)) menuHandler.appendMainMenuSubItem(AB_CONTACT_SHARE_ID);
+                    menuHandler.appendBlockUnblockItem(false, isUserBlocked);
+                    menuHandler.appendMainMenuSubItem(AB_CONTACT_EDIT_ID);
+                    menuHandler.appendMainMenuSubItem(AB_CONTACT_DELETE_ID);
                 }
             }
         } else if (chatId != 0) {
             TLRPC.Chat chat = getMessagesController().getChat(chatId);
             if (chat == null) return;
             if (topicId == 0 && ChatObject.canChangeChatInfo(chat)) {
-                updateMenuAutoDelete();
+                appendMenuAutoDelete();
             }
             if (ChatObject.isChannel(chat)) {
                 if (topicId != 0) {
@@ -272,11 +292,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
         menuHandler.updateEditItem(editMenuItemVisible && !mediaHeaderVisible, animated);
         // WIP
         if (appendLogout) {
-            menuHandler.appendLogoutItem();
+            menuHandler.appendMainMenuSubItem(AB_LOGOUT_ID);
         }
     }
 
-    private void updateMenuAutoDelete() {
+    private void appendMenuAutoDelete() {
         if (menuHandler == null) return;
         menuHandler.appendAutoDeleteItem(dialogId > 0 || userId > 0, new AutoDeletePopupWrapper.Callback() {
             @Override public void dismiss() {}
@@ -333,6 +353,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         topicId = arguments.getLong("topic_id", 0);
         isSaved = arguments.getBoolean("saved", false);
         isMyProfile = arguments.getBoolean("my_profile", false);
+        isReportSpam = arguments.getBoolean("reportSpam", false);
         // WIP: Expand photo and other vars
 
         if (userId != 0) {
@@ -343,6 +364,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
             TLRPC.User user = getMessagesController().getUser(userId);
             if (user == null) return false;
             subscribeToNotifications();
+
+            isUserBlocked = getMessagesController().blockePeers.indexOfKey(userId) >= 0;
             if (user.bot) {
                 getMediaDataController().loadBotInfo(user.id, user.id, true, classGuid);
             }
@@ -494,6 +517,36 @@ public class ProfileActivityReplacement extends BaseFragment implements
     }
 
     @Override
+    public boolean didSelectDialogs(DialogsActivity fragment, ArrayList<MessagesStorage.TopicKey> dids, CharSequence message, boolean param, boolean notify, int scheduleDate, TopicsFragment topicsFragment) {
+        long did = dids.get(0).dialogId;
+        Bundle args = new Bundle();
+        args.putBoolean("scrollToTopOnResume", true);
+        if (DialogObject.isEncryptedDialog(did)) {
+            args.putInt("enc_id", DialogObject.getEncryptedChatId(did));
+        } else if (DialogObject.isUserDialog(did)) {
+            args.putLong("user_id", did);
+        } else if (DialogObject.isChatDialog(did)) {
+            args.putLong("chat_id", -did);
+        }
+        if (!getMessagesController().checkCanOpenChat(args, fragment)) {
+            return false;
+        }
+
+        getNotificationCenter().removeObserver(this, NotificationCenter.closeChats);
+        getNotificationCenter().postNotificationName(NotificationCenter.closeChats);
+        presentFragment(new ChatActivity(args), true);
+        removeSelfFromStack();
+        TLRPC.User user = getMessagesController().getUser(userId);
+        getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of(user, did, null, null, null, null, notify, scheduleDate));
+        if (!TextUtils.isEmpty(message)) {
+            AccountInstance accountInstance = AccountInstance.getInstance(currentAccount);
+            SendMessagesHelper.prepareSendingText(accountInstance, message.toString(), did, notify, scheduleDate, 0);
+        }
+        return true;
+    }
+
+
+    @Override
     public void onActivityResultFragment(int requestCode, int resultCode, Intent data) {
         if (imageUpdater != null) {
             imageUpdater.onActivityResult(requestCode, resultCode, data);
@@ -630,47 +683,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
-                if (getParentActivity() == null) return;
-                if (id == -1) {
-                    finishFragment();
-                } else if (id == AB_EDIT_INFO_ID) {
-                    presentFragment(new UserInfoActivity());
-                } else if (id == AB_ADD_PHOTO_ID) {
-                    uploadUserImage(null, null);
-                } else if (id == AB_EDIT_ID) {
-                    if (isMyProfile()) {
-                        presentFragment(new UserInfoActivity());
-                    } else if (topicId != 0) {
-                        Bundle args = new Bundle();
-                        args.putLong("chat_id", chatId);
-                        TopicCreateFragment fragment = TopicCreateFragment.create(chatId, topicId);
-                        presentFragment(fragment);
-                    } else {
-                        Bundle args = new Bundle();
-                        if (chatId != 0) {
-                            args.putLong("chat_id", chatId);
-                        } else if (userInfo != null && userInfo.user.bot) {
-                            args.putLong("user_id", userId);
-                        }
-                        ChatEditActivity fragment = new ChatEditActivity(args);
-                        if (chatInfo != null) fragment.setInfo(chatInfo);
-                        else fragment.setInfo(userInfo);
-                        presentFragment(fragment);
-                    }
-                } else if (id == AB_QR_ID) {
-                    Bundle args = new Bundle();
-                    args.putLong("chat_id", chatId);
-                    args.putLong("user_id", userId);
-                    presentFragment(new QrActivity(args));
-                } else if (id == AB_LOGOUT_ID) {
-                    presentFragment(new LogoutActivity());
-                } else if (id == AB_EDIT_COLOR_ID) {
-                    if (!getUserConfig().isPremium()) {
-                        showDialog(new PremiumFeatureBottomSheet(ProfileActivityReplacement.this, PremiumPreviewFragment.PREMIUM_FEATURE_NAME_COLOR, true));
-                    } else {
-                        presentFragment(new PeerColorActivity(0).startOnProfile().setOnApplied(ProfileActivityReplacement.this));
-                    }
-                }
+                handleActionBarMenuClick(id);
             }
         });
         return actionBar;
@@ -912,7 +925,157 @@ public class ProfileActivityReplacement extends BaseFragment implements
             updatePremiumData();
         } else if (id == NotificationCenter.userIsPremiumBlockedUpadted) {
             updatePremiumData();
+        } else if (id == NotificationCenter.blockedUsersDidLoad) {
+            boolean oldValue = isUserBlocked;
+            isUserBlocked = getMessagesController().blockePeers.indexOfKey(userId) >= 0;
+            if (oldValue != isUserBlocked) {
+                updateMenuData(true);
+                // WIP: updateListAnimated(false);
+            }
         }
+    }
+
+    // CLICKS
+
+    private void handleActionBarMenuClick(int id) {
+        if (getParentActivity() == null) return;
+        if (id == -1) {
+            finishFragment();
+        } else if (id == AB_EDIT_INFO_ID) {
+            presentFragment(new UserInfoActivity());
+        } else if (id == AB_ADD_PHOTO_ID) {
+            uploadUserImage(null, null);
+        } else if (id == AB_EDIT_ID) {
+            if (isMyProfile()) {
+                presentFragment(new UserInfoActivity());
+            } else if (topicId != 0) {
+                Bundle args = new Bundle();
+                args.putLong("chat_id", chatId);
+                TopicCreateFragment fragment = TopicCreateFragment.create(chatId, topicId);
+                presentFragment(fragment);
+            } else {
+                Bundle args = new Bundle();
+                if (chatId != 0) {
+                    args.putLong("chat_id", chatId);
+                } else if (userInfo != null && userInfo.user.bot) {
+                    args.putLong("user_id", userId);
+                }
+                ChatEditActivity fragment = new ChatEditActivity(args);
+                if (chatInfo != null) fragment.setInfo(chatInfo);
+                else fragment.setInfo(userInfo);
+                presentFragment(fragment);
+            }
+        } else if (id == AB_QR_ID) {
+            Bundle args = new Bundle();
+            args.putLong("chat_id", chatId);
+            args.putLong("user_id", userId);
+            presentFragment(new QrActivity(args));
+        } else if (id == AB_LOGOUT_ID) {
+            presentFragment(new LogoutActivity());
+        } else if (id == AB_EDIT_COLOR_ID) {
+            if (!getUserConfig().isPremium()) {
+                showDialog(new PremiumFeatureBottomSheet(ProfileActivityReplacement.this, PremiumPreviewFragment.PREMIUM_FEATURE_NAME_COLOR, true));
+            } else {
+                presentFragment(new PeerColorActivity(0).startOnProfile().setOnApplied(ProfileActivityReplacement.this));
+            }
+        } else if (id == AB_CONTACT_DELETE_ID) {
+            final TLRPC.User user = getMessagesController().getUser(userId);
+            if (user == null) return;
+            AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), getResourceProvider());
+            builder.setTitle(LocaleController.getString(R.string.DeleteContact));
+            builder.setMessage(LocaleController.getString(R.string.AreYouSureDeleteContact));
+            builder.setPositiveButton(LocaleController.getString(R.string.Delete), (dialogInterface, i) -> {
+                ArrayList<TLRPC.User> list = new ArrayList<>(); list.add(user);
+                getContactsController().deleteContact(list, true);
+                user.contact = false;
+            });
+            builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+            AlertDialog dialog = builder.create();
+            showDialog(dialog);
+            TextView button = (TextView) dialog.getButton(DialogInterface.BUTTON_POSITIVE);
+            if (button != null) button.setTextColor(getThemedColor(Theme.key_text_RedBold));
+        } else if (id == AB_CONTACT_EDIT_ID) {
+            Bundle args = new Bundle();
+            args.putLong("user_id", userId);
+            presentFragment(new ContactAddActivity(args, getResourceProvider()));
+        } else if (id == AB_CONTACT_SHARE_ID) {
+            Bundle args = new Bundle();
+            args.putBoolean("onlySelect", true);
+            args.putInt("dialogsType", DialogsActivity.DIALOGS_TYPE_FORWARD);
+            args.putString("selectAlertString", LocaleController.getString(R.string.SendContactToText));
+            args.putString("selectAlertStringGroup", LocaleController.getString(R.string.SendContactToGroupText));
+            DialogsActivity fragment = new DialogsActivity(args);
+            fragment.setDelegate(ProfileActivityReplacement.this);
+            presentFragment(fragment);
+        } else if (id == AB_BOT_UNBLOCK_ID) {
+            getMessagesController().unblockPeer(userId, ()-> getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of("/start", userId, null, null, null, false, null, null, null, true, 0, null, false)));
+            finishFragment();
+        } else if (id == AB_BOT_BLOCK_ID) {
+            TLRPC.User user = getMessagesController().getUser(userId);
+            if (user == null) return;
+            AlertsCreator.createClearOrDeleteDialogAlert(ProfileActivityReplacement.this, false, chat, user, chatEncrypted != null, true, true, (param) -> {
+                if (getParentLayout() != null) {
+                    List<BaseFragment> fragmentStack = getParentLayout().getFragmentStack();
+                    BaseFragment prevFragment = fragmentStack == null || fragmentStack.size() < 2 ? null : fragmentStack.get(fragmentStack.size() - 2);
+                    if (prevFragment instanceof ChatActivity) {
+                        getParentLayout().removeFragmentFromStack(fragmentStack.size() - 2);
+                    }
+                }
+                finishFragment();
+                getNotificationCenter().postNotificationName(NotificationCenter.needDeleteDialog, dialogId, user, chat, param);
+            }, getResourceProvider());
+        } else if (id == AB_USER_UNBLOCK_ID) {
+            getMessagesController().unblockPeer(userId);
+            if (BulletinFactory.canShowBulletin(ProfileActivityReplacement.this)) {
+                BulletinFactory.createBanBulletin(ProfileActivityReplacement.this, false).show();
+            }
+        } else if (id == AB_USER_BLOCK_ID) {
+            TLRPC.User user = getMessagesController().getUser(userId);
+            if (user == null) return;
+            if (isReportSpam) {
+                AlertsCreator.showBlockReportSpamAlert(ProfileActivityReplacement.this, userId, user, null, chatEncrypted, false, null, param -> {
+                    if (param == 1) {
+                        getNotificationCenter().removeObserver(ProfileActivityReplacement.this, NotificationCenter.closeChats);
+                        getNotificationCenter().postNotificationName(NotificationCenter.closeChats);
+                        // WIP: playProfileAnimation = 0;
+                        finishFragment();
+                    } else {
+                        getNotificationCenter().postNotificationName(NotificationCenter.peerSettingsDidLoad, userId);
+                    }
+                }, getResourceProvider());
+            } else {
+                AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), getResourceProvider());
+                builder.setTitle(LocaleController.getString(R.string.BlockUser));
+                builder.setMessage(AndroidUtilities.replaceTags(formatString("AreYouSureBlockContact2", R.string.AreYouSureBlockContact2, ContactsController.formatName(user.first_name, user.last_name))));
+                builder.setPositiveButton(LocaleController.getString(R.string.BlockContact), (dialogInterface, i) -> {
+                    getMessagesController().blockPeer(userId);
+                    if (BulletinFactory.canShowBulletin(ProfileActivityReplacement.this)) {
+                        BulletinFactory.createBanBulletin(ProfileActivityReplacement.this, true).show();
+                    }
+                });
+                builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+                AlertDialog dialog = builder.create();
+                showDialog(dialog);
+                TextView button = (TextView) dialog.getButton(DialogInterface.BUTTON_POSITIVE);
+                if (button != null) button.setTextColor(getThemedColor(Theme.key_text_RedBold));
+            }
+        } else if (id == AB_CONTACT_ADD_ID) {
+            TLRPC.User user = getMessagesController().getUser(userId);
+            if (user == null) return;
+            Bundle args = new Bundle();
+            args.putLong("user_id", user.id);
+            args.putBoolean("addContact", true);
+            handleContactAdd(user, args);
+        }
+    }
+
+    private void handleContactAdd(TLRPC.User user, Bundle args) {
+        ContactAddActivity contactAddActivity = new ContactAddActivity(args, getResourceProvider());
+        contactAddActivity.setDelegate(() -> {
+            // WIP: Expand profile & update list
+            if (getUndoView() != null) getUndoView().showWithAction(dialogId, UndoView.ACTION_CONTACT_ADDED, user);
+        });
+        presentFragment(contactAddActivity);
     }
 
 }

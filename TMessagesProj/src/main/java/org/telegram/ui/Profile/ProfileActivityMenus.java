@@ -27,13 +27,22 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 
 
 public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
-    public final static int AB_MAIN_ID = 10;
+
+    public final static int AB_CONTACT_ADD_ID = 1;
+    public final static int AB_CONTACT_SHARE_ID = 3;
+    public final static int AB_CONTACT_EDIT_ID = 4;
+    public final static int AB_CONTACT_DELETE_ID = 5;
     public final static int AB_EDIT_INFO_ID = 30;
     public final static int AB_LOGOUT_ID = 31;
     public final static int AB_ADD_PHOTO_ID = 36;
     public final static int AB_QR_ID = 37;
     public final static int AB_EDIT_COLOR_ID = 40;
     public final static int AB_EDIT_ID = 41;
+    public final static int AB_BOT_BLOCK_ID = 50;
+    public final static int AB_BOT_UNBLOCK_ID = 51;
+    public final static int AB_USER_BLOCK_ID = 52;
+    public final static int AB_USER_UNBLOCK_ID = 53;
+    public final static int AB_MAIN_ID = 999;
 
     private final ActionBarMenuItem mainMenuItem;
     private final ActionBarMenuItem editMenuItem;
@@ -167,21 +176,39 @@ public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
         mainMenuItem.removeAllSubItems();
     }
 
-    public void appendEditInfoItem() {
-        mainMenuItem.addSubItem(AB_EDIT_INFO_ID, R.drawable.msg_edit, LocaleController.getString(R.string.EditInfo));
+    public void appendMainMenuSubItem(int id) {
+        if (id == AB_CONTACT_SHARE_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_share, LocaleController.getString(R.string.ShareContact));
+        } else if (id == AB_CONTACT_DELETE_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_delete, LocaleController.getString(R.string.DeleteContact));
+        } else if (id == AB_CONTACT_EDIT_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_edit, LocaleController.getString(R.string.EditContact));
+        } else if (id == AB_EDIT_INFO_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_edit, LocaleController.getString(R.string.EditInfo));
+        } else if (id == AB_ADD_PHOTO_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_addphoto, LocaleController.getString(R.string.AddPhoto));
+        } else if (id == AB_LOGOUT_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_leave, LocaleController.getString(R.string.LogOut));
+        } else if (id == AB_EDIT_COLOR_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.menu_profile_colors, LocaleController.getString(R.string.ProfileColorEdit));
+        } else if (id == AB_CONTACT_ADD_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_addcontact, LocaleController.getString(R.string.AddContact));
+        }
     }
 
-    public void appendEditColorItem() {
-        mainMenuItem.addSubItem(AB_EDIT_COLOR_ID, R.drawable.menu_profile_colors, LocaleController.getString(R.string.ProfileColorEdit));
-        updateEditColorItem(false);
-    }
-
-    public void appendPhotoItem() {
-        mainMenuItem.addSubItem(AB_ADD_PHOTO_ID, R.drawable.msg_addphoto, LocaleController.getString(R.string.AddPhoto));
-    }
-
-    public void appendLogoutItem() {
-        mainMenuItem.addSubItem(AB_LOGOUT_ID, R.drawable.msg_leave, LocaleController.getString(R.string.LogOut));
+    public void appendBlockUnblockItem(boolean bot, boolean blocked) {
+        if (bot) {
+            if (blocked) {
+                mainMenuItem.addSubItem(AB_BOT_UNBLOCK_ID, R.drawable.msg_retry, LocaleController.getString(R.string.BotRestart));
+            } else {
+                ActionBarMenuSubItem item = mainMenuItem.addSubItem(AB_BOT_BLOCK_ID, R.drawable.msg_block2, LocaleController.getString(R.string.DeleteAndBlock));
+                item.setColors(getColor(Theme.key_text_RedRegular), getColor(Theme.key_text_RedRegular));
+            }
+        } else {
+            int text = blocked ? R.string.Unblock : R.string.BlockContact;
+            int id = blocked ? AB_USER_UNBLOCK_ID : AB_USER_BLOCK_ID;
+            mainMenuItem.addSubItem(id, R.drawable.msg_block, LocaleController.getString(text));
+        }
     }
 
     public void appendAutoDeleteItem(boolean allowExtendedHint, AutoDeletePopupWrapper.Callback callback) {
