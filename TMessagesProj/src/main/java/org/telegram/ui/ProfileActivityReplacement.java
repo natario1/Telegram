@@ -260,6 +260,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
                         if (!user.bot) {
                             menuHandler.appendMainMenuSubItem(AB_CONTACT_ADD_ID);
                         }
+                        if (user.bot) {
+                            menuHandler.appendMainMenuSubItem(AB_SHARE_ID);
+                        }
                         if (!TextUtils.isEmpty(user.phone)) {
                             menuHandler.appendMainMenuSubItem(AB_CONTACT_SHARE_ID);
                         }
@@ -285,8 +288,18 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 } else {
                     editMenuItemVisible = ChatObject.hasAdminRights(chat) || chat.megagroup && ChatObject.canChangeChatInfo(chat);
                 }
+                if (chat.megagroup) {
+                    if (!chat.creator && !chat.left && !chat.kicked && topicId == 0) {
+                        menuHandler.appendLeaveGroupItem(true, true);
+                    }
+                    // WIP
+                } else {
+                    if (ChatObject.isPublic(chat)) menuHandler.appendMainMenuSubItem(AB_SHARE_ID);
+                    if (!chat.creator && !chat.left && !chat.kicked) menuHandler.appendLeaveGroupItem(false, true);
+                }
             } else {
                 editMenuItemVisible = ChatObject.canChangeChatInfo(chat);
+                menuHandler.appendLeaveGroupItem(false, false);
             }
         }
         menuHandler.updateEditItem(editMenuItemVisible && !mediaHeaderVisible, animated);
@@ -1066,6 +1079,36 @@ public class ProfileActivityReplacement extends BaseFragment implements
             args.putLong("user_id", user.id);
             args.putBoolean("addContact", true);
             handleContactAdd(user, args);
+        } else if (id == AB_SHARE_ID) {
+            TLRPC.User user = userId != 0 ? getMessagesController().getUser(userId) : null;
+            TLRPC.Chat chat = chatId != 0 ? getMessagesController().getChat(chatId) : null;
+            if (user == null && chat == null) return;
+            try {
+                String text = "";
+                String username = user != null ? UserObject.getPublicUsername(user) : ChatObject.getPublicUsername(chat);
+                String about = user != null ? (user.bot && userInfo != null ? userInfo.about : null) : (chatInfo != null ? chatInfo.about : null);
+                if (TextUtils.isEmpty(about)) {
+                    text = String.format("https://" + getMessagesController().linkPrefix + "/%s", username);
+                } else {
+                    text = String.format("%s https://" + getMessagesController().linkPrefix + "/%s", about, username);
+                }
+                Intent intent = new Intent(Intent.ACTION_SEND);
+                intent.setType("text/plain");
+                intent.putExtra(Intent.EXTRA_TEXT, text);
+                startActivityForResult(Intent.createChooser(intent, LocaleController.getString(R.string.BotShare)), 500);
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        } else if (id == AB_GROUP_LEAVE_ID) {
+            if (chat == null) return;
+            boolean isForum = ChatObject.isForum(chat);
+            AlertsCreator.createClearOrDeleteDialogAlert(this, false, chat, null, false, isForum, !isForum, (param) -> {
+                // WIP: playProfileAnimation = 0;
+                getNotificationCenter().removeObserver(this, NotificationCenter.closeChats);
+                getNotificationCenter().postNotificationName(NotificationCenter.closeChats);
+                finishFragment();
+                getNotificationCenter().postNotificationName(NotificationCenter.needDeleteDialog, -chat.id, null, chat, param);
+            }, getResourceProvider());
         }
     }
 

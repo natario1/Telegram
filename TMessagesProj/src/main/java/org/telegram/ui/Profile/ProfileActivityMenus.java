@@ -26,12 +26,14 @@ import java.util.ArrayList;
 import static org.telegram.messenger.AndroidUtilities.dp;
 
 
-public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
+public class ProfileActivityMenus {
 
     public final static int AB_CONTACT_ADD_ID = 1;
     public final static int AB_CONTACT_SHARE_ID = 3;
     public final static int AB_CONTACT_EDIT_ID = 4;
     public final static int AB_CONTACT_DELETE_ID = 5;
+    public final static int AB_GROUP_LEAVE_ID = 7; // TODO: move to header
+    public final static int AB_SHARE_ID = 10; // TODO: move to header
     public final static int AB_EDIT_INFO_ID = 30;
     public final static int AB_LOGOUT_ID = 31;
     public final static int AB_ADD_PHOTO_ID = 36;
@@ -193,6 +195,8 @@ public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
             mainMenuItem.addSubItem(id, R.drawable.menu_profile_colors, LocaleController.getString(R.string.ProfileColorEdit));
         } else if (id == AB_CONTACT_ADD_ID) {
             mainMenuItem.addSubItem(id, R.drawable.msg_addcontact, LocaleController.getString(R.string.AddContact));
+        } else if (id == AB_SHARE_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_share, LocaleController.getString(R.string.BotShare));
         }
     }
 
@@ -209,6 +213,11 @@ public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
             int id = blocked ? AB_USER_UNBLOCK_ID : AB_USER_BLOCK_ID;
             mainMenuItem.addSubItem(id, R.drawable.msg_block, LocaleController.getString(text));
         }
+    }
+
+    public void appendLeaveGroupItem(boolean megagroup, boolean channel) {
+        int title = megagroup ? R.string.LeaveMegaMenu : channel ? R.string.LeaveChannelMenu : R.string.DeleteAndExit;
+        mainMenuItem.addSubItem(AB_GROUP_LEAVE_ID, R.drawable.msg_leave, LocaleController.getString(title));
     }
 
     public void appendAutoDeleteItem(boolean allowExtendedHint, AutoDeletePopupWrapper.Callback callback) {
