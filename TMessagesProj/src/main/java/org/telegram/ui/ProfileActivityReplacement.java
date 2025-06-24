@@ -17,6 +17,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import androidx.annotation.NonNull;
@@ -61,6 +62,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private RootLayout rootLayout;
 
     private float mediaHeaderAnimationProgress = 0F;
+    private boolean mediaHeaderVisible = false;
 
     public static ProfileActivityReplacement of(long dialogId) {
         Bundle bundle = new Bundle();
@@ -134,7 +136,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         TLRPC.Chat newChat = getMessagesController().getChat(chatId);
         if (newChat != null) {
             chat = newChat;
-            createActionBarMenu(true);
+            updateActionBarMenuItems(true);
         }
         if (flagSecure != null) {
             flagSecure.invalidate();
@@ -548,6 +550,30 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 if (getParentActivity() == null) return;
                 if (id == -1) {
                     finishFragment();
+                } else if (id == RootLayout.EDIT_INFO_ID) {
+                    presentFragment(new UserInfoActivity());
+                } else if (id == RootLayout.ADD_PHOTO_ID) {
+                    uploadUserImage(null, null);
+                } else if (id == RootLayout.EDIT_ID) {
+                    if (isMyProfile) {
+                        presentFragment(new UserInfoActivity());
+                    } else if (topicId != 0) {
+                        Bundle args = new Bundle();
+                        args.putLong("chat_id", chatId);
+                        TopicCreateFragment fragment = TopicCreateFragment.create(chatId, topicId);
+                        presentFragment(fragment);
+                    } else {
+                        Bundle args = new Bundle();
+                        if (chatId != 0) {
+                            args.putLong("chat_id", chatId);
+                        } else if (userInfo != null && userInfo.user.bot) {
+                            args.putLong("user_id", userId);
+                        }
+                        ChatEditActivity fragment = new ChatEditActivity(args);
+                        if (chatInfo != null) fragment.setInfo(chatInfo);
+                        else fragment.setInfo(userInfo);
+                        presentFragment(fragment);
+                    }
                 } else {
                     super.onItemClick(id);
                 }
@@ -556,42 +582,71 @@ public class ProfileActivityReplacement extends BaseFragment implements
         return actionBar;
     }
 
-    private void createActionBarMenu(boolean animated) {
+    private void updateActionBarMenuItems(boolean animated) {
         if (rootLayout == null) return;
-        ActionBarMenuItem menu = rootLayout.actionBarMenuItem;
-        menu.removeAllSubItems();
+        ActionBarMenuItem mainMenuItem = rootLayout.mainMenuItem;
+        mainMenuItem.removeAllSubItems();
+        boolean editMenuItemVisible = false;
         if (userId != 0) {
             TLRPC.User user = getMessagesController().getUser(userId);
             if (user == null) return;
             if (UserObject.isUserSelf(user)) {
-                // WIP
+                editMenuItemVisible = isMyProfile;
+                mainMenuItem.addSubItem(RootLayout.EDIT_INFO_ID, R.drawable.msg_edit, LocaleController.getString(R.string.EditInfo));
+                if (imageUpdater != null) {
+                    mainMenuItem.addSubItem(RootLayout.ADD_PHOTO_ID, R.drawable.msg_addphoto, LocaleController.getString(R.string.AddPhoto));
+                }
             } else {
-                if ((user.bot || getContactsController().contactsDict.get(userId) == null)) {
+                editMenuItemVisible = user.bot && user.bot_can_edit;
+                if (user.bot || getContactsController().contactsDict.get(userId) == null) {
                     if (MessagesController.isSupportUser(user)) {
                         // WIP
                     } else if (getDialogId() != UserObject.VERIFY) {
-                        if (chatEncrypted == null) createActionBarMenuAutoDeleteItem(rootLayout);
+                        if (chatEncrypted == null) updateActionBarAutoDeleteMenuItem(rootLayout);
                     }
                 } else {
-                    if (chatEncrypted == null) createActionBarMenuAutoDeleteItem(rootLayout);
+                    if (chatEncrypted == null) updateActionBarAutoDeleteMenuItem(rootLayout);
                 }
             }
         } else if (chatId != 0) {
             TLRPC.Chat chat = getMessagesController().getChat(chatId);
             if (chat == null) return;
             if (topicId == 0 && ChatObject.canChangeChatInfo(chat)) {
-                createActionBarMenuAutoDeleteItem(rootLayout);
+                updateActionBarAutoDeleteMenuItem(rootLayout);
             }
-
+            if (ChatObject.isChannel(chat)) {
+                if (topicId != 0) {
+                    editMenuItemVisible = ChatObject.canManageTopic(currentAccount, chat, topicId);
+                } else {
+                    editMenuItemVisible = ChatObject.hasAdminRights(chat) || chat.megagroup && ChatObject.canChangeChatInfo(chat);
+                }
+            } else {
+                editMenuItemVisible = ChatObject.canChangeChatInfo(chat);
+            }
         }
+        updateActionBarEditMenuItem(rootLayout, editMenuItemVisible, animated);
         // WIP
     }
 
-    private void createActionBarMenuAutoDeleteItem(RootLayout rootLayout) {
+    private void updateActionBarEditMenuItem(RootLayout rootLayout, boolean visible, boolean animated) {
+        boolean actuallyVisible = visible && !mediaHeaderVisible;
+        ActionBarMenuItem editMenuItem = rootLayout.editMenuItem;
+        if (actuallyVisible && editMenuItem.getVisibility() != View.VISIBLE) {
+            editMenuItem.setVisibility(View.VISIBLE);
+            if (animated) {
+                editMenuItem.setAlpha(0);
+                editMenuItem.animate().alpha(1f).setDuration(150).start();
+            }
+        } else if (!actuallyVisible && editMenuItem.getVisibility() != View.GONE) {
+            editMenuItem.setVisibility(View.GONE);
+        }
+    }
+
+    private void updateActionBarAutoDeleteMenuItem(RootLayout rootLayout) {
         rootLayout.appendTtlMenuItem(dialogId > 0 || userId > 0, new AutoDeletePopupWrapper.Callback() {
             @Override
             public void dismiss() {
-                rootLayout.actionBarMenuItem.toggleSubMenu();
+                rootLayout.mainMenuItem.toggleSubMenu();
             }
             @Override
             public void setAutoDeleteHistory(int time, int action) {
@@ -606,6 +661,20 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
         });
         updateTtlData();
+    }
+
+    private boolean uploadUserImage(Runnable onDismiss, Runnable onDelete) {
+        if (imageUpdater == null) return false;
+        TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
+        if (user == null) user = UserConfig.getInstance(currentAccount).getCurrentUser();
+        if (user == null) return false;
+        imageUpdater.openMenu(user.photo != null && user.photo.photo_big != null && !(user.photo instanceof TLRPC.TL_userProfilePhotoEmpty), () -> {
+            MessagesController.getInstance(currentAccount).deleteUserPhoto(null);
+            if (onDelete != null) onDelete.run();
+        }, dialog -> {
+            if (onDismiss != null) onDismiss.run();
+        }, 0);
+        return true;
     }
 
     @Override
@@ -624,7 +693,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout = new RootLayout(context, resourceProvider, actionBar);
 
         rootLayout.updateColors(peerColor, 0F);
-        createActionBarMenu(false);
+        updateActionBarMenuItems(false);
 
 
         // Decorations
@@ -813,7 +882,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         } else if (id == NotificationCenter.reloadDialogPhotos) {
             updateProfileData(false);
         } else if (id == NotificationCenter.contactsDidLoad || id == NotificationCenter.channelRightsUpdated) {
-            createActionBarMenu(true);
+            updateActionBarMenuItems(true);
         } else if (id == NotificationCenter.chatInfoDidLoad) {
             final TLRPC.ChatFull full = (TLRPC.ChatFull) args[0];
             if (full.id != chatId) return;
@@ -833,6 +902,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
     // Views
 
     private static class RootLayout extends FrameLayout {
+        private final static int MAIN_ID = 10;
+        private final static int EDIT_ID = 41;
+        private final static int EDIT_INFO_ID = 30;
+        private final static int ADD_PHOTO_ID = 36;
+
         /** @noinspection deprecation*/
         private final UndoView undoView;
         private final View blurredView;
@@ -842,8 +916,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
         private final Paint scrimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         private final ActionBar actionBar;
-        private final ActionBarMenuItem actionBarMenuItem;
-        private final Paint actionBarScrimBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint actionBarBackButtonBackgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        private final ActionBarMenuItem mainMenuItem;
+        private final ActionBarMenuItem editMenuItem;
 
         private final ImageView ttlIndicator;
         private AutoDeletePopupWrapper ttlPopupWrapper;
@@ -858,12 +934,15 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
             // Action bar
             this.actionBar = actionBar;
-            actionBarMenuItem = actionBar.createMenu().addItem(10, R.drawable.ic_ab_other, resourceProvider);
-            actionBarMenuItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
-            actionBarScrimBackgroundPaint.setColor(getColor(Theme.key_listSelector));
+            this.actionBarBackButtonBackgroundPaint.setColor(getColor(Theme.key_listSelector));
+
+            editMenuItem = actionBar.createMenu().addItem(EDIT_ID, R.drawable.group_edit_profile, resourceProvider);
+            editMenuItem.setContentDescription(LocaleController.getString(R.string.Edit));
+            mainMenuItem = actionBar.createMenu().addItem(MAIN_ID, R.drawable.ic_ab_other, resourceProvider);
+            mainMenuItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
             ttlIndicator = new ImageView(context);
             ttlIndicator.setImageResource(R.drawable.msg_mini_autodelete_timer);
-            actionBarMenuItem.addView(ttlIndicator, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
+            mainMenuItem.addView(ttlIndicator, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
             updateTtlIndicator(false, false);
 
             //noinspection deprecation
@@ -887,6 +966,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
 
         void addDecorationViews() {
+            if (actionBar.getParent() != null) {
+                ((ViewGroup) actionBar.getParent()).removeView(actionBar);
+            }
             addView(actionBar);
             addView(undoView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 8, 0, 8, 8));
             addView(blurredView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
@@ -959,7 +1041,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             int foreground = ColorUtils.blendARGB(rawForeground, getColor(Theme.key_actionBarActionModeDefaultIcon), actionModeProgress);
             actionBar.setItemsBackgroundColor(ColorUtils.blendARGB(rawBackground, getColor(Theme.key_actionBarActionModeDefaultSelector), actionModeProgress), false);
             actionBar.setItemsColor(foreground, false);
-            actionBarMenuItem.setIconColor(rawForeground);
+            mainMenuItem.setIconColor(rawForeground);
             ttlIndicator.setColorFilter(new PorterDuffColorFilter(foreground, PorterDuff.Mode.MULTIPLY));
             if (ttlPopupWrapper != null && ttlPopupWrapper.textView != null) {
                 ttlPopupWrapper.textView.invalidate();
@@ -976,13 +1058,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
 
         void appendTtlMenuItem(boolean allowExtendedLink, AutoDeletePopupWrapper.Callback callback) {
-            ttlPopupWrapper = new AutoDeletePopupWrapper(getContext(), actionBarMenuItem.getPopupLayout().getSwipeBack(), callback, false, 0, resourceProvider);
+            ttlPopupWrapper = new AutoDeletePopupWrapper(getContext(), mainMenuItem.getPopupLayout().getSwipeBack(), callback, false, 0, resourceProvider);
             if (allowExtendedLink) {
                 ttlPopupWrapper.allowExtendedHint(getColor(Theme.key_windowBackgroundWhiteBlueText));
             }
             ttlTimerDrawable = TimerDrawable.getTtlIcon(0);
-            actionBarMenuItem.addSwipeBackItem(0, ttlTimerDrawable, LocaleController.getString(R.string.AutoDeletePopupTitle), ttlPopupWrapper.windowLayout);
-            actionBarMenuItem.addColoredGap();
+            mainMenuItem.addSwipeBackItem(0, ttlTimerDrawable, LocaleController.getString(R.string.AutoDeletePopupTitle), ttlPopupWrapper.windowLayout);
+            mainMenuItem.addColoredGap();
         }
 
         @Override
@@ -1002,10 +1084,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 canvas.translate(scrimView.getLeft(), scrimView.getTop());
                 if (scrimView == actionBar.getBackButton()) {
                     int r = Math.max(scrimView.getMeasuredWidth(), scrimView.getMeasuredHeight()) / 2;
-                    int wasAlpha = actionBarScrimBackgroundPaint.getAlpha();
-                    actionBarScrimBackgroundPaint.setAlpha((int) (wasAlpha * (scrimPaint.getAlpha() / 255f) / 0.3f));
-                    canvas.drawCircle(r, r, r * 0.7f, actionBarScrimBackgroundPaint);
-                    actionBarScrimBackgroundPaint.setAlpha(wasAlpha);
+                    int wasAlpha = actionBarBackButtonBackgroundPaint.getAlpha();
+                    actionBarBackButtonBackgroundPaint.setAlpha((int) (wasAlpha * (scrimPaint.getAlpha() / 255f) / 0.3f));
+                    canvas.drawCircle(r, r, r * 0.7f, actionBarBackButtonBackgroundPaint);
+                    actionBarBackButtonBackgroundPaint.setAlpha(wasAlpha);
                 }
                 scrimView.draw(canvas);
                 canvas.restoreToCount(c);
