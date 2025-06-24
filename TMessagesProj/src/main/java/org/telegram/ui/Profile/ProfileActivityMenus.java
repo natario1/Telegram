@@ -6,30 +6,34 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.*;
+import android.graphics.drawable.Drawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import org.telegram.messenger.*;
-import org.telegram.ui.ActionBar.ActionBar;
-import org.telegram.ui.ActionBar.ActionBarMenu;
-import org.telegram.ui.ActionBar.ActionBarMenuItem;
-import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.*;
 import org.telegram.ui.Components.AutoDeletePopupWrapper;
+import org.telegram.ui.Components.CombinedDrawable;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.TimerDrawable;
 
 import java.util.ArrayList;
 
+import static org.telegram.messenger.AndroidUtilities.dp;
+
 
 public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
     public final static int AB_MAIN_ID = 10;
-    public final static int AB_EDIT_ID = 41;
     public final static int AB_EDIT_INFO_ID = 30;
+    public final static int AB_LOGOUT_ID = 31;
     public final static int AB_ADD_PHOTO_ID = 36;
     public final static int AB_QR_ID = 37;
+    public final static int AB_EDIT_COLOR_ID = 40;
+    public final static int AB_EDIT_ID = 41;
 
     private final ActionBarMenuItem mainMenuItem;
     private final ActionBarMenuItem editMenuItem;
@@ -142,6 +146,23 @@ public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
         }
     }
 
+    public void updateEditColorItem(boolean isPremium) {
+        ActionBarMenuSubItem item = (ActionBarMenuSubItem) mainMenuItem.getSubItem(AB_EDIT_COLOR_ID);
+        if (item == null) return;
+        if (isPremium) {
+            item.setIcon(R.drawable.menu_profile_colors);
+        } else {
+            Drawable icon = ContextCompat.getDrawable(context, R.drawable.menu_profile_colors_locked);
+            icon.setColorFilter(new PorterDuffColorFilter(getColor(Theme.key_actionBarDefaultSubmenuItemIcon), PorterDuff.Mode.SRC_IN));
+            Drawable lockIcon = ContextCompat.getDrawable(context, R.drawable.msg_gallery_locked2);
+            lockIcon.setColorFilter(new PorterDuffColorFilter(ColorUtils.blendARGB(Color.WHITE, Color.BLACK, 0.5f), PorterDuff.Mode.MULTIPLY));
+            CombinedDrawable combinedDrawable = new CombinedDrawable(icon, lockIcon, dp(1), -dp(1)) {
+                @Override public void setColorFilter(ColorFilter colorFilter) {}
+            };
+            item.setIcon(combinedDrawable);
+        }
+    }
+
     public void clearMainMenu() {
         mainMenuItem.removeAllSubItems();
     }
@@ -150,8 +171,17 @@ public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
         mainMenuItem.addSubItem(AB_EDIT_INFO_ID, R.drawable.msg_edit, LocaleController.getString(R.string.EditInfo));
     }
 
+    public void appendEditColorItem() {
+        mainMenuItem.addSubItem(AB_EDIT_COLOR_ID, R.drawable.menu_profile_colors, LocaleController.getString(R.string.ProfileColorEdit));
+        updateEditColorItem(false);
+    }
+
     public void appendPhotoItem() {
         mainMenuItem.addSubItem(AB_ADD_PHOTO_ID, R.drawable.msg_addphoto, LocaleController.getString(R.string.AddPhoto));
+    }
+
+    public void appendLogoutItem() {
+        mainMenuItem.addSubItem(AB_LOGOUT_ID, R.drawable.msg_leave, LocaleController.getString(R.string.LogOut));
     }
 
     public void appendAutoDeleteItem(boolean allowExtendedHint, AutoDeletePopupWrapper.Callback callback) {

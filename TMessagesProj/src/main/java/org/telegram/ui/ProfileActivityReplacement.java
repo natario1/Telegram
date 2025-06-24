@@ -17,6 +17,7 @@ import org.telegram.tgnet.tl.TL_account;
 import org.telegram.ui.ActionBar.*;
 import org.telegram.ui.Cells.ProfileChannelCell;
 import org.telegram.ui.Components.*;
+import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.voip.VoIPHelper;
 import org.telegram.ui.Profile.ProfileActivityMenus;
 import org.telegram.ui.Profile.ProfileActivityRootLayout;
@@ -229,13 +230,17 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (menuHandler == null) return;
         menuHandler.clearMainMenu();
         boolean editMenuItemVisible = false;
+        boolean appendLogout = false;
         if (userId != 0) {
             TLRPC.User user = getMessagesController().getUser(userId);
             if (user == null) return;
             if (UserObject.isUserSelf(user)) {
                 editMenuItemVisible = isMyProfile;
+                appendLogout = !isMyProfile;
                 menuHandler.appendEditInfoItem();
                 if (imageUpdater != null) menuHandler.appendPhotoItem();
+                menuHandler.appendEditColorItem();
+                updatePremiumData();
             } else {
                 editMenuItemVisible = user.bot && user.bot_can_edit;
                 if (user.bot || getContactsController().contactsDict.get(user.id) == null) {
@@ -266,6 +271,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
         menuHandler.updateEditItem(editMenuItemVisible && !mediaHeaderVisible, animated);
         // WIP
+        if (appendLogout) {
+            menuHandler.appendLogoutItem();
+        }
     }
 
     private void updateMenuAutoDelete() {
@@ -286,6 +294,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
         });
         updateTtlData();
+    }
+
+    private void updatePremiumData() {
+        boolean isPremium = getUserConfig().isPremium();
+        if (menuHandler != null) {
+            menuHandler.updateEditColorItem(isPremium);
+        }
     }
 
     private void updateTtlData() {
@@ -647,6 +662,14 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     args.putLong("chat_id", chatId);
                     args.putLong("user_id", userId);
                     presentFragment(new QrActivity(args));
+                } else if (id == AB_LOGOUT_ID) {
+                    presentFragment(new LogoutActivity());
+                } else if (id == AB_EDIT_COLOR_ID) {
+                    if (!getUserConfig().isPremium()) {
+                        showDialog(new PremiumFeatureBottomSheet(ProfileActivityReplacement.this, PremiumPreviewFragment.PREMIUM_FEATURE_NAME_COLOR, true));
+                    } else {
+                        presentFragment(new PeerColorActivity(0).startOnProfile().setOnApplied(ProfileActivityReplacement.this));
+                    }
                 }
             }
         });
@@ -885,6 +908,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
             removeSelfFromStack(true);
         } else if (id == NotificationCenter.privacyRulesUpdated) {
             if (menuHandler != null) menuHandler.updateQrItem(true, true);
+        } else if (id == NotificationCenter.currentUserPremiumStatusChanged) {
+            updatePremiumData();
+        } else if (id == NotificationCenter.userIsPremiumBlockedUpadted) {
+            updatePremiumData();
         }
     }
 
