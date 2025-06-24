@@ -1,9 +1,15 @@
 package org.telegram.ui.Profile;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.*;
 import android.view.Gravity;
 import android.view.View;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
 import androidx.core.graphics.ColorUtils;
 import org.telegram.messenger.*;
@@ -15,15 +21,22 @@ import org.telegram.ui.Components.AutoDeletePopupWrapper;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.TimerDrawable;
 
+import java.util.ArrayList;
+
 
 public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
     public final static int AB_MAIN_ID = 10;
     public final static int AB_EDIT_ID = 41;
     public final static int AB_EDIT_INFO_ID = 30;
     public final static int AB_ADD_PHOTO_ID = 36;
+    public final static int AB_QR_ID = 37;
 
     private final ActionBarMenuItem mainMenuItem;
     private final ActionBarMenuItem editMenuItem;
+
+    private final ActionBarMenuItem qrMenuItem;
+    private boolean qrMenuItemVisible;
+    private AnimatorSet qrMenuItemAnimator;
 
     private final ImageView ttlIndicator;
     private AutoDeletePopupWrapper ttlPopupWrapper;
@@ -32,16 +45,32 @@ public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
     private final Theme.ResourcesProvider resourceProvider;
     private final Context context;
 
-    public ProfileActivityMenus(Context context, Theme.ResourcesProvider resourceProvider, ActionBar actionBar) {
+    public ProfileActivityMenus(
+            Context context,
+            Theme.ResourcesProvider resourceProvider,
+            ActionBar actionBar,
+            boolean qr
+    ) {
         this.resourceProvider = resourceProvider;
         this.context = context;
 
         ActionBarMenu menu = actionBar.createMenu();
         menu.removeAllViews();
+
+        if (qr) {
+            qrMenuItem = menu.addItem(AB_QR_ID, R.drawable.msg_qr_mini, resourceProvider);
+            qrMenuItem.setContentDescription(LocaleController.getString(R.string.GetQRCode));
+            updateQrItem(true, false);
+        } else {
+            qrMenuItem = null;
+        }
+
         editMenuItem = menu.addItem(AB_EDIT_ID, R.drawable.group_edit_profile, resourceProvider);
         editMenuItem.setContentDescription(LocaleController.getString(R.string.Edit));
+
         mainMenuItem = menu.addItem(AB_MAIN_ID, R.drawable.ic_ab_other, resourceProvider);
         mainMenuItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
+
         ttlIndicator = new ImageView(context);
         ttlIndicator.setImageResource(R.drawable.msg_mini_autodelete_timer);
         mainMenuItem.addView(ttlIndicator, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
@@ -69,6 +98,36 @@ public class ProfileActivityMenus extends ActionBar.ActionBarMenuOnItemClick {
     public void updateTtlPopup(int ttl) {
         if (ttlTimerDrawable != null) ttlTimerDrawable.setTime(ttl);
         if (ttlPopupWrapper != null) ttlPopupWrapper.updateItems(ttl);
+    }
+
+    // WIP: Only show if extraHeight / AndroidUtilities.dp(88f) > .5f && searchTransitionProgress > .5f
+    public void updateQrItem(boolean visible, boolean animated) {
+        if (qrMenuItem == null) return;
+        if (animated && visible == qrMenuItemVisible) return;
+        qrMenuItemVisible = visible;
+        if (qrMenuItemAnimator != null) qrMenuItemAnimator.cancel();
+        qrMenuItem.setClickable(visible);
+        float alpha = visible ? 1F : 0F;
+        float scale = visible ? 1F : 0F;
+        if (animated) {
+            if (!(qrMenuItem.getVisibility() == View.GONE && !visible)) {
+                qrMenuItem.setVisibility(View.VISIBLE);
+            }
+            qrMenuItemAnimator = new AnimatorSet();
+            qrMenuItemAnimator.setInterpolator(visible ? new DecelerateInterpolator() : new AccelerateInterpolator());
+            qrMenuItemAnimator.playTogether(
+                    ObjectAnimator.ofFloat(qrMenuItem, View.ALPHA, alpha),
+                    ObjectAnimator.ofFloat(qrMenuItem, View.SCALE_Y, scale)
+                    // WIP: ObjectAnimator.ofFloat(avatarsViewPagerIndicatorView, View.TRANSLATION_X, ...)
+            );
+            qrMenuItemAnimator.setDuration(150);
+            qrMenuItemAnimator.start();
+        } else {
+            qrMenuItem.setScaleY(scale);
+            qrMenuItem.setAlpha(alpha);
+            qrMenuItem.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+        qrMenuItemVisible = visible;
     }
 
     public void updateEditItem(boolean visible, boolean animated) {

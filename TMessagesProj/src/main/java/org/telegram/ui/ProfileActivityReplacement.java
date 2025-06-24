@@ -24,6 +24,7 @@ import org.telegram.ui.Profile.ProfileActivityRootLayout;
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
 
+import static org.telegram.messenger.ContactsController.PRIVACY_RULES_TYPE_ADDED_BY_PHONE;
 import static org.telegram.ui.Profile.ProfileActivityMenus.*;
 
 public class ProfileActivityReplacement extends BaseFragment implements
@@ -202,18 +203,25 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
         if (wasPeerColor != peerColor) {
             // WIP: updatedPeerColor() method.
-            if (rootLayout != null) {
-                rootLayout.updateColors(peerColor, mediaHeaderAnimationProgress);
-            }
-            if (menuHandler != null) {
-                menuHandler.updateColors(peerColor, mediaHeaderAnimationProgress);
-            }
-            if (sharedMediaLayout != null && sharedMediaLayout.scrollSlidingTextTabStrip != null) {
-                sharedMediaLayout.scrollSlidingTextTabStrip.updateColors();
-            }
-            if (sharedMediaLayout != null && sharedMediaLayout.giftsContainer != null) {
-                sharedMediaLayout.giftsContainer.updateColors();
-            }
+            updateColors();
+        }
+        if (menuHandler != null) {
+            menuHandler.updateQrItem(true, true);
+        }
+    }
+
+    private void updateColors() {
+        if (rootLayout != null) {
+            rootLayout.updateColors(peerColor, mediaHeaderAnimationProgress);
+        }
+        if (menuHandler != null) {
+            menuHandler.updateColors(peerColor, mediaHeaderAnimationProgress);
+        }
+        if (sharedMediaLayout != null && sharedMediaLayout.scrollSlidingTextTabStrip != null) {
+            sharedMediaLayout.scrollSlidingTextTabStrip.updateColors();
+        }
+        if (sharedMediaLayout != null && sharedMediaLayout.giftsContainer != null) {
+            sharedMediaLayout.giftsContainer.updateColors();
         }
     }
 
@@ -634,8 +642,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
                         else fragment.setInfo(userInfo);
                         presentFragment(fragment);
                     }
-                } else {
-                    super.onItemClick(id);
+                } else if (id == AB_QR_ID) {
+                    Bundle args = new Bundle();
+                    args.putLong("chat_id", chatId);
+                    args.putLong("user_id", userId);
+                    presentFragment(new QrActivity(args));
                 }
             }
         });
@@ -669,8 +680,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
 
         // Root view
+        boolean qr = userId == getUserConfig().clientUserId && !isMyProfile;
         rootLayout = new ProfileActivityRootLayout(context, resourceProvider, actionBar);
-        menuHandler = new ProfileActivityMenus(context, resourceProvider, actionBar);
+        menuHandler = new ProfileActivityMenus(context, resourceProvider, actionBar, qr);
+        if (qr && ContactsController.getInstance(currentAccount).getPrivacyRules(PRIVACY_RULES_TYPE_ADDED_BY_PHONE) == null) {
+            ContactsController.getInstance(currentAccount).loadPrivacySettings();
+        }
 
         rootLayout.updateColors(peerColor, 0F);
         menuHandler.updateColors(peerColor, 0F);
@@ -712,8 +727,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
         ThemeDescription.ThemeDescriptionDelegate themeDelegate = () -> {
             // WIP
-            if (rootLayout != null) rootLayout.updateColors(peerColor, mediaHeaderAnimationProgress);
-            if (menuHandler != null) menuHandler.updateColors(peerColor, mediaHeaderAnimationProgress);
+            updateColors();
         };
         arrayList.add(new ThemeDescription(null, 0, null, null, null, themeDelegate, Theme.key_actionBarDefaultIcon));
         arrayList.add(new ThemeDescription(null, 0, null, null, null, themeDelegate, Theme.key_avatar_actionBarSelectorBlue));
@@ -869,6 +883,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
             updateTtlData();
         } else if (id == NotificationCenter.closeChats) {
             removeSelfFromStack(true);
+        } else if (id == NotificationCenter.privacyRulesUpdated) {
+            if (menuHandler != null) menuHandler.updateQrItem(true, true);
         }
     }
 
