@@ -9,19 +9,12 @@ import org.telegram.ui.ActionBar.ActionBar;
 
 public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
 
-    private final static int DEFAULT_MID_GROWTH = AndroidUtilities.dp(300);
-    private final static int DEFAULT_MAX_GROWTH = AndroidUtilities.dp(480);
 
     private final ActionBar actionBar;
 
     public ProfileHeaderView(@NonNull ActionBar actionBar) {
         super(actionBar.getContext());
         this.actionBar = actionBar;
-    }
-
-    @Override
-    public int getBaseHeight() {
-        return ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0);
     }
 
     @Override
@@ -32,19 +25,27 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
     }
 
     public void onConfigurationChanged(Point size) {
-        // WIP: also isTablet and avatarImage.getImageReceiver().hasNotThumb()
+        int baseHeight = ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0);
+        int overscrollHeight = AndroidUtilities.dp(48);
+        int availableHeight = size.y - baseHeight;
+
+        // Configure base height
+        configureHeights(baseHeight);
+
+        // Configure growth
+        // WIP: also !isTablet and avatarImage.getImageReceiver().hasNotThumb()
         boolean landscape = size.x > size.y;
         boolean expandable = !landscape && !AndroidUtilities.isAccessibilityScreenReaderEnabled();
-        boolean wasExpandable = snapGrowths.length == 3;
-        if (expandable == wasExpandable && snapGrowths.length > 0) return;
-        int availableHeight = size.y - getBaseHeight();
-        int mid = (int) Math.min(0.7F * availableHeight, DEFAULT_MID_GROWTH);
+        if ((expandable && snapGrowths.length == 3) || (!expandable && snapGrowths.length == 2)) return;
+        int mid = (int) Math.min(0.7F * availableHeight, AndroidUtilities.dp(300));
         if (expandable) {
-            int max = Math.min(availableHeight, DEFAULT_MAX_GROWTH);
-            configureGrowth(max, new int[]{0, mid, max});
+            int max = Math.min(availableHeight - overscrollHeight, AndroidUtilities.dp(480));
+            configureGrowth(max + overscrollHeight, new int[]{0, mid, max});
         } else {
             configureGrowth(mid, new int[]{0, mid});
         }
+
+        // Animate to mid value
         changeGrowth(mid, true);
     }
 

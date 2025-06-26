@@ -19,24 +19,27 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
         protected int growth = 0;
         protected int maxGrowth = 0;
         protected int[] snapGrowths = new int[0];
+        protected int baseHeight = 0;
 
         public Header(@NonNull Context context) {
             super(context);
         }
 
-        public abstract int getBaseHeight();
-
-        private void applyGrowth(int growth) {
-            this.growth = Math.max(Math.min(growth, maxGrowth), 0);
-            setTranslationY(this.growth - maxGrowth);
-            onGrowthChanged(this.growth);
+        public final void configureHeights(int baseHeight) {
+            if (baseHeight >= 0) this.baseHeight = baseHeight;
+            if (getParent() != null) getParent().requestLayout();
         }
 
         public final void configureGrowth(int maxGrowth, int[] snapGrowths) {
             if (maxGrowth >= 0) this.maxGrowth = maxGrowth;
             if (snapGrowths != null) this.snapGrowths = snapGrowths;
-            ViewParent parent = getParent();
-            if (parent != null) parent.requestLayout();
+            if (getParent() != null) getParent().requestLayout();
+        }
+
+        private void applyGrowth(int growth) {
+            this.growth = Math.max(Math.min(growth, maxGrowth), 0);
+            setTranslationY(this.growth - maxGrowth);
+            onGrowthChanged(this.growth);
         }
 
         public final void changeGrowth(int targetGrowth, boolean animated) {
@@ -58,8 +61,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
 
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            int maxHeight = getBaseHeight() + maxGrowth;
-            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.EXACTLY));
+            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(baseHeight + maxGrowth, MeasureSpec.EXACTLY));
         }
     }
 
@@ -108,7 +110,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         if (content != null) {
-            ((LayoutParams) content.getLayoutParams()).topMargin = header.getBaseHeight();
+            ((LayoutParams) content.getLayoutParams()).topMargin = header.baseHeight;
             if (content.getPaddingTop() != header.maxGrowth) {
                 // Called only once
                 content.setPadding(content.getPaddingLeft(), header.maxGrowth, content.getPaddingRight(), content.getPaddingBottom());
