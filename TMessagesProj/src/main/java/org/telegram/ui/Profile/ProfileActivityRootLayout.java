@@ -13,7 +13,6 @@ import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.core.graphics.ColorUtils;
 import org.telegram.messenger.*;
@@ -21,6 +20,7 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.SizeNotifierFrameLayout;
 import org.telegram.ui.Components.UndoView;
 
 import java.util.ArrayList;
@@ -29,7 +29,7 @@ import java.util.ArrayList;
  * Root view for ProfileActivity. Draws the action bar and other overlays.
  */
 @SuppressLint("ViewConstructor")
-public class ProfileActivityRootLayout extends FrameLayout {
+public class ProfileActivityRootLayout extends SizeNotifierFrameLayout {
     /**
      * @noinspection deprecation
      */

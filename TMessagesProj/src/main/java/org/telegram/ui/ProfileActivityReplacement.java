@@ -11,9 +11,14 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import org.telegram.messenger.*;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
@@ -23,8 +28,7 @@ import org.telegram.ui.Components.*;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.voip.VoIPHelper;
 import org.telegram.ui.Gifts.GiftSheet;
-import org.telegram.ui.Profile.ProfileActivityMenus;
-import org.telegram.ui.Profile.ProfileActivityRootLayout;
+import org.telegram.ui.Profile.*;
 import org.telegram.ui.Stars.StarsController;
 import org.telegram.ui.bots.BotWebViewAttachedSheet;
 
@@ -69,6 +73,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
     public SharedMediaLayout sharedMediaLayout;
     private ProfileActivityRootLayout rootLayout;
     private ProfileActivityMenus menuHandler;
+    private ProfileContentView listView;
+    private LinearLayoutManager listLayoutManager;
 
     private float mediaHeaderAnimationProgress = 0F;
     private boolean mediaHeaderVisible = false;
@@ -767,20 +773,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
         return actionBar;
     }
 
-    public boolean uploadUserImage(Runnable onDismiss, Runnable onDelete) {
-        if (imageUpdater == null) return false;
-        TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
-        if (user == null) user = UserConfig.getInstance(currentAccount).getCurrentUser();
-        if (user == null) return false;
-        imageUpdater.openMenu(user.photo != null && user.photo.photo_big != null && !(user.photo instanceof TLRPC.TL_userProfilePhotoEmpty), () -> {
-            MessagesController.getInstance(currentAccount).deleteUserPhoto(null);
-            if (onDelete != null) onDelete.run();
-        }, dialog -> {
-            if (onDismiss != null) onDismiss.run();
-        }, 0);
-        return true;
-    }
-
     @Override
     public View createView(Context context) {
         // Resource management
@@ -796,19 +788,46 @@ public class ProfileActivityReplacement extends BaseFragment implements
         // Root view
         boolean qr = userId == getUserConfig().clientUserId && !isMyProfile;
         rootLayout = new ProfileActivityRootLayout(context, resourceProvider, actionBar);
+        rootLayout.needBlur = true;
         menuHandler = new ProfileActivityMenus(context, resourceProvider, actionBar, qr);
         if (qr && ContactsController.getInstance(currentAccount).getPrivacyRules(PRIVACY_RULES_TYPE_ADDED_BY_PHONE) == null) {
             ContactsController.getInstance(currentAccount).loadPrivacySettings();
         }
+        ProfileCoordinatorLayout coordinator = new ProfileCoordinatorLayout(context);
+        rootLayout.addView(coordinator);
 
-        rootLayout.updateColors(peerColor, 0F);
-        menuHandler.updateColors(peerColor, 0F);
+        // Header
+        ProfileHeaderView header = new ProfileHeaderView(actionBar);
+        coordinator.addHeader(header);
+
+        // List
+        listView = new ProfileContentView(actionBar, sharedMediaLayout, getNotificationCenter());
+        listView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                    AndroidUtilities.hideKeyboard(getParentActivity().getCurrentFocus());
+                }
+            }
+        });
+        listLayoutManager = new LinearLayoutManager(context) {
+            @Override
+            public boolean supportsPredictiveItemAnimations() {
+                return imageUpdater != null;
+            }
+        };
+        listLayoutManager.setOrientation(LinearLayoutManager.VERTICAL);
+        listLayoutManager.mIgnoreTopPadding = false;
+        listView.setLayoutManager(listLayoutManager);
+        coordinator.addContent(listView);
 
         // Decorations
         rootLayout.blurredView.setOnClickListener(e -> { finishPreviewFragment(); });
         rootLayout.addDecorationViews();
-        rootLayout.setBackgroundColor(Color.BLACK);
 
+        // Updates
+        rootLayout.updateColors(peerColor, 0F);
+        menuHandler.updateColors(peerColor, 0F);
         updateProfileData(true);
         updateMenuData(false);
 
@@ -1030,6 +1049,30 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
     // CLICKS
 
+    private boolean handleImageUpload(Runnable onDismiss, Runnable onDelete) {
+        if (imageUpdater == null) return false;
+        TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
+        if (user == null) user = UserConfig.getInstance(currentAccount).getCurrentUser();
+        if (user == null) return false;
+        imageUpdater.openMenu(user.photo != null && user.photo.photo_big != null && !(user.photo instanceof TLRPC.TL_userProfilePhotoEmpty), () -> {
+            MessagesController.getInstance(currentAccount).deleteUserPhoto(null);
+            if (onDelete != null) onDelete.run();
+        }, dialog -> {
+            if (onDismiss != null) onDismiss.run();
+        }, 0);
+        return true;
+    }
+
+    private void handleContactAdd(TLRPC.User user, Bundle args) {
+        ContactAddActivity contactAddActivity = new ContactAddActivity(args, getResourceProvider());
+        contactAddActivity.setDelegate(() -> {
+            // WIP: Expand profile & update list
+            if (getUndoView() != null) //noinspection deprecation
+                getUndoView().showWithAction(dialogId, UndoView.ACTION_CONTACT_ADDED, user);
+        });
+        presentFragment(contactAddActivity);
+    }
+
     private void handleActionBarMenuClick(int id) {
         if (getParentActivity() == null) return;
         if (id == -1) {
@@ -1037,7 +1080,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         } else if (id == AB_EDIT_INFO_ID) {
             presentFragment(new UserInfoActivity());
         } else if (id == AB_ADD_PHOTO_ID) {
-            uploadUserImage(null, null);
+            handleImageUpload(null, null);
         } else if (id == AB_EDIT_ID) {
             if (isMyProfile()) {
                 presentFragment(new UserInfoActivity());
@@ -1295,15 +1338,4 @@ public class ProfileActivityReplacement extends BaseFragment implements
             showDialog(new GiftSheet(getContext(), currentAccount, getDialogId(), null, null));
         }
     }
-
-    private void handleContactAdd(TLRPC.User user, Bundle args) {
-        ContactAddActivity contactAddActivity = new ContactAddActivity(args, getResourceProvider());
-        contactAddActivity.setDelegate(() -> {
-            // WIP: Expand profile & update list
-            if (getUndoView() != null) //noinspection deprecation
-                getUndoView().showWithAction(dialogId, UndoView.ACTION_CONTACT_ADDED, user);
-        });
-        presentFragment(contactAddActivity);
-    }
-
 }
