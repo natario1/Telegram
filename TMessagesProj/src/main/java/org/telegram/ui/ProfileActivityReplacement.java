@@ -7,10 +7,12 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.*;
+import android.graphics.Point;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -73,6 +75,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
     public SharedMediaLayout sharedMediaLayout;
     private ProfileActivityRootLayout rootLayout;
     private ProfileActivityMenus menuHandler;
+    private ProfileHeaderView headerView;
     private ProfileContentView listView;
     private LinearLayoutManager listLayoutManager;
 
@@ -418,6 +421,15 @@ public class ProfileActivityReplacement extends BaseFragment implements
         menuHandler.updateTtlPopup(ttl);
     }
 
+    private void updateLandscapeData() {
+        if (headerView != null) {
+            final Point size = new Point();
+            final Display display = getParentActivity().getWindowManager().getDefaultDisplay();
+            display.getSize(size);
+            headerView.onConfigurationChanged(size);
+        }
+    }
+
     // LIFECYCLE
 
     @Override
@@ -558,6 +570,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             setParentActivityTitle(LocaleController.getString(R.string.Settings));
         }
         updateProfileData(true);
+        updateLandscapeData();
     }
 
     @Override
@@ -704,6 +717,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (sharedMediaLayout != null) {
             sharedMediaLayout.onConfigurationChanged(newConfig);
         }
+        updateLandscapeData();
     }
 
     // MISC
@@ -797,8 +811,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout.addView(coordinator);
 
         // Header
-        ProfileHeaderView header = new ProfileHeaderView(actionBar);
-        coordinator.addHeader(header);
+        headerView = new ProfileHeaderView(actionBar);
+        coordinator.addHeader(headerView);
 
         // List
         listView = new ProfileContentView(actionBar, sharedMediaLayout, getNotificationCenter());

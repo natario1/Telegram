@@ -1,47 +1,65 @@
 package org.telegram.ui.Profile;
 
 import android.content.Context;
-import android.util.Log;
-import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.core.view.NestedScrollingParent3;
 import androidx.core.view.ViewCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.LayoutHelper;
 
 public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrollingParent3 {
 
     public abstract static class Header extends FrameLayout {
-        protected int growth;
-        protected final int maxGrowth;
-        protected final int[] snapGrowths;
+        protected int growth = 0;
+        protected int maxGrowth = 0;
+        protected int[] snapGrowths = new int[0];
 
-        public Header(@NonNull Context context, int maxGrowth, @NonNull int[] snapGrowths) {
+        public Header(@NonNull Context context) {
             super(context);
-            this.maxGrowth = maxGrowth;
-            this.snapGrowths = snapGrowths;
-            this.growth = maxGrowth;
         }
 
         public abstract int getBaseHeight();
 
-        public void setGrowth(int growth) {
-            this.growth = growth;
+        private void applyGrowth(int growth) {
+            this.growth = Math.max(Math.min(growth, maxGrowth), 0);
+            setTranslationY(this.growth - maxGrowth);
+            onGrowthChanged(this.growth);
+        }
+
+        public final void configureGrowth(int maxGrowth, int[] snapGrowths) {
+            if (maxGrowth >= 0) this.maxGrowth = maxGrowth;
+            if (snapGrowths != null) this.snapGrowths = snapGrowths;
+            ViewParent parent = getParent();
+            if (parent != null) parent.requestLayout();
+        }
+
+        public final void changeGrowth(int targetGrowth, boolean animated) {
+            ProfileCoordinatorLayout parent = (ProfileCoordinatorLayout) getParent();
+            if (parent != null) {
+                parent.changeContentOffset(targetGrowth, animated);
+            } else {
+                applyGrowth(targetGrowth);
+            }
+        }
+
+        protected void onGrowthChanged(int growth) {
+            // No-op
+        }
+
+        protected int onContentTouch(int dy) {
+            return dy;
         }
 
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             int maxHeight = getBaseHeight() + maxGrowth;
             super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.EXACTLY));
-        }
-
-        @Override
-        protected LayoutParams generateDefaultLayoutParams() {
-            return new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.BOTTOM);
         }
     }
 
@@ -51,7 +69,8 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
     private final RecyclerView.OnScrollListener scrollListener = new RecyclerView.OnScrollListener() {
         @Override
         public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
-            synchronizeHeader();
+            int contentOffset = Math.max(0, getContentOffset());
+            header.applyGrowth(contentOffset);
         }
     };
 
@@ -73,8 +92,6 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
         if (this.header != null) removeView(this.header);
         this.header = header;
         addView(header, 0, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-        requestLayout();
-
     }
 
     public void addContent(@NonNull RecyclerView content) {
@@ -86,7 +103,6 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
         this.content = content;
         addView(content, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         content.addOnScrollListener(scrollListener);
-        requestLayout();
     }
 
     @Override
@@ -96,6 +112,8 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             if (content.getPaddingTop() != header.maxGrowth) {
                 // Called only once
                 content.setPadding(content.getPaddingLeft(), header.maxGrowth, content.getPaddingRight(), content.getPaddingBottom());
+                LinearLayoutManager manager = (LinearLayoutManager) content.getLayoutManager();
+                if (manager != null) manager.scrollToPositionWithOffset(0, -header.maxGrowth + header.growth);
             }
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
@@ -116,11 +134,11 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
     @Override
     public void onStopNestedScroll(@NonNull View target, int type) {
         if (type == ViewCompat.TYPE_NON_TOUCH) {
-            snapContent();
+            snapContentOffset();
             hasNonTouchNestedScroll = false;
         } else {
             // If hasNonTouchNestedScroll, there'll be a fling animation that we didn't block
-            if (!hasNonTouchNestedScroll) snapContent();
+            if (!hasNonTouchNestedScroll) snapContentOffset();
             hasTouchNestedScroll = false;
         }
     }
@@ -137,14 +155,17 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
 
     @Override
     public void onNestedPreScroll(@NonNull View target, int dx, int dy, @NonNull int[] consumed, int type) {
-        // No-op
+        if (type == ViewCompat.TYPE_TOUCH) {
+            int actualDy = header.onContentTouch(dy);
+            consumed[1] = dy - actualDy;
+        }
     }
 
     @Override
     public boolean onNestedPreFling(@NonNull View target, float velocityX, float velocityY) {
         // If fling is not that fast, abort the default recycler fling and snap ourselves
         // If it's fast enough, we'll snap after the default fling ends
-        return Math.abs(velocityY) < 1000 && snapContent();
+        return Math.abs(velocityY / AndroidUtilities.density) < 1000 && snapContentOffset();
     }
 
     @Override
@@ -160,26 +181,26 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
         return view != null ? view.getTop() : Integer.MIN_VALUE;
     }
 
-    private boolean snapContent() {
+    private boolean snapContentOffset() {
         if (content == null || header.snapGrowths.length == 0) return false;
         int distance = header.growth - header.snapGrowths[0];
         for (int s = 1; s < header.snapGrowths.length; s++) {
             int delta = header.growth - header.snapGrowths[s];
             if (Math.abs(delta) < Math.abs(distance)) distance = delta;
         }
+        return changeContentOffset(header.growth - distance, true);
+
+    }
+
+    private boolean changeContentOffset(int targetGrowth, boolean animated) {
+        int coerced = Math.max(Math.min(targetGrowth, header.maxGrowth), 0);
+        int distance = header.growth - coerced;
         if (distance == 0) return false;
-        content.smoothScrollBy(0, distance, 200, CubicBezierInterpolator.EASE_OUT_QUINT);
+        if (animated) {
+            content.smoothScrollBy(0, distance, 200, CubicBezierInterpolator.EASE_OUT_QUINT);
+        } else {
+            content.scrollBy(0, distance);
+        }
         return true;
-    }
-
-    private void synchronizeHeader() {
-        int contentOffset = Math.max(0, getContentOffset());
-        if (contentOffset == header.growth) return;
-        growHeaderBy(contentOffset - header.growth);
-    }
-
-    private void growHeaderBy(int delta) {
-        header.setGrowth(Math.max(Math.min(header.growth + delta, header.maxGrowth), 0));
-        header.setTranslationY(header.growth - header.maxGrowth);
     }
 }
