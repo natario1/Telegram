@@ -15,17 +15,20 @@ import android.text.TextUtils;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import org.telegram.messenger.*;
+import org.telegram.messenger.browser.Browser;
+import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
+import org.telegram.tgnet.tl.TL_fragment;
 import org.telegram.ui.ActionBar.*;
 import org.telegram.ui.Cells.ProfileChannelCell;
+import org.telegram.ui.Cells.SettingsSuggestionCell;
 import org.telegram.ui.Components.*;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.voip.VoIPHelper;
@@ -35,10 +38,10 @@ import org.telegram.ui.Stars.StarsController;
 import org.telegram.ui.bots.BotWebViewAttachedSheet;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
-import static org.telegram.messenger.ContactsController.PRIVACY_RULES_TYPE_ADDED_BY_PHONE;
 import static org.telegram.messenger.LocaleController.formatString;
 import static org.telegram.ui.Profile.ProfileActivityMenus.*;
 
@@ -51,11 +54,17 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private SharedMediaLayout.SharedMediaPreloader sharedMediaPreloader;
     private ImageUpdater imageUpdater;
     private FlagSecureReason flagSecure;
+    public ProfileChannelCell.ChannelMessageFetcher channelMessageFetcher;
+    private boolean channelMessageFetcherSubscribed = false;
+    private ProfileBirthdayEffect.BirthdayEffectFetcher birthdayEffectFetcher;
+    private ProfileBirthdayEffect birthdayEffect;
+    private boolean birthdayEffectFetcherOwned = false;
+    public final HashSet<Integer> notificationsExceptions = new HashSet<>();
 
     private long chatId;
     private TLRPC.ChatFull chatInfo;
     private TLRPC.Chat chat;
-    private TLRPC.EncryptedChat chatEncrypted;
+    public TLRPC.EncryptedChat chatEncrypted;
 
     private long userId;
     private TLRPC.UserFull userInfo;
@@ -77,7 +86,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private ProfileActivityMenus menuHandler;
     private ProfileHeaderView headerView;
     private ProfileContentView listView;
-    private LinearLayoutManager listLayoutManager;
 
     private float mediaHeaderAnimationProgress = 0F;
     private boolean mediaHeaderVisible = false;
@@ -111,9 +119,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
     // Called before presenting
     public void setFetchers(
         ProfileChannelCell.ChannelMessageFetcher channelMessageFetcher,
-        ProfileBirthdayEffect.BirthdayEffectFetcher birthdayAssetsFetcher
+        ProfileBirthdayEffect.BirthdayEffectFetcher birthdayEffectFetcher
     ) {
-        // WIP
+        this.channelMessageFetcher = channelMessageFetcher;
+        this.birthdayEffectFetcher = birthdayEffectFetcher;
+        this.birthdayEffectFetcherOwned = false;
     }
 
     public void setUserInfo(TLRPC.UserFull value) {
@@ -139,6 +149,24 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
         if (menuHandler != null) {
             menuHandler.updateBotViewPrivacyItem(isBotWithPrivacyPolicy);
+        }
+        if (!isSettings()) {
+            if (channelMessageFetcher == null) {
+                channelMessageFetcher = new ProfileChannelCell.ChannelMessageFetcher(currentAccount);
+            }
+            if (!channelMessageFetcherSubscribed) {
+                channelMessageFetcherSubscribed = true;
+                channelMessageFetcher.subscribe(() -> updateListData(false));
+                channelMessageFetcher.fetch(userInfo);
+            }
+        }
+        if (!isSettings()) {
+            ProfileBirthdayEffect.BirthdayEffectFetcher old = birthdayEffectFetcher;
+            birthdayEffectFetcher = ProfileBirthdayEffect.BirthdayEffectFetcher.of(currentAccount, userInfo, old);
+            birthdayEffectFetcherOwned = birthdayEffectFetcher != old;
+            if (birthdayEffectFetcher != null) {
+                birthdayEffectFetcher.subscribe(this::updateBirthdayData);
+            }
         }
         updateTtlData();
         updatePremiumData();
@@ -191,12 +219,16 @@ public class ProfileActivityReplacement extends BaseFragment implements
         return -chatId;
     }
 
+    public long getUserId() {
+        return userId;
+    }
+
     public long getTopicId() {
         return topicId;
     }
 
-    public boolean isChat() {
-        return chatId != 0;
+    public long getChatId() {
+        return chatId;
     }
 
     public boolean isSettings() {
@@ -210,6 +242,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
     public boolean isSaved() {
         return isSaved;
     }
+
+    public boolean isTopic() {
+        return topicId != 0;
+    }
+
+    // UPDATE*
 
     private void updateProfileData(boolean reload) {
         if (getParentActivity() == null) return;
@@ -430,6 +468,41 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
     }
 
+    private void updateBirthdayData() {
+        if (rootLayout == null || !isFullyVisible || birthdayEffectFetcher == null) return;
+        if (birthdayEffect != null) {
+            birthdayEffect.updateFetcher(birthdayEffectFetcher);
+            birthdayEffect.invalidate();
+        } else {
+            birthdayEffect = new ProfileBirthdayEffect(getContext(), outPoint -> {
+                if (listView != null) listView.computeBirthdaySourcePosition(outPoint);
+            }, birthdayEffectFetcher);
+            rootLayout.addView(birthdayEffect, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
+        }
+    }
+
+    private void updateNotificationExceptionsData() {
+        if (!isTopic() && ChatObject.isForum(chat)) {
+            getNotificationsController().loadTopicsNotificationsExceptions(-chatId, (topics) -> {
+                ArrayList<Integer> arrayList = new ArrayList<>(topics);
+                for (int i = 0; i < arrayList.size(); i++) {
+                    if (getMessagesController().getTopicsController().findTopic(chatId, arrayList.get(i)) == null) {
+                        arrayList.remove(i);
+                        i--;
+                    }
+                }
+                notificationsExceptions.clear();
+                notificationsExceptions.addAll(arrayList);
+                if (listView != null) listView.notifyChangeTo(ProfileContentView.Rows.Notifications);
+            });
+        }
+    }
+
+    private void updateListData(boolean updateOnlineCount) {
+
+    }
+
+
     // LIFECYCLE
 
     @Override
@@ -513,6 +586,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             } else if (chatInfo == null) {
                 chatInfo = getMessagesStorage().loadChatInfo(chatId, false, null, false, false);
             }
+            updateNotificationExceptionsData();
         } else {
             return false;
         }
@@ -552,6 +626,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
         if (imageUpdater != null) {
             imageUpdater.clear();
+        }
+        if (birthdayEffectFetcher != null && birthdayEffectFetcherOwned) {
+            birthdayEffectFetcherOwned = false;
+            birthdayEffectFetcher.detach(true);
+            birthdayEffectFetcher = null;
         }
         unsubscribeFromNotifications();
     }
@@ -594,6 +673,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
     public void onBecomeFullyHidden() {
         super.onBecomeFullyHidden();
         if (rootLayout != null) rootLayout.hideUndoView(0);
+    }
+
+    @Override
+    public void onBecomeFullyVisible() {
+        super.onBecomeFullyVisible();
+        updateBirthdayData();
     }
 
     @Override
@@ -727,7 +812,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (sharedMediaLayout != null && sharedMediaPreloader != null) {
             sharedMediaLayout.setNewMediaCounts(sharedMediaPreloader.getLastMediaCount());
         }
-        // WIP updateListAnimated(false);
+        updateListData(false);
         // WIP updateSelectedMediaTabText();
         if (userInfo != null) {
             resumeDelayedFragmentAnimation();
@@ -804,7 +889,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout = new ProfileActivityRootLayout(context, resourceProvider, actionBar);
         rootLayout.needBlur = true;
         menuHandler = new ProfileActivityMenus(context, resourceProvider, actionBar, qr);
-        if (qr && ContactsController.getInstance(currentAccount).getPrivacyRules(PRIVACY_RULES_TYPE_ADDED_BY_PHONE) == null) {
+        if (qr && ContactsController.getInstance(currentAccount).getPrivacyRules(ContactsController.PRIVACY_RULES_TYPE_ADDED_BY_PHONE) == null) {
             ContactsController.getInstance(currentAccount).loadPrivacySettings();
         }
         ProfileCoordinatorLayout coordinator = new ProfileCoordinatorLayout(context);
@@ -824,7 +909,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 }
             }
         });
-        listLayoutManager = new LinearLayoutManager(context) {
+        LinearLayoutManager listLayoutManager = new LinearLayoutManager(context) {
             @Override
             public boolean supportsPredictiveItemAnimations() {
                 return imageUpdater != null;
@@ -834,10 +919,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
         listLayoutManager.mIgnoreTopPadding = false;
         listView.setLayoutManager(listLayoutManager);
         coordinator.addContent(listView);
+        ProfileContentAdapter listAdapter = new ProfileContentAdapter(this);
+        listView.setAdapter(listAdapter);
 
         // Decorations
         rootLayout.blurredView.setOnClickListener(e -> { finishPreviewFragment(); });
         rootLayout.addDecorationViews();
+        updateBirthdayData();
 
         // Updates
         rootLayout.updateColors(peerColor, 0F);
@@ -868,9 +956,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (getResourceProvider() != null) return null;
         
         ArrayList<ThemeDescription> arrayList = new ArrayList<>();
-        if (sharedMediaLayout != null) {
-            arrayList.addAll(sharedMediaLayout.getThemeDescriptions());
-        }
 
         ThemeDescription.ThemeDescriptionDelegate themeDelegate = () -> {
             // WIP
@@ -892,8 +977,15 @@ public class ProfileActivityReplacement extends BaseFragment implements
         arrayList.add(new ThemeDescription(null, 0, null, null, null, themeDelegate, Theme.key_avatar_backgroundBlue));
         arrayList.add(new ThemeDescription(null, 0, null, null, null, themeDelegate, Theme.key_avatar_backgroundPink));
 
+        arrayList.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_SUBMENUBACKGROUND, null, null, null, null, Theme.key_actionBarDefaultSubmenuBackground));
+        arrayList.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_SUBMENUITEM, null, null, null, null, Theme.key_actionBarDefaultSubmenuItem));
+        arrayList.add(new ThemeDescription(actionBar, ThemeDescription.FLAG_AB_SUBMENUITEM | ThemeDescription.FLAG_IMAGECOLOR, null, null, null, null, Theme.key_actionBarDefaultSubmenuItemIcon));
+
         if (rootLayout != null) {
             rootLayout.getThemeDescriptions(arrayList);
+        }
+        if (listView != null) {
+            listView.getThemeDescriptions(arrayList, themeDelegate);
         }
         return arrayList;
     }
@@ -1046,7 +1138,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             isUserBlocked = getMessagesController().blockePeers.indexOfKey(userId) >= 0;
             if (oldValue != isUserBlocked) {
                 updateMenuData(true);
-                // WIP: updateListAnimated(false);
+                updateListData(false);
             }
         } else if (id == NotificationCenter.encryptedChatCreated) {
             if (!isCreatingEncryptedChat) return;
@@ -1063,18 +1155,93 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
     // CLICKS
 
-    private boolean handleImageUpload(Runnable onDismiss, Runnable onDelete) {
-        if (imageUpdater == null) return false;
+    public void handleOpenBotApp() {
+        TLRPC.User bot = getMessagesController().getUser(userId);
+        getMessagesController().openApp(this, bot, null, getClassGuid(), null);
+    }
+
+    public void handleOpenUrl(String url, Browser.Progress progress) {
+        if (url.startsWith("@")) {
+            getMessagesController().openByUserName(url.substring(1), this, 0, progress);
+        } else if (url.startsWith("#") || url.startsWith("$")) {
+            DialogsActivity fragment = new DialogsActivity(null);
+            fragment.setSearchString(url);
+            presentFragment(fragment);
+        } else if (url.startsWith("/")) {
+            if (parentLayout.getFragmentStack().size() > 1) {
+                BaseFragment previousFragment = parentLayout.getFragmentStack().get(parentLayout.getFragmentStack().size() - 2);
+                if (previousFragment instanceof ChatActivity) {
+                    finishFragment();
+                    ((ChatActivity) previousFragment).chatActivityEnterView.setCommand(null, url, false, false);
+                }
+            }
+        }
+    }
+
+    public void handleUsernameSpanClick(TLRPC.TL_username usernameObj, Runnable onDone) {
+        if (!usernameObj.editable) {
+            TL_fragment.TL_getCollectibleInfo req = new TL_fragment.TL_getCollectibleInfo();
+            TL_fragment.TL_inputCollectibleUsername input = new TL_fragment.TL_inputCollectibleUsername();
+            input.username = usernameObj.username;
+            req.collectible = input;
+            int reqId = getConnectionsManager().sendRequest(req, (res, err) -> AndroidUtilities.runOnUIThread(() -> {
+                if (res instanceof TL_fragment.TL_collectibleInfo) {
+                    TLObject obj;
+                    if (userId != 0) {
+                        obj = getMessagesController().getUser(userId);
+                    } else {
+                        obj = getMessagesController().getChat(chatId);
+                    }
+                    if (getContext() == null) {
+                        return;
+                    }
+                    FragmentUsernameBottomSheet.open(getContext(), FragmentUsernameBottomSheet.TYPE_USERNAME, usernameObj.username, obj, (TL_fragment.TL_collectibleInfo) res, getResourceProvider());
+                } else {
+                    BulletinFactory.showError(err);
+                }
+                onDone.run();
+            }));
+            getConnectionsManager().bindRequestToGuid(reqId, getClassGuid());
+        } else {
+            String urlFinal = getMessagesController().linkPrefix + "/" +  usernameObj.username;
+            if (chat == null || !chat.noforwards) {
+                AndroidUtilities.addToClipboard(urlFinal);
+                UndoView undoView = getUndoView();
+                if (undoView != null) undoView.showWithAction(0, UndoView.ACTION_USERNAME_COPIED, null);
+            }
+            onDone.run();
+        }
+    }
+
+    private void handleImageUpload() {
+        if (imageUpdater == null) return;
         TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
         if (user == null) user = UserConfig.getInstance(currentAccount).getCurrentUser();
-        if (user == null) return false;
+        if (user == null) return;
+        RLottieImageView setAvatarImage = listView != null ? listView.findSetAvatarImage() : null;
         imageUpdater.openMenu(user.photo != null && user.photo.photo_big != null && !(user.photo instanceof TLRPC.TL_userProfilePhotoEmpty), () -> {
             MessagesController.getInstance(currentAccount).deleteUserPhoto(null);
-            if (onDelete != null) onDelete.run();
+            if (setAvatarImage != null) {
+                setAvatarImage.getAnimatedDrawable().setCurrentFrame(0);
+            }
         }, dialog -> {
-            if (onDismiss != null) onDismiss.run();
+            if (!imageUpdater.isUploadingImage()) {
+                if (setAvatarImage != null) {
+                    setAvatarImage.getAnimatedDrawable().setCustomEndFrame(86);
+                    setAvatarImage.playAnimation();
+                }
+            } else {
+                if (setAvatarImage != null) {
+                    setAvatarImage.getAnimatedDrawable().setCurrentFrame(0, false);
+                }
+            }
         }, 0);
-        return true;
+        if (setAvatarImage != null) {
+            setAvatarImage.getAnimatedDrawable().setCurrentFrame(0);
+            setAvatarImage.getAnimatedDrawable().setCustomEndFrame(43);
+            setAvatarImage.playAnimation();
+        }
+        return;
     }
 
     private void handleContactAdd(TLRPC.User user, Bundle args) {
@@ -1087,6 +1254,47 @@ public class ProfileActivityReplacement extends BaseFragment implements
         presentFragment(contactAddActivity);
     }
 
+    public void handleSuggestionClick(int type, boolean yes) {
+        if (yes) {
+            AndroidUtilities.runOnUIThread(() -> {
+                getNotificationCenter().removeObserver(this, NotificationCenter.newSuggestionsAvailable);
+                if (type == SettingsSuggestionCell.TYPE_GRACE) {
+                    getMessagesController().removeSuggestion(0, "PREMIUM_GRACE");
+                    Browser.openUrl(getContext(), getMessagesController().premiumManageSubscriptionUrl);
+                } else {
+                    getMessagesController().removeSuggestion(0, type == SettingsSuggestionCell.TYPE_PHONE ? "VALIDATE_PHONE_NUMBER" : "VALIDATE_PASSWORD");
+                }
+                getNotificationCenter().addObserver(this, NotificationCenter.newSuggestionsAvailable);
+                updateListData(false);
+            });
+        } else {
+            if (type == SettingsSuggestionCell.TYPE_PHONE) {
+                presentFragment(new ActionIntroActivity(ActionIntroActivity.ACTION_TYPE_CHANGE_PHONE_NUMBER));
+            } else {
+                presentFragment(new TwoStepVerificationSetupActivity(TwoStepVerificationSetupActivity.TYPE_VERIFY, null));
+            }
+        }
+    }
+
+    public void handleDetailCellImageClick(int kind) {
+        if (kind == ProfileContentView.Rows.Username) {
+            Bundle args = new Bundle();
+            args.putLong("chat_id", chatId);
+            args.putLong("user_id", userId);
+            presentFragment(new QrActivity(args));
+        } else if (kind == ProfileContentView.Rows.Birthday) {
+            if (userId == getUserConfig().getClientUserId()) {
+                presentFragment(new PremiumPreviewFragment("my_profile_gift"));
+                return;
+            }
+            if (UserObject.areGiftsDisabled(userInfo)) {
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.error, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserDisallowedGifts, DialogObject.getShortName(userId)))).show();
+                return;
+            }
+            showDialog(new GiftSheet(getContext(), currentAccount, userId, null, null));
+        }
+    }
+
     private void handleActionBarMenuClick(int id) {
         if (getParentActivity() == null) return;
         if (id == -1) {
@@ -1094,7 +1302,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         } else if (id == AB_EDIT_INFO_ID) {
             presentFragment(new UserInfoActivity());
         } else if (id == AB_ADD_PHOTO_ID) {
-            handleImageUpload(null, null);
+            handleImageUpload();
         } else if (id == AB_EDIT_ID) {
             if (isMyProfile()) {
                 presentFragment(new UserInfoActivity());

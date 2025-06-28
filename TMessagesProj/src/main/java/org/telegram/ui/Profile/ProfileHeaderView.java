@@ -6,6 +6,10 @@ import androidx.annotation.NonNull;
 import androidx.core.graphics.ColorUtils;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeDescription;
+
+import java.util.ArrayList;
 
 public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
 
@@ -63,5 +67,9 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
             factor = AndroidUtilities.lerp(4F, 0.6F, t);
         }
         return Math.round(dy * factor);
+    }
+
+    public void getThemeDescriptions(ArrayList<ThemeDescription> arrayList) {
+        arrayList.add(new ThemeDescription(this, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_avatar_backgroundActionBarBlue));
     }
 }

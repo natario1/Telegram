@@ -7922,7 +7922,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     ProfileActivityReplacement profileActivity = (ProfileActivityReplacement) lastFragment;
                     if (profileActivity.isSettings()) {
                         outState.putString("fragment", "settings");
-                    } else if (profileActivity.isChat() && args != null) {
+                    } else if (profileActivity.getChatId() != 0 && args != null) {
                         outState.putBundle("args", args);
                         outState.putString("fragment", "chat_profile");
                     }

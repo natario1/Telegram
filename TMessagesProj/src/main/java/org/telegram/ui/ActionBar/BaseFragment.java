@@ -84,7 +84,7 @@ public abstract class BaseFragment {
     private boolean removingFromStack;
     private PreviewDelegate previewDelegate;
     protected Theme.ResourcesProvider resourceProvider;
-    private boolean isFullyVisible;
+    protected boolean isFullyVisible;
 //    public ArrayList<StoryViewer> storyViewerStack;
 //    public ArrayList<BotWebViewAttachedSheet> botsStack;
 //
