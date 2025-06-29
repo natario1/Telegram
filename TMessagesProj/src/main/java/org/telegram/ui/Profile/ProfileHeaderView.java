@@ -41,9 +41,9 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
         boolean landscape = size.x > size.y;
         boolean expandable = !landscape && !AndroidUtilities.isAccessibilityScreenReaderEnabled();
         if ((expandable && snapGrowths.length == 3) || (!expandable && snapGrowths.length == 2)) return;
-        int mid = (int) Math.min(0.7F * availableHeight, AndroidUtilities.dp(300));
+        int mid = (int) Math.min(0.7F * availableHeight, AndroidUtilities.dp(246));
         if (expandable) {
-            int max = Math.min(availableHeight - overscrollHeight, AndroidUtilities.dp(480));
+            int max = Math.min(availableHeight - overscrollHeight, AndroidUtilities.dp(398));
             configureGrowth(max + overscrollHeight, new int[]{0, mid, max});
         } else {
             configureGrowth(mid, new int[]{0, mid});
