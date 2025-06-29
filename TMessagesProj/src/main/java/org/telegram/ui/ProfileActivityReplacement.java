@@ -21,6 +21,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.collection.LongSparseArray;
+import androidx.core.graphics.ColorUtils;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import org.telegram.PhoneFormat.PhoneFormat;
@@ -63,7 +64,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private SharedMediaLayout.SharedMediaPreloader sharedMediaPreloader;
     private ImageUpdater imageUpdater;
     private FlagSecureReason flagSecure;
-    public ProfileChannelCell.ChannelMessageFetcher channelMessageFetcher;
+    private ProfileChannelCell.ChannelMessageFetcher channelMessageFetcher;
     private boolean channelMessageFetcherSubscribed = false;
     private ProfileBirthdayEffect.BirthdayEffectFetcher birthdayEffectFetcher;
     private ProfileBirthdayEffect birthdayEffect;
@@ -172,7 +173,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (channelMessageFetcher == null) {
                 channelMessageFetcher = new ProfileChannelCell.ChannelMessageFetcher(currentAccount);
             }
-            if (!channelMessageFetcherSubscribed) {
+            if (!channelMessageFetcherSubscribed && userInfo != null) {
                 channelMessageFetcherSubscribed = true;
                 channelMessageFetcher.subscribe(() -> updateListData("channelMessageFetcher"));
                 channelMessageFetcher.fetch(userInfo);
@@ -186,6 +187,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
         updateTtlData();
         updatePremiumData();
+        updateListData("setUserInfo");
     }
 
     public TLRPC.User getCurrentUser() {
@@ -193,7 +195,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
     }
 
     public void setChatInfo(TLRPC.ChatFull value) {
-        if (chatInfo instanceof TLRPC.TL_channelFull && value.participants == null) {
+        if (chatInfo instanceof TLRPC.TL_channelFull && value != null && value.participants == null) {
             value.participants = chatInfo.participants;
         }
         long previousMigrationId = chatInfo != null ? chatInfo.migrated_from_chat_id : 0;
@@ -213,15 +215,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
             flagSecure.invalidate();
         }
         updateTtlData();
-        if (newChat != null && !newChat.megagroup && chatInfo instanceof TLRPC.TL_channelFull && chatInfo.participants != null) {
-            for (int a = 0; a < chatInfo.participants.participants.size(); a++) {
-                TLRPC.ChatParticipant chatParticipant = chatInfo.participants.participants.get(a);
-                chatMembers.put(chatParticipant.user_id, chatParticipant);
-            }
-        } else {
-            chatMembers.clear();
-        }
-        updateOnlineData(true);
+        updateOnlineData(false);
+        updateListData("setChatInfo");
         if (menuHandler != null) {
             boolean canPurchase = !BuildVars.IS_BILLING_UNAVAILABLE && !getMessagesController().premiumPurchaseBlocked();
             boolean canSendGifts = chatInfo != null && chatInfo.stargifts_available;
@@ -501,7 +496,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             birthdayEffect.invalidate();
         } else {
             birthdayEffect = new ProfileBirthdayEffect(getContext(), outPoint -> {
-                TextDetailCell cell = listView != null ? listView.findRowView(Rows.Birthday) : null;
+                TextDetailCell cell = listView != null ? listView.findRowView(Rows.InfoBirthday) : null;
                 if (cell != null) {
                     outPoint.x = listView.getX() + cell.getX() + cell.textView.getX() + dp(12);
                     outPoint.y = listView.getY() + cell.getY() + cell.textView.getY() + cell.textView.getMeasuredHeight() / 2f;
@@ -523,14 +518,25 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 }
                 notificationsExceptions.clear();
                 notificationsExceptions.addAll(arrayList);
-                if (listView != null) listView.notifyRowChange(Rows.Notifications);
+                // WIP: Notify header instead. if (listView != null) listView.notifyRowChange(Rows.Notifications);
             });
         }
     }
 
-    private void updateListData(boolean updateOnlineCount) {
     private void updateChatMembersData(boolean reload) {
-        if (chatInfo == null || chat == null || !chat.megagroup) return;
+        if (chatInfo == null || chat == null || isTopic()) return;
+        if (!chat.megagroup) {
+            // When !megagroup, just load from chatInfo
+            chatMembers.clear();
+            if (chatInfo.participants != null && !(chatInfo.participants instanceof TLRPC.TL_chatParticipantsForbidden)) {
+                for (int a = 0; a < chatInfo.participants.participants.size(); a++) {
+                    TLRPC.ChatParticipant chatParticipant = chatInfo.participants.participants.get(a);
+                    chatMembers.put(chatParticipant.user_id, chatParticipant);
+                }
+            }
+            updateOnlineData(true);
+            return;
+        }
         if (chatMembersLoading || (!reload && chatMembersEndReached)) return;
         chatMembersLoading = true;
         chatMembersEndReached = false;
@@ -607,67 +613,69 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
 
             if (userId != 0) {
-                if (LocaleController.isRTL) rows.append(Rows.Empty);
                 TLRPC.User user = getMessagesController().getUser(userId);
                 if (UserObject.isUserSelf(user) && !isMyProfile) {
                     /* WIP: if (avatarBig == null && (user.photo == null || !(user.photo.photo_big instanceof TLRPC.TL_fileLocation_layer97) && !(user.photo.photo_big instanceof TLRPC.TL_fileLocationToBeDeprecated)) && (avatarsViewPager == null || avatarsViewPager.getRealCount() == 0)) {
                         Rows.SetAvatar = rowCount++;
                         Rows.SetAvatarSection = rowCount++;
                     } */
-                    rows.append(Rows.NumberSection);
-                    rows.append(Rows.Number);
-                    rows.append(Rows.SetUsername);
-                    rows.append(Rows.Bio);
-                    rows.append(Rows.SettingsSection);
+                    // Settings screen
+                    rows.append(Rows.MyHeader);
+                    rows.append(Rows.MyPhoneNumber);
+                    rows.append(Rows.MyUsername);
+                    rows.append(Rows.MyBio);
+                    rows.append(Rows.MyFooter);
+                    rows.append(Rows.MyShadow);
 
                     Set<String> suggestions = getMessagesController().pendingSuggestions;
                     if (suggestions.contains("PREMIUM_GRACE")) {
-                        rows.append(Rows.GraceSuggestion);
-                        rows.append(Rows.GraceSuggestionSection);
+                        rows.append(Rows.SuggestionGrace);
+                        rows.append(Rows.SuggestionShadow);
                     } else if (suggestions.contains("VALIDATE_PHONE_NUMBER")) {
-                        rows.append(Rows.PhoneSuggestion);
-                        rows.append(Rows.PhoneSuggestionSection);
+                        rows.append(Rows.SuggestionPhone);
+                        rows.append(Rows.SuggestionShadow);
                     } else if (suggestions.contains("VALIDATE_PASSWORD")) {
-                        rows.append(Rows.PasswordSuggestion);
-                        rows.append(Rows.PasswordSuggestionSection);
+                        rows.append(Rows.SuggestionPassword);
+                        rows.append(Rows.SuggestionShadow);
                     }
 
-                    rows.append(Rows.SettingsSection2);
-                    rows.append(Rows.Chat);
-                    rows.append(Rows.Privacy);
-                    rows.append(Rows.Notification);
-                    rows.append(Rows.Data);
-                    rows.append(Rows.LiteMode);
+                    rows.append(Rows.MySettingsHeader);
+                    rows.append(Rows.MySettingsChat);
+                    rows.append(Rows.MySettingsPrivacy);
+                    rows.append(Rows.MySettingsNotification);
+                    rows.append(Rows.MySettingsData);
+                    rows.append(Rows.MySettingsLiteMode);
                     if (getMessagesController().filtersEnabled || !getMessagesController().dialogFilters.isEmpty()) {
-                        rows.append(Rows.Filters);
+                        rows.append(Rows.MySettingsFilters);
                     }
-                    rows.append(Rows.Devices);
-                    rows.append(Rows.Language);
-                    rows.append(Rows.DevicesSection);
-                    if (!getMessagesController().premiumFeaturesBlocked()) rows.append(Rows.Premium);
-                    if (getMessagesController().starsPurchaseAvailable()) rows.append(Rows.Stars);
-                    if (!getMessagesController().premiumFeaturesBlocked()) rows.append(Rows.Business);
-                    if (!getMessagesController().premiumPurchaseBlocked()) rows.append(Rows.PremiumGifting);
-                    if (rows.has(Rows.Premium) || rows.has(Rows.Stars) || rows.has(Rows.Business) || rows.has(Rows.PremiumGifting)) {
-                        rows.append(Rows.PremiumSections);
+                    rows.append(Rows.MySettingsDevices);
+                    rows.append(Rows.MySettingsLanguage);
+                    rows.append(Rows.MySettingsSection);
+                    if (!getMessagesController().premiumFeaturesBlocked()) rows.append(Rows.FeaturesPremium);
+                    if (getMessagesController().starsPurchaseAvailable()) rows.append(Rows.FeaturesStars);
+                    if (!getMessagesController().premiumFeaturesBlocked()) rows.append(Rows.FeaturesBusiness);
+                    if (!getMessagesController().premiumPurchaseBlocked()) rows.append(Rows.FeaturesGift);
+                    if (rows.has(Rows.FeaturesPremium) || rows.has(Rows.FeaturesStars) || rows.has(Rows.FeaturesBusiness) || rows.has(Rows.FeaturesGift)) {
+                        rows.append(Rows.FeaturesSection);
                     }
                     rows.append(Rows.HelpHeader);
-                    rows.append(Rows.Question);
-                    rows.append(Rows.Faq);
-                    rows.append(Rows.Policy);
+                    rows.append(Rows.HelpQuestion);
+                    rows.append(Rows.HelpFaq);
+                    rows.append(Rows.HelpPolicy);
                     if (BuildVars.LOGS_ENABLED || BuildVars.DEBUG_PRIVATE_VERSION) {
                         rows.append(Rows.HelpSection);
                         rows.append(Rows.DebugHeader);
                     }
                     if (BuildVars.LOGS_ENABLED) {
-                        rows.append(Rows.SendLogs);
-                        rows.append(Rows.SendLastLogs);
-                        rows.append(Rows.ClearLogs);
+                        rows.append(Rows.DebugSendLogs);
+                        rows.append(Rows.DebugSendLastLogs);
+                        rows.append(Rows.DebugClearLogs);
                     }
                     if (BuildVars.DEBUG_VERSION) {
-                        rows.append(Rows.SwitchBackend);
+                        rows.append(Rows.DebugSwitchBackend);
                     }
-                    rows.append(Rows.Version);
+                    rows.append(Rows.MyVersion);
+                    hasMedia = false;
                 } else {
                     String username = UserObject.getPublicUsername(user);
                     boolean hasInfo = userInfo != null && !TextUtils.isEmpty(userInfo.about) || user != null && !TextUtils.isEmpty(username);
@@ -676,28 +684,27 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     if (userInfo != null && (userInfo.flags2 & 64) != 0 && (channelMessageFetcher == null || !channelMessageFetcher.loaded || channelMessageFetcher.messageObject != null)) {
                         final TLRPC.Chat channel = getMessagesController().getChat(userInfo.personal_channel_id);
                         if (channel != null && (ChatObject.isPublic(channel) || !ChatObject.isNotInChat(channel))) {
-                            rows.append(Rows.Channel);
-                            rows.append(Rows.ChannelDivider);
+                            rows.appendObject(Rows.PersonalChannel, channelMessageFetcher != null ? channelMessageFetcher.messageObject : null, 1);
+                            rows.append(Rows.PersonalChannelShadow);
                         }
                     }
-                    // WIP: infoStartRow = rowCount;
                     rows.append(Rows.InfoHeader);
-                    if ((user != null && !user.bot) && (hasPhone || !hasInfo)) rows.append(Rows.Phone);
-                    if (userInfo != null && !TextUtils.isEmpty(userInfo.about)) rows.append(Rows.UserInfo);
-                    if (user != null && username != null) rows.append(Rows.Username);
+                    if ((user != null && !user.bot) && (hasPhone || !hasInfo)) rows.append(Rows.InfoPhone);
+                    if (userInfo != null && !TextUtils.isEmpty(userInfo.about)) rows.appendObject(Rows.InfoUserAbout, user, 1);
+                    if (user != null && username != null) rows.appendObject(Rows.InfoUsername, user, 1);
                     if (userInfo != null) {
-                        if (userInfo.birthday != null) rows.append(Rows.Birthday);
-                        if (userInfo.business_work_hours != null) rows.append(Rows.BizHours);
-                        if (userInfo.business_location != null) rows.append(Rows.BizLocation);
+                        if (userInfo.birthday != null) rows.append(Rows.InfoBirthday);
+                        if (userInfo.business_work_hours != null) rows.append(Rows.InfoBizHours);
+                        if (userInfo.business_location != null) rows.append(Rows.InfoBizLocation);
                     }
-                    if (userId != getUserConfig().getClientUserId()) rows.append(Rows.Notifications);
-                    if (user != null && user.bot && user.bot_has_main_app) rows.append(Rows.BotApp);
-                    // WIP: infoEndRow = rowCount - 1;
-                    rows.append(Rows.InfoSection);
+                    // WIP: Moved to header if (userId != getUserConfig().getClientUserId()) rows.append(Rows.Notifications);
+                    if (user != null && user.bot && user.bot_has_main_app) rows.append(Rows.InfoBotApp);
+                    rows.append(Rows.InfoFooter);
+                    rows.appendObject(Rows.InfoShadow, user, 1);
 
                     if (user != null && user.bot && userInfo != null && userInfo.starref_program != null && (userInfo.starref_program.flags & 2) == 0 && getMessagesController().starrefConnectAllowed) {
                         rows.append(Rows.Affiliate);
-                        rows.append(Rows.AffiliateInfo);
+                        rows.appendObject(Rows.AffiliateInfo, user, 1);
                     }
 
                     if (user != null && user.bot) {
@@ -711,49 +718,48 @@ public class ProfileActivityReplacement extends BaseFragment implements
                         if (containsPermissionEmojiStatus || containsPermissionLocation || containsPermissionBiometry) {
                             rows.append(Rows.BotPermissionHeader);
                             if (containsPermissionEmojiStatus) rows.append(Rows.BotPermissionEmojiStatus);
-                            if (containsPermissionLocation) rows.appendRaw(Rows.BotPermissionLocation, botLocation, 1);
-                            if (containsPermissionBiometry) rows.appendRaw(Rows.BotPermissionBiometry, botBiometry, 1);
-                            rows.append(Rows.BotPermissionDivider);
+                            if (containsPermissionLocation) rows.appendObject(Rows.BotPermissionLocation, botLocation, 1);
+                            if (containsPermissionBiometry) rows.appendObject(Rows.BotPermissionBiometry, botBiometry, 1);
+                            rows.append(Rows.BotPermissionShadow);
                         }
                     }
 
                     if (chatEncrypted instanceof TLRPC.TL_encryptedChat) {
-                        rows.append(Rows.SettingsTimer);
-                        rows.append(Rows.SettingsKey);
-                        rows.append(Rows.SecretSettingsSection);
+                        rows.append(Rows.SecretSettingsTimer);
+                        rows.append(Rows.SecretSettingsKey);
+                        rows.append(Rows.SecretSettingsShadow);
                     }
 
                     if (user != null && !user.bot && chatEncrypted == null && user.id != getUserConfig().getClientUserId() && isUserBlocked) {
                         rows.append(Rows.Unblock);
-                        rows.append(Rows.LastSection);
+                        rows.append(Rows.UnblockShadow);
                     }
 
                     boolean divider = false;
                     if (user != null && user.bot) {
                         BotStarsController controller = BotStarsController.getInstance(currentAccount);
-                        if (userInfo != null && userInfo.can_view_revenue && controller.getTONBalance(userId) > 0) rows.append(Rows.BotTonBalance);
-                        if (controller.getBotStarsBalance(userId).amount > 0 || controller.hasTransactions(userId)) rows.append(Rows.BotStarsBalance);
+                        if (userInfo != null && userInfo.can_view_revenue && controller.getTONBalance(userId) > 0) rows.append(Rows.ActionsBotTonBalance);
+                        if (controller.getBotStarsBalance(userId).amount > 0 || controller.hasTransactions(userId)) rows.append(Rows.ActionsBotStarsBalance);
                     }
                     if (user != null && user.bot && !user.bot_nochats) {
-                        rows.append(Rows.AddToGroupButton);
-                        rows.append(Rows.AddToGroupInfo);
-                    } else if (rows.has(Rows.BotStarsBalance)) {
+                        rows.append(Rows.ActionsAddToGroupButton);
+                        rows.append(Rows.ActionsAddToGroupInfo);
+                    } else if (rows.has(Rows.ActionsBotStarsBalance)) {
                         divider = true;
                     }
                     boolean showAddToContacts = arguments.getBoolean("show_add_to_contacts", true);
                     if (!isMyProfile && showAddToContacts && user != null && !user.contact && !user.bot && !UserObject.isService(user.id)) {
-                        rows.append(Rows.AddToContacts);
+                        rows.append(Rows.ActionsAddToContacts);
                         divider = true;
                     }
                     if (!isMyProfile && reportReactionMessageId != 0 && !ContactsController.getInstance(currentAccount).isContact(userId)) {
-                        rows.append(Rows.ReportReaction);
+                        rows.append(Rows.ActionsReportReaction);
                         divider = true;
                     }
-                    if (divider) rows.append(Rows.ReportDivider);
+                    if (divider) rows.append(Rows.ActionsShadow);
 
-                    if (hasMedia || (user != null && user.bot && user.bot_can_edit) || userInfo != null && userInfo.common_chats_count != 0 || isMyProfile) {
-                        rows.append(Rows.SharedMedia);
-                    } /* WIP moving to header: else if (!rows.has(Rows.LastSection) && needSendMessage) {
+                    hasMedia = hasMedia || (user != null && user.bot && user.bot_can_edit) || userInfo != null && userInfo.common_chats_count != 0 || isMyProfile;
+                    /* WIP moving to header: else if (!rows.has(Rows.LastSection) && needSendMessage) {
                         rows.append(Rows.SendMessage);
                         rows.append(Rows.Report);
                         rows.append(Rows.LastSection);
@@ -761,65 +767,60 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 }
             } else if (isTopic()) {
                 rows.append(Rows.InfoHeader);
-                rows.append(Rows.Username);
-                rows.append(Rows.NotificationsSimple);
-                rows.append(Rows.InfoSection);
-                if (hasMedia) {
-                    rows.append(Rows.SharedMedia);
-                }
+                rows.appendObject(Rows.InfoUsername, getCurrentChat(), 1);
+                // WIP moving to header: rows.append(Rows.NotificationsSimple);
+                rows.append(Rows.InfoFooter);
+                rows.append(Rows.InfoShadow);
             } else if (chatId != 0) {
                 if (chatInfo != null && (!TextUtils.isEmpty(chatInfo.about) || chatInfo.location instanceof TLRPC.TL_channelLocation) || ChatObject.isPublic(chat)) {
-                    if (LocaleController.isRTL && ChatObject.isChannel(chat) && chatInfo != null && !chat.megagroup && chatInfo.linked_chat_id != 0) {
-                        rows.append(Rows.Empty);
-                    }
                     rows.append(Rows.InfoHeader);
                     if (chatInfo != null) {
-                        if (!TextUtils.isEmpty(chatInfo.about)) rows.append(Rows.ChannelInfo);
-                        if (chatInfo.location instanceof TLRPC.TL_channelLocation) rows.append(Rows.Location);
+                        if (!TextUtils.isEmpty(chatInfo.about)) rows.appendObject(Rows.InfoChatAbout, chat, 1);
+                        if (chatInfo.location instanceof TLRPC.TL_channelLocation) rows.append(Rows.InfoLocation);
                     }
-                    if (ChatObject.isPublic(chat)) rows.append(Rows.Username);
+                    if (ChatObject.isPublic(chat)) rows.appendObject(Rows.InfoUsername, chat, 1);
+                    rows.append(Rows.InfoFooter);
+                    rows.append(Rows.InfoShadow);
                 }
-                rows.append(Rows.Notifications);
-                rows.append(Rows.InfoSection);
+                // WIP: moved to header rows.append(Rows.Notifications);
 
                 BotStarsController bots = BotStarsController.getInstance(currentAccount);
                 if (ChatObject.isChannel(chat) && !chat.megagroup) {
                     if (chatInfo != null && (chat.creator || chatInfo.can_view_participants)) {
-                        rows.append(Rows.MembersHeader);
-                        rows.append(Rows.Subscribers);
-                        if (chatInfo.requests_pending > 0) rows.append(Rows.SubscribersRequests);
-                        rows.append(Rows.Administrators);
-                        if (chatInfo.banned_count != 0 || chatInfo.kicked_count != 0) rows.append(Rows.BlockedUsers);
+                        rows.append(Rows.ChannelOptionsSubscribers);
+                        if (chatInfo.requests_pending > 0) rows.append(Rows.ChannelOptionsSubscribersRequests);
+                        rows.append(Rows.ChannelOptionsAdministrators);
+                        if (chatInfo.banned_count != 0 || chatInfo.kicked_count != 0) rows.append(Rows.ChannelOptionsBlockedUsers);
                         if (chatInfo != null && chatInfo.can_view_stars_revenue && (bots.getBotStarsBalance(-chatId).amount > 0 || bots.hasTransactions(-chatId))
                                 || chatInfo != null && chatInfo.can_view_revenue && bots.getTONBalance(-chatId) > 0) {
-                            rows.append(Rows.ChannelBalance);
+                            rows.append(Rows.ChannelOptionsBalance);
                         }
-                        rows.append(Rows.Settings);
-                        rows.append(Rows.ChannelBalanceSection);
+                        rows.append(Rows.ChannelOptionsSettings);
+                        rows.append(Rows.ChannelOptionsShadow);
                     }
                 } else {
                     if (chatInfo != null && chatInfo.can_view_stars_revenue && (bots.getBotStarsBalance(-chatId).amount > 0 || bots.hasTransactions(-chatId))
                             || chatInfo != null && chatInfo.can_view_revenue && bots.getTONBalance(-chatId) > 0) {
-                        rows.append(Rows.ChannelBalance);
-                        rows.append(Rows.ChannelBalanceSection);
+                        rows.append(Rows.ChannelOptionsBalance);
+                        rows.append(Rows.ChannelOptionsShadow);
                     }
                 }
 
                 if (ChatObject.isChannel(chat)) {
-                    if (!isTopic() && chatInfo != null && chat.megagroup && chatInfo.participants != null && chatInfo.participants.participants != null && !chatInfo.participants.participants.isEmpty()) {
+                    // Channels
+                    if (!isTopic() && chatInfo != null && chat.megagroup && !chatMembers.isEmpty()) {
                         if (!ChatObject.isNotInChat(chat) && ChatObject.canAddUsers(chat) && chatInfo.participants_count < getMessagesController().maxMegagroupCount) {
-                            rows.append(Rows.AddMember);
+                            rows.append(Rows.MembersAdd);
                         }
-                        int count = chatInfo.participants.participants.size();
+                        int count = chatMembers.size();
                         if ((count <= 5 || !hasMedia || chatMembersForceShow == 1) && chatMembersForceShow != 2) {
-                            if (!rows.has(Rows.AddMember)) rows.append(Rows.MembersHeader);
                             rows.appendList(Rows.Members, sortMembers(chatMembers, chatMembersOrder));
                             chatMembersForceShow = 1;
                             if (sharedMediaLayout != null) {
                                 sharedMediaLayout.setChatUsers(null, null);
                             }
                         } else {
-                            if (rows.has(Rows.AddMember)) rows.append(Rows.MembersSection);
+                            if (rows.has(Rows.MembersAdd)) rows.append(Rows.MembersShadow);
                             if (sharedMediaLayout != null) {
                                 if (!chatMembersOrder.isEmpty()) {
                                     chatMembersForceShow = 2;
@@ -830,56 +831,57 @@ public class ProfileActivityReplacement extends BaseFragment implements
                         }
                     } else {
                         if (!ChatObject.isNotInChat(chat) && ChatObject.canAddUsers(chat) && chatInfo != null && chatInfo.participants_hidden) {
-                            rows.append(Rows.AddMember);
-                            rows.append(Rows.MembersSection);
+                            rows.append(Rows.MembersAdd);
+                            rows.append(Rows.MembersShadow);
                         }
                         if (sharedMediaLayout != null) {
                             sharedMediaLayout.updateAdapters();
                         }
                     }
 
-                    if (!rows.has(Rows.LastSection) && chat != null && chat.left && !chat.kicked) {
+                    /* WIP: moved to header if (!rows.has(Rows.UnblockShadow) && chat != null && chat.left && !chat.kicked) {
                         long requestedTime = MessagesController.getNotificationsSettings(currentAccount).getLong("dialog_join_requested_time_" + dialogId, -1);
                         if (!(requestedTime > 0 && System.currentTimeMillis() - requestedTime < 1000 * 60 * 2)) {
                             rows.append(Rows.Join);
-                            rows.append(Rows.LastSection);
+                            rows.append(Rows.JoinShadow);
                         }
-                    }
+                    } */
                 } else if (chatInfo != null) {
+                    // Groups
                     if (!isTopic() && chatInfo.participants != null && chatInfo.participants.participants != null && !(chatInfo.participants instanceof TLRPC.TL_chatParticipantsForbidden)) {
                         if (chat != null && (ChatObject.canAddUsers(chat) || chat.default_banned_rights == null || !chat.default_banned_rights.invite_users)) {
-                            rows.append(Rows.AddMember);
+                            rows.append(Rows.MembersAdd);
                         }
-                        int count = chatInfo.participants.participants.size();
+                        int count = chatMembers.size();
                         if (count <= 5 || !hasMedia) {
-                            if (!rows.has(Rows.AddMember)) rows.append(Rows.MembersHeader);
                             rows.appendList(Rows.Members, sortMembers(chatMembers, chatMembersOrder));
                             if (sharedMediaLayout != null) {
                                 sharedMediaLayout.setChatUsers(null, null);
                             }
                         } else {
-                            if (!rows.has(Rows.AddMember)) rows.append(Rows.MembersSection);
+                            if (!rows.has(Rows.MembersAdd)) rows.append(Rows.MembersShadow);
                             if (sharedMediaLayout != null) {
                                 sharedMediaLayout.setChatUsers(chatMembersOrder, chatInfo);
                             }
                         }
                     } else {
                         if (!ChatObject.isNotInChat(chat) && ChatObject.canAddUsers(chat) && chatInfo.participants_hidden) {
-                            rows.append(Rows.AddMember);
-                            rows.append(Rows.MembersSection);
+                            rows.append(Rows.MembersAdd);
+                            rows.append(Rows.MembersShadow);
                         }
                         if (sharedMediaLayout != null) {
                             sharedMediaLayout.updateAdapters();
                         }
                     }
                 }
-
-                if (hasMedia) {
-                    rows.append(Rows.SharedMedia);
-                }
             }
-            // WIP if (!rows.has(Rows.SharedMedia)) rows.append(Rows.BottomPadding);
-            listView.setTranslateSelectorPosition(rows.position(Rows.BizHours));
+            if (hasMedia) {
+                if (rows.count() == 0) rows.append(Rows.SharedMediaPrefix);
+                rows.append(Rows.SharedMedia);
+            } else {
+                rows.append(Rows.Filler);
+            }
+            listView.setTranslateSelectorPosition(rows.position(Rows.InfoBizHours));
             return rows;
         });
     }
@@ -894,7 +896,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         return sorted.stream().filter(Objects::nonNull).toList();
     }
 
-    // Needer whenever chatMembers changes.
+    // Needed whenever chatMembers changes.
     private void updateOnlineData(boolean notify) {
         chatMembersOnline = 0;
         int currentTime = getConnectionsManager().getCurrentTime();
@@ -1321,6 +1323,24 @@ public class ProfileActivityReplacement extends BaseFragment implements
     }
 
     @Override
+    public boolean isLightStatusBar() {
+        int color;
+        if (headerView != null && !headerView.canGrow()) {
+            return false;
+        }
+        if (actionBar.isActionModeShowed()) {
+            color = getThemedColor(Theme.key_actionBarActionModeDefault);
+        } else if (mediaHeaderVisible) {
+            color = getThemedColor(Theme.key_windowBackgroundWhite);
+        } else if (peerColor != null) {
+            color = peerColor.getBgColor2(Theme.isCurrentThemeDark());
+        } else {
+            color = getThemedColor(Theme.key_actionBarDefault);
+        }
+        return ColorUtils.calculateLuminance(color) > 0.7f;
+    }
+
+    @Override
     public ActionBar createActionBar(Context context) {
         checkThemeResourceProvider();
         final ActionBar actionBar = new ActionBar(context, getResourceProvider()) {
@@ -1360,7 +1380,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
     @Override
     public View createView(Context context) {
-        // Resource management
+        // Preparation
         Theme.createProfileResources(context);
         Theme.createChatResources(context, false);
         checkThemeResourceProvider();
@@ -1636,7 +1656,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 boolean infoChanged = (mask & MessagesController.UPDATE_MASK_AVATAR) != 0 || (mask & MessagesController.UPDATE_MASK_NAME) != 0 || (mask & MessagesController.UPDATE_MASK_STATUS) != 0 || (mask & MessagesController.UPDATE_MASK_EMOJI_STATUS) != 0;
                 if (infoChanged) updateProfileData(true);
                 if ((mask & MessagesController.UPDATE_MASK_PHONE) != 0) {
-                    if (listView != null) listView.notifyRowChange(Rows.Phone);
+                    if (listView != null) listView.notifyRowChange(Rows.InfoPhone);
                 }
             } else if (chatId != 0) {
                 boolean infoChanged = ((mask & MessagesController.UPDATE_MASK_CHAT) != 0 || (mask & MessagesController.UPDATE_MASK_CHAT_AVATAR) != 0 || (mask & MessagesController.UPDATE_MASK_CHAT_NAME) != 0 || (mask & MessagesController.UPDATE_MASK_CHAT_MEMBERS) != 0 || (mask & MessagesController.UPDATE_MASK_STATUS) != 0 || (mask & MessagesController.UPDATE_MASK_EMOJI_STATUS) != 0);
@@ -1682,19 +1702,18 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if ((loadChannelParticipants || !byChannelUsers)) {
                 updateChatMembersData(true);
             }
-            updateListData("NotificationCenter.chatInfoDidLoad");
         } else if (id == NotificationCenter.groupCallUpdated) {
             Long chatId = (Long) args[0];
             if (chat != null && chatId == chat.id && ChatObject.canManageCalls(chat)) {
                 TLRPC.ChatFull chatFull = MessagesController.getInstance(currentAccount).getChatFull(chatId);
                 setChatInfo(chatFull);
+                updateChatMembersData(false);
             }
         } else if (id == NotificationCenter.userInfoDidLoad) {
             final long uid = (Long) args[0];
             if (uid != userId) return;
             final TLRPC.UserFull full = (TLRPC.UserFull) args[1];
             setUserInfo(full);
-            updateTtlData();
         } else if (id == NotificationCenter.closeChats) {
             removeSelfFromStack(true);
         } else if (id == NotificationCenter.privacyRulesUpdated) {
@@ -1871,12 +1890,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
     }
 
     public void handleDetailCellImageClick(int kind) {
-        if (kind == Rows.Username) {
+        if (kind == Rows.InfoUsername) {
             Bundle args = new Bundle();
             args.putLong("chat_id", chatId);
             args.putLong("user_id", userId);
             presentFragment(new QrActivity(args));
-        } else if (kind == Rows.Birthday) {
+        } else if (kind == Rows.InfoBirthday) {
             if (userId == getUserConfig().getClientUserId()) {
                 presentFragment(new PremiumPreviewFragment("my_profile_gift"));
                 return;

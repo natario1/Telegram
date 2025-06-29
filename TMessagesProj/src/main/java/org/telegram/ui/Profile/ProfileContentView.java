@@ -226,10 +226,10 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         }
 
         public void append(int kind) {
-            appendRaw(kind, null, 1);
+            appendObject(kind, null, 1);
         }
 
-        public void appendRaw(int kind, Object payload, int count) {
+        public void appendObject(int kind, Object payload, int count) {
             if (count <= 0) return;
             entries.append(index, kind);
             positions[kind] = index + 1; // We do -1 in position()
@@ -239,7 +239,7 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         }
 
         public <T> void appendList(int kind, List<T> list) {
-            appendRaw(kind, list, list.size());
+            appendObject(kind, list, list.size());
         }
 
         public int position(int kind) {
@@ -272,7 +272,7 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
             for (int i = 0; i < entries.size(); i++) {
                 int kind = entries.valueAt(i);
                 if (predicate.test(copy, kind)) {
-                    copy.appendRaw(kind, payloads.get(kind), lists.get(kind, 1));
+                    copy.appendObject(kind, payloads.get(kind), lists.get(kind, 1));
                 }
             }
             return copy;
@@ -287,98 +287,124 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
             return kind;
         }
 
-        public final static int AddToContacts = newKind(VIEW_TYPE_TEXT);
-        public final static int AddToGroupButton = newKind(VIEW_TYPE_TEXT);
-        public final static int AddToGroupInfo = newKind(VIEW_TYPE_ADDTOGROUP_INFO);
+        public final static int SetAvatar = newKind(VIEW_TYPE_TEXT);
+        public final static int SetAvatarSection = newKind(VIEW_TYPE_SHADOW);
+
+        public final static int Members = newKind(VIEW_TYPE_USER);
+        public final static int MembersShadow = newKind(VIEW_TYPE_SHADOW);
+        public final static int MembersAdd = newKind(VIEW_TYPE_TEXT);
+
         public final static int Affiliate = newKind(VIEW_TYPE_COLORFUL_TEXT);
         public final static int AffiliateInfo = newKind(VIEW_TYPE_SHADOW_TEXT);
-        public final static int AddMember = newKind(VIEW_TYPE_TEXT);
-        public final static int Administrators = newKind(VIEW_TYPE_TEXT);
-        // public final static int BalanceDivider = newKind(VIEW_TYPE_SHADOW);
-        public final static int BlockedUsers = newKind(VIEW_TYPE_TEXT);
-        public final static int Bio = newKind(VIEW_TYPE_ABOUT_LINK);
-        public final static int Birthday = newKind(VIEW_TYPE_TEXT_DETAIL);
-        public final static int BizHours = newKind(VIEW_TYPE_HOURS);
-        public final static int BizLocation = newKind(VIEW_TYPE_LOCATION);
-        public final static int BotStarsBalance = newKind(VIEW_TYPE_TEXT);
-        public final static int BotTonBalance = newKind(VIEW_TYPE_TEXT);
-        public final static int BotApp = newKind(VIEW_TYPE_BOT_APP);
+
+        public final static int ActionsBotStarsBalance = newKind(VIEW_TYPE_TEXT);
+        public final static int ActionsBotTonBalance = newKind(VIEW_TYPE_TEXT);
+        public final static int ActionsAddToContacts = newKind(VIEW_TYPE_TEXT);
+        public final static int ActionsAddToGroupButton = newKind(VIEW_TYPE_TEXT);
+        public final static int ActionsAddToGroupInfo = newKind(VIEW_TYPE_SHADOW_TEXT);
+        public final static int ActionsReportReaction = newKind(VIEW_TYPE_TEXT);
+        public final static int ActionsShadow = newKind(VIEW_TYPE_SHADOW);
+
+        // SecretSettings* rows appear on encrypted chats
+        public final static int SecretSettingsTimer = newKind(VIEW_TYPE_TEXT);
+        public final static int SecretSettingsKey = newKind(VIEW_TYPE_TEXT);
+        public final static int SecretSettingsShadow = newKind(VIEW_TYPE_SHADOW);
+
+        // BotPermission* rows appear on bot pages
         public final static int BotPermissionHeader = newKind(VIEW_TYPE_HEADER);
         public final static int BotPermissionLocation = newKind(VIEW_TYPE_TEXT);
         public final static int BotPermissionEmojiStatus = newKind(VIEW_TYPE_TEXT);
         public final static int BotPermissionBiometry = newKind(VIEW_TYPE_TEXT);
-        public final static int BotPermissionDivider = newKind(VIEW_TYPE_SHADOW);
-        // public final static int BottomPadding = newKind(VIEW_TYPE_BOTTOM_PADDING);
-        public final static int Business = newKind(VIEW_TYPE_TEXT);
-        public final static int Channel = newKind(VIEW_TYPE_CHANNEL);
-        public final static int ChannelDivider = newKind(VIEW_TYPE_SHADOW);
-        public final static int ChannelInfo = newKind(VIEW_TYPE_ABOUT_LINK);
-        public final static int ChannelBalance = newKind(VIEW_TYPE_TEXT);
-        public final static int ChannelBalanceSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int Chat = newKind(VIEW_TYPE_TEXT);
-        public final static int ClearLogs = newKind(VIEW_TYPE_TEXT);
-        public final static int Data = newKind(VIEW_TYPE_TEXT);
-        public final static int DebugHeader = newKind(VIEW_TYPE_HEADER);
-        public final static int Devices = newKind(VIEW_TYPE_TEXT);
-        public final static int DevicesSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int Empty = newKind(VIEW_TYPE_EMPTY);
-        public final static int Faq = newKind(VIEW_TYPE_TEXT);
-        public final static int Filters = newKind(VIEW_TYPE_TEXT);
-        public final static int GraceSuggestionSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int GraceSuggestion = newKind(VIEW_TYPE_SUGGESTION);
+        public final static int BotPermissionShadow = newKind(VIEW_TYPE_SHADOW);
+
+        // Unblock rows appear in user pages when blocked
+        public final static int Unblock = newKind(VIEW_TYPE_TEXT);
+        public final static int UnblockShadow = newKind(VIEW_TYPE_SHADOW);
+
+        // Generic rows for the very first section, which has extra spacing
+        public final static int InfoHeader = newKind(VIEW_TYPE_SPACER);
+        public final static int InfoBirthday = newKind(VIEW_TYPE_TEXT_DETAIL);
+        public final static int InfoPhone = newKind(VIEW_TYPE_TEXT_DETAIL);
+        public final static int InfoBotApp = newKind(VIEW_TYPE_BOT_APP);
+        public final static int InfoBizHours = newKind(VIEW_TYPE_HOURS);
+        public final static int InfoBizLocation = newKind(VIEW_TYPE_LOCATION);
+        public final static int InfoUserAbout = newKind(VIEW_TYPE_ABOUT_LINK);
+        public final static int InfoChatAbout = newKind(VIEW_TYPE_ABOUT_LINK);
+        public final static int InfoUsername = newKind(VIEW_TYPE_TEXT_DETAIL_MULTILINE);
+        public final static int InfoLocation = newKind(VIEW_TYPE_TEXT_DETAIL);
+        public final static int InfoFooter = newKind(VIEW_TYPE_SPACER);
+        public final static int InfoShadow = newKind(VIEW_TYPE_SHADOW_TEXT);
+
+        // public final static int Join = newKind(VIEW_TYPE_TEXT); // Moved to header
+        // public final static int SendMessage = newKind(VIEW_TYPE_TEXT); // Moved to header
+        // public final static int Report = newKind(VIEW_TYPE_TEXT); // Moved to header
+        // public final static int NotificationsSimple = newKind(VIEW_TYPE_NOTIFICATIONS_CHECK_SIMPLE); // Moved to header
+
+        // ChannelOptions* rows appear on managed channels
+        public final static int ChannelOptionsSubscribers = newKind(VIEW_TYPE_TEXT);
+        public final static int ChannelOptionsSubscribersRequests = newKind(VIEW_TYPE_TEXT);
+        public final static int ChannelOptionsAdministrators = newKind(VIEW_TYPE_TEXT);
+        public final static int ChannelOptionsBalance = newKind(VIEW_TYPE_TEXT);
+        public final static int ChannelOptionsSettings = newKind(VIEW_TYPE_TEXT);
+        public final static int ChannelOptionsShadow = newKind(VIEW_TYPE_SHADOW);
+        public final static int ChannelOptionsBlockedUsers = newKind(VIEW_TYPE_TEXT);
+
+        // SharedMedia* rows appear on most pages
+        public final static int SharedMediaPrefix = newKind(VIEW_TYPE_SHADOW);
+        public final static int SharedMedia = newKind(VIEW_TYPE_SHARED_MEDIA);
+        public final static int Filler = newKind(VIEW_TYPE_FILLER); // used when there's no SharedMedia
+
+        // PersonalChannel may appear at the top of user pages
+        public final static int PersonalChannel = newKind(VIEW_TYPE_CHANNEL);
+        public final static int PersonalChannelShadow = newKind(VIEW_TYPE_SHADOW);
+
+        // My* rows appear in my settings
+        public final static int MyHeader = newKind(VIEW_TYPE_SPACER);
+        public final static int MyFooter = newKind(VIEW_TYPE_SPACER);
+        public final static int MyUsername = newKind(VIEW_TYPE_TEXT_DETAIL_MULTILINE);
+        public final static int MyBio = newKind(VIEW_TYPE_ABOUT_LINK);
+        public final static int MyPhoneNumber = newKind(VIEW_TYPE_TEXT_DETAIL);
+        public final static int MyShadow = newKind(VIEW_TYPE_SHADOW);
+        public final static int MyVersion = newKind(VIEW_TYPE_SHADOW_VERSION);
+
+        // Suggestion* rows appear in my settings
+        public final static int SuggestionShadow = newKind(VIEW_TYPE_SHADOW);
+        public final static int SuggestionGrace = newKind(VIEW_TYPE_SUGGESTION);
+        public final static int SuggestionPhone = newKind(VIEW_TYPE_SUGGESTION);
+        public final static int SuggestionPassword = newKind(VIEW_TYPE_SUGGESTION);
+
+        // MySettings* rows appear in my settings
+        public final static int MySettingsHeader = newKind(VIEW_TYPE_HEADER);
+        public final static int MySettingsPrivacy = newKind(VIEW_TYPE_TEXT);
+        public final static int MySettingsNotification = newKind(VIEW_TYPE_TEXT);
+        public final static int MySettingsLanguage = newKind(VIEW_TYPE_TEXT);
+        public final static int MySettingsFilters = newKind(VIEW_TYPE_TEXT);
+        public final static int MySettingsChat = newKind(VIEW_TYPE_TEXT);
+        public final static int MySettingsData = newKind(VIEW_TYPE_TEXT);
+        public final static int MySettingsDevices = newKind(VIEW_TYPE_TEXT);
+        public final static int MySettingsSection = newKind(VIEW_TYPE_SHADOW);
+        public final static int MySettingsLiteMode = newKind(VIEW_TYPE_TEXT);
+
+        // Help* rows appear in my settings
         public final static int HelpHeader = newKind(VIEW_TYPE_HEADER);
         public final static int HelpSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int InfoHeader = newKind(VIEW_TYPE_HEADER);
-        public final static int InfoSection = newKind(VIEW_TYPE_SHADOW_TEXT);
-        public final static int Join = newKind(VIEW_TYPE_TEXT);
-        public final static int Language = newKind(VIEW_TYPE_TEXT);
-        public final static int LastSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int LiteMode = newKind(VIEW_TYPE_TEXT);
-        public final static int Location = newKind(VIEW_TYPE_TEXT_DETAIL);
-        public final static int MembersHeader = newKind(VIEW_TYPE_HEADER);
-        public final static int Members = newKind(VIEW_TYPE_USER);
-        public final static int MembersSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int Notification = newKind(VIEW_TYPE_TEXT); // 49
-        public final static int Notifications = newKind(VIEW_TYPE_NOTIFICATIONS_CHECK);
-        public final static int NotificationsSimple = newKind(VIEW_TYPE_NOTIFICATIONS_CHECK_SIMPLE);
-        public final static int NumberSection = newKind(VIEW_TYPE_HEADER);
-        public final static int Number = newKind(VIEW_TYPE_TEXT_DETAIL);
-        public final static int PhoneSuggestionSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int PhoneSuggestion = newKind(VIEW_TYPE_SUGGESTION);
-        public final static int PasswordSuggestionSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int PasswordSuggestion = newKind(VIEW_TYPE_SUGGESTION);
-        public final static int Phone = newKind(VIEW_TYPE_TEXT_DETAIL);
-        public final static int Premium = newKind(VIEW_TYPE_PREMIUM_TEXT_CELL);
-        public final static int PremiumGifting = newKind(VIEW_TYPE_TEXT);
-        public final static int PremiumSections = newKind(VIEW_TYPE_SHADOW);
-        public final static int Policy = newKind(VIEW_TYPE_TEXT);
-        public final static int Privacy = newKind(VIEW_TYPE_TEXT);
-        public final static int Question = newKind(VIEW_TYPE_TEXT);
-        public final static int Report = newKind(VIEW_TYPE_TEXT); // Moved to header
-        public final static int ReportReaction = newKind(VIEW_TYPE_TEXT);
-        public final static int ReportDivider = newKind(VIEW_TYPE_SHADOW);
-        public final static int Settings = newKind(VIEW_TYPE_TEXT);
-        public final static int SettingsTimer = newKind(VIEW_TYPE_TEXT);
-        public final static int SettingsSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int SettingsKey = newKind(VIEW_TYPE_TEXT);
-        public final static int SettingsSection2 = newKind(VIEW_TYPE_HEADER);
-        public final static int SetAvatar = newKind(VIEW_TYPE_TEXT);
-        public final static int SetAvatarSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int SetUsername = newKind(VIEW_TYPE_TEXT_DETAIL_MULTILINE);
-        // public final static int Stickers = newKind(VIEW_TYPE_TEXT);
-        public final static int SendLogs = newKind(VIEW_TYPE_TEXT);
-        public final static int SendLastLogs = newKind(VIEW_TYPE_TEXT);
-        public final static int SwitchBackend = newKind(VIEW_TYPE_TEXT);
-        public final static int SendMessage = newKind(VIEW_TYPE_TEXT); // Moved to header
-        public final static int Subscribers = newKind(VIEW_TYPE_TEXT);
-        public final static int SubscribersRequests = newKind(VIEW_TYPE_TEXT);
-        public final static int Stars = newKind(VIEW_TYPE_STARS_TEXT_CELL);
-        public final static int SecretSettingsSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int SharedMedia = newKind(VIEW_TYPE_SHARED_MEDIA);
-        public final static int UserInfo = newKind(VIEW_TYPE_ABOUT_LINK);
-        public final static int Username = newKind(VIEW_TYPE_TEXT_DETAIL_MULTILINE);
-        public final static int Unblock = newKind(VIEW_TYPE_TEXT);
-        public final static int Version = newKind(VIEW_TYPE_VERSION);
+        public final static int HelpQuestion = newKind(VIEW_TYPE_TEXT);
+        public final static int HelpPolicy = newKind(VIEW_TYPE_TEXT);
+        public final static int HelpFaq = newKind(VIEW_TYPE_TEXT);
+
+        // Features* rows appear in my settings
+        public final static int FeaturesPremium = newKind(VIEW_TYPE_PREMIUM_TEXT_CELL);
+        public final static int FeaturesGift = newKind(VIEW_TYPE_TEXT);
+        public final static int FeaturesSection = newKind(VIEW_TYPE_SHADOW);
+        public final static int FeaturesStars = newKind(VIEW_TYPE_STARS_TEXT_CELL);
+        public final static int FeaturesBusiness = newKind(VIEW_TYPE_TEXT);
+
+        // Debug* rows appear in my settings
+        public final static int DebugHeader = newKind(VIEW_TYPE_HEADER);
+        public final static int DebugClearLogs = newKind(VIEW_TYPE_TEXT);
+        public final static int DebugSendLogs = newKind(VIEW_TYPE_TEXT);
+        public final static int DebugSendLastLogs = newKind(VIEW_TYPE_TEXT);
+        public final static int DebugSwitchBackend = newKind(VIEW_TYPE_TEXT);
     }
 
     private class ItemAnimator extends DefaultItemAnimator {
