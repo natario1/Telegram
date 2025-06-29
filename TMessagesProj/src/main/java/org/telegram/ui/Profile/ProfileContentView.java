@@ -1,11 +1,9 @@
 package org.telegram.ui.Profile;
 
 import android.animation.ValueAnimator;
-import android.graphics.PointF;
 import android.util.SparseIntArray;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.*;
 import org.telegram.messenger.*;
@@ -15,26 +13,25 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Cells.*;
 import org.telegram.ui.Components.CubicBezierInterpolator;
-import org.telegram.ui.Components.RLottieImageView;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.SharedMediaLayout;
 import org.telegram.ui.Stories.StoriesListPlaceProvider;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
 
-import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.ui.Profile.ProfileContentAdapter.*;
 
 public class ProfileContentView extends RecyclerListView implements StoriesListPlaceProvider.ClippedView {
 
     private final ActionBar actionBar;
     private final SharedMediaLayout sharedMediaLayout;
+    private RecyclerListView sharedMediaScrollingList;
 
     public ProfileContentView(
             @NonNull ActionBar actionBar,
-            SharedMediaLayout sharedMediaLayout,
+            @NonNull SharedMediaLayout sharedMediaLayout,
             @NonNull NotificationCenter notificationCenter
             ) {
         super(actionBar.getContext());
@@ -45,21 +42,18 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         setClipToPadding(false);
         setHideIfEmpty(false);
         setGlowColor(0);
+        setNestedScrollingEnabled(true);
         addOnScrollListener(new OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
-                if (sharedMediaLayout != null) {
-                    sharedMediaLayout.setPinnedToTop(sharedMediaLayout.getY() <= 0);
-                    if (sharedMediaLayout.isAttachedToWindow()) {
-                        sharedMediaLayout.setVisibleHeight(getMeasuredHeight() - sharedMediaLayout.getTop());
-                    }
+                sharedMediaLayout.setPinnedToTop(sharedMediaLayout.getY() <= 0);
+                if (sharedMediaLayout.isAttachedToWindow()) {
+                    sharedMediaLayout.setVisibleHeight(getMeasuredHeight() - sharedMediaLayout.getTop());
                 }
             }
             @Override
             public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
-                if (sharedMediaLayout != null) {
-                    sharedMediaLayout.scrollingByUser = scrollingByUser;
-                }
+                sharedMediaLayout.scrollingByUser = scrollingByUser;
             }
         });
     }
@@ -81,22 +75,15 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
     }
 
     @Override
-    protected void requestChildOnScreen(@NonNull View child, View focused) {
-
-    }
-
-    @Override
     public boolean onInterceptTouchEvent(MotionEvent e) {
-        if (sharedMediaLayout != null) {
-            if (sharedMediaLayout.canEditStories() && sharedMediaLayout.isActionModeShown() && sharedMediaLayout.getClosestTab() == SharedMediaLayout.TAB_BOT_PREVIEWS) {
-                return false;
-            }
-            if (sharedMediaLayout.canEditStories() && sharedMediaLayout.isActionModeShown() && sharedMediaLayout.getClosestTab() == SharedMediaLayout.TAB_STORIES) {
-                return false;
-            }
-            if (sharedMediaLayout.giftsContainer != null && sharedMediaLayout.giftsContainer.isReordering()) {
-                return false;
-            }
+        if (sharedMediaLayout.canEditStories() && sharedMediaLayout.isActionModeShown() && sharedMediaLayout.getClosestTab() == SharedMediaLayout.TAB_BOT_PREVIEWS) {
+            return false;
+        }
+        if (sharedMediaLayout.canEditStories() && sharedMediaLayout.isActionModeShown() && sharedMediaLayout.getClosestTab() == SharedMediaLayout.TAB_STORIES) {
+            return false;
+        }
+        if (sharedMediaLayout.giftsContainer != null && sharedMediaLayout.giftsContainer.isReordering()) {
+            return false;
         }
         return super.onInterceptTouchEvent(e);
     }
@@ -106,6 +93,25 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         super.onLayout(changed, l, t, r, b);
         // WIP: updateBottomButtonY();
     }
+
+    // SHARED MEDIA SCROLL
+
+    @Override
+    public boolean dispatchNestedPreScroll(int dx, int dy, int[] consumed, int[] offsetInWindow, int type) {
+        boolean res = super.dispatchNestedPreScroll(dx, dy, consumed, offsetInWindow, type);
+        RecyclerListView inner = sharedMediaLayout.getCurrentListView();
+        int leftover = dy - consumed[1];
+        if (inner != null && sharedMediaLayout.getTop() == 0 && inner.canScrollVertically(leftover)) {
+            // NOTE: It's possible to understand exactly how many pixels will be consumed,
+            // but it's not as important as scroll performance. We may consume too much only for one frame.
+            inner.scrollBy(0, leftover);
+            consumed[1] = leftover;
+            res = true;
+        }
+        return res;
+    }
+
+    // THEME
 
     public void getThemeDescriptions(ArrayList<ThemeDescription> arrayList, ThemeDescription.ThemeDescriptionDelegate delegate) {
         if (sharedMediaLayout != null) {
@@ -160,96 +166,123 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         arrayList.add(new ThemeDescription(this, 0, new Class[]{TextInfoPrivacyCell.class}, new String[]{"textView"}, null, null, null, Theme.key_windowBackgroundWhiteGrayText4));
     }
 
-    public void scrollTo(int rowKind, boolean animated) {
-        LinearLayoutManager layoutManager = (LinearLayoutManager) getLayoutManager();
+    // ROW APIS
+
+    public int getRowPosition(int rowKind) {
         ProfileContentAdapter adapter = (ProfileContentAdapter) getAdapter();
-        if (adapter == null || layoutManager == null) return;
-        int position = adapter.getRows().position(rowKind);
-        if (position >= 0) {
-            if (animated) {
-                LinearSmoothScrollerCustom linearSmoothScroller = new LinearSmoothScrollerCustom(getContext(), LinearSmoothScrollerCustom.POSITION_TOP, .6f);
-                linearSmoothScroller.setTargetPosition(position);
-                linearSmoothScroller.setOffset(-getPaddingTop());
-                layoutManager.startSmoothScroll(linearSmoothScroller);
-            } else {
-                layoutManager.scrollToPositionWithOffset(position, -getPaddingTop());
-            }
+        if (adapter == null) return -1;
+        return adapter.getRows().position(rowKind);
+    }
+
+    public void scrollToRow(int rowKind, boolean animated) {
+        LinearLayoutManager layoutManager = (LinearLayoutManager) getLayoutManager();
+        int position = getRowPosition(rowKind);
+        if (layoutManager == null || position < 0) return;
+        if (animated) {
+            LinearSmoothScrollerCustom linearSmoothScroller = new LinearSmoothScrollerCustom(getContext(), LinearSmoothScrollerCustom.POSITION_TOP, .6f);
+            linearSmoothScroller.setTargetPosition(position);
+            linearSmoothScroller.setOffset(-getPaddingTop());
+            layoutManager.startSmoothScroll(linearSmoothScroller);
+        } else {
+            layoutManager.scrollToPositionWithOffset(position, -getPaddingTop());
         }
     }
 
-    public void notifyChangeTo(int rowKind) {
-        ProfileContentAdapter adapter = (ProfileContentAdapter) getAdapter();
-        if (adapter == null) return;
-        int position = adapter.getRows().position(rowKind);
-        if (position >= 0) adapter.notifyItemChanged(position);
+    public void notifyRowChange(int rowKind) {
+        int position = getRowPosition(rowKind);
+        if (position >= 0 && getAdapter() != null) {
+            getAdapter().notifyItemChanged(position);
+        }
     }
 
-    public RLottieImageView findSetAvatarImage() {
-        LinearLayoutManager layoutManager = (LinearLayoutManager) getLayoutManager();
-        ProfileContentAdapter adapter = (ProfileContentAdapter) getAdapter();
-        if (adapter == null || layoutManager == null) return null;
-        int position = adapter.getRows().position(Rows.SetAvatar);
-        if (position >= 0) {
-            TextCell view = (TextCell) layoutManager.findViewByPosition(position);
-            if (view != null) return view.getImageView();
+    /** @noinspection unchecked*/
+    public <T extends View> T findRowView(int rowKind) {
+        int position = getRowPosition(rowKind);
+        if (position >= 0 && getLayoutManager() != null) {
+            return (T) getLayoutManager().findViewByPosition(position);
         }
         return null;
     }
 
-    public void computeBirthdaySourcePosition(PointF outPoint) {
-        LinearLayoutManager layoutManager = (LinearLayoutManager) getLayoutManager();
+    public void updateRows(Function<Rows, Rows> updater) {
         ProfileContentAdapter adapter = (ProfileContentAdapter) getAdapter();
-        if (adapter == null || layoutManager == null) return;
-        int position = adapter.getRows().position(Rows.Birthday);
-        if (position > 0) {
-            TextDetailCell cell = (TextDetailCell) layoutManager.findViewByPosition(position);
-            if (cell != null) {
-                outPoint.set(
-                        getX() + cell.getX() + cell.textView.getX() + dp(12),
-                        getY() + cell.getY() + cell.textView.getY() + cell.textView.getMeasuredHeight() / 2f
-                );
-            }
-        }
+        if (adapter == null) return;
+        Rows rows = adapter.getRows();
+        // WIP: keepingScrollPosition { ... }
+        Rows newRows = updater.apply(rows);
+        if (newRows != null) adapter.setRows(newRows, false);
+        // WIP: AndroidUtilities.updateVisibleRows(listView);
     }
 
     public static class Rows {
         private int index = 0;
-        private final SparseIntArray data = new SparseIntArray();
-        private List<TLRPC.ChatParticipant> members = Collections.emptyList();
+        private final SparseIntArray entries = new SparseIntArray();
+        private final int[] positions = new int[Kinds]; // Maps kinds to positions
+        private final SparseIntArray lists = new SparseIntArray(); // Entries which span more than one row - empty in most cases
+        private final Map<Integer, Object> payloads = new HashMap<>(); // Short list of members, bot location, bot biometry...
 
         public int count() {
             return index;
         }
 
         public void append(int kind) {
-            data.put(kind, index);
-            index++;
+            appendRaw(kind, null, 1);
         }
 
-        public void appendMembers(List<TLRPC.ChatParticipant> members) {
-            this.members = members;
-            for (int i = 0; i < members.size(); i++) {
-                append(Members);
-            }
+        public void appendRaw(int kind, Object payload, int count) {
+            if (count <= 0) return;
+            entries.append(index, kind);
+            positions[kind] = index + 1; // We do -1 in position()
+            if (payload != null) payloads.put(kind, payload);
+            if (count > 1) lists.put(kind, count);
+            index += count;
+        }
+
+        public <T> void appendList(int kind, List<T> list) {
+            appendRaw(kind, list, list.size());
         }
 
         public int position(int kind) {
-            return data.get(kind, -1);
+            return positions[kind] - 1;
         }
 
         public int kind(int position) {
-            return data.keyAt(position);
+            int maybe = entries.get(position, -1);
+            if (maybe >= 0) return maybe;
+            for (int s = 0; s < lists.size(); s++) { // Rare
+                int kind = lists.keyAt(s);
+                int start = position(kind);
+                int count = lists.valueAt(s);
+                if (position >= start && position < start + count) return kind;
+            }
+            return -1;
         }
 
         public boolean has(int kind) {
             return position(kind) >= 0;
         }
 
-        private final static SparseIntArray VIEW_TYPES = new SparseIntArray();
+        /** @noinspection unchecked*/
+        public <T> T payload(int kind) {
+            return (T) payloads.get(kind);
+        }
+
+        public Rows copy(BiPredicate<Rows, Integer> predicate) {
+            Rows copy = new Rows();
+            for (int i = 0; i < entries.size(); i++) {
+                int kind = entries.valueAt(i);
+                if (predicate.test(copy, kind)) {
+                    copy.appendRaw(kind, payloads.get(kind), lists.get(kind, 1));
+                }
+            }
+            return copy;
+        }
+
+        public final static SparseIntArray VIEW_TYPES = new SparseIntArray();
 
         private static int Kinds = 0;
-        public static int newKind(int viewType) {
-            int kind = ++Kinds;
+        private static int newKind(int viewType) {
+            int kind = Kinds++;
             VIEW_TYPES.put(kind, viewType);
             return kind;
         }
@@ -258,9 +291,10 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         public final static int AddToGroupButton = newKind(VIEW_TYPE_TEXT);
         public final static int AddToGroupInfo = newKind(VIEW_TYPE_ADDTOGROUP_INFO);
         public final static int Affiliate = newKind(VIEW_TYPE_COLORFUL_TEXT);
+        public final static int AffiliateInfo = newKind(VIEW_TYPE_SHADOW_TEXT);
         public final static int AddMember = newKind(VIEW_TYPE_TEXT);
         public final static int Administrators = newKind(VIEW_TYPE_TEXT);
-        public final static int BalanceDivider = newKind(VIEW_TYPE_SHADOW);
+        // public final static int BalanceDivider = newKind(VIEW_TYPE_SHADOW);
         public final static int BlockedUsers = newKind(VIEW_TYPE_TEXT);
         public final static int Bio = newKind(VIEW_TYPE_ABOUT_LINK);
         public final static int Birthday = newKind(VIEW_TYPE_TEXT_DETAIL);
@@ -296,17 +330,15 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         public final static int HelpSection = newKind(VIEW_TYPE_SHADOW);
         public final static int InfoHeader = newKind(VIEW_TYPE_HEADER);
         public final static int InfoSection = newKind(VIEW_TYPE_SHADOW_TEXT);
-        public final static int InfoAffiliate = newKind(VIEW_TYPE_SHADOW_TEXT);
         public final static int Join = newKind(VIEW_TYPE_TEXT);
         public final static int Language = newKind(VIEW_TYPE_TEXT);
+        public final static int LastSection = newKind(VIEW_TYPE_SHADOW);
         public final static int LiteMode = newKind(VIEW_TYPE_TEXT);
         public final static int Location = newKind(VIEW_TYPE_TEXT_DETAIL);
-        public final static int LastSection = newKind(VIEW_TYPE_SHADOW);
         public final static int MembersHeader = newKind(VIEW_TYPE_HEADER);
         public final static int Members = newKind(VIEW_TYPE_USER);
         public final static int MembersSection = newKind(VIEW_TYPE_SHADOW);
-        public final static int Notification = newKind(VIEW_TYPE_TEXT);
-        public final static int NotificationsDivider = newKind(VIEW_TYPE_DIVIDER);
+        public final static int Notification = newKind(VIEW_TYPE_TEXT); // 49
         public final static int Notifications = newKind(VIEW_TYPE_NOTIFICATIONS_CHECK);
         public final static int NotificationsSimple = newKind(VIEW_TYPE_NOTIFICATIONS_CHECK_SIMPLE);
         public final static int NumberSection = newKind(VIEW_TYPE_HEADER);
@@ -322,7 +354,7 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         public final static int Policy = newKind(VIEW_TYPE_TEXT);
         public final static int Privacy = newKind(VIEW_TYPE_TEXT);
         public final static int Question = newKind(VIEW_TYPE_TEXT);
-        public final static int Report = newKind(VIEW_TYPE_TEXT);
+        public final static int Report = newKind(VIEW_TYPE_TEXT); // Moved to header
         public final static int ReportReaction = newKind(VIEW_TYPE_TEXT);
         public final static int ReportDivider = newKind(VIEW_TYPE_SHADOW);
         public final static int Settings = newKind(VIEW_TYPE_TEXT);
@@ -333,11 +365,11 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         public final static int SetAvatar = newKind(VIEW_TYPE_TEXT);
         public final static int SetAvatarSection = newKind(VIEW_TYPE_SHADOW);
         public final static int SetUsername = newKind(VIEW_TYPE_TEXT_DETAIL_MULTILINE);
-        public final static int Stickers = newKind(VIEW_TYPE_TEXT);
+        // public final static int Stickers = newKind(VIEW_TYPE_TEXT);
         public final static int SendLogs = newKind(VIEW_TYPE_TEXT);
         public final static int SendLastLogs = newKind(VIEW_TYPE_TEXT);
         public final static int SwitchBackend = newKind(VIEW_TYPE_TEXT);
-        public final static int SendMessage = newKind(VIEW_TYPE_TEXT);
+        public final static int SendMessage = newKind(VIEW_TYPE_TEXT); // Moved to header
         public final static int Subscribers = newKind(VIEW_TYPE_TEXT);
         public final static int SubscribersRequests = newKind(VIEW_TYPE_TEXT);
         public final static int Stars = newKind(VIEW_TYPE_STARS_TEXT_CELL);
@@ -402,12 +434,12 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         }
     }
 
-    private static class RowDiffer extends DiffUtil.Callback {
+    public static class RowDiffer extends DiffUtil.Callback {
 
         private final Rows oldRows;
         private final Rows newRows;
 
-        private RowDiffer(Rows oldRows, Rows newRows) {
+        public RowDiffer(Rows oldRows, Rows newRows) {
             this.oldRows = oldRows;
             this.newRows = newRows;
         }
@@ -429,14 +461,18 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
                 if (kind != Rows.Members) return true;
                 int oldIndex = oldItemPosition - oldRows.position(Rows.Members);
                 int newIndex = newItemPosition - newRows.position(Rows.Members);
-                return oldRows.members.get(oldIndex).user_id == newRows.members.get(newIndex).user_id;
+                List<TLRPC.ChatParticipant> oldMembers = oldRows.payload(Rows.Members);
+                List<TLRPC.ChatParticipant> newMembers = newRows.payload(Rows.Members);
+                return oldMembers.get(oldIndex).user_id == newMembers.get(newIndex).user_id;
             }
             return false;
         }
 
         @Override
         public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
-            return areItemsTheSame(oldItemPosition, newItemPosition);
+            if (!areItemsTheSame(oldItemPosition, newItemPosition)) return false;
+            int kind = newRows.kind(newItemPosition);
+            return oldRows.payload(kind) == newRows.payload(kind);
         }
     }
 }

@@ -214,6 +214,10 @@ public class ProfileActivityMenus {
         mainMenuItem.removeAllSubItems();
     }
 
+    public boolean hasMainMenuSubItem(int id) {
+        return mainMenuItem.getSubItem(id) != null;
+    }
+
     public void appendMainMenuSubItem(int id) {
         if (id == AB_CONTACT_SHARE_ID) {
             mainMenuItem.addSubItem(id, R.drawable.msg_share, LocaleController.getString(R.string.ShareContact));

@@ -25,6 +25,10 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             super(context);
         }
 
+        public final boolean canGrow() {
+            return growth < maxGrowth;
+        }
+
         public final void configureHeights(int baseHeight) {
             if (baseHeight >= 0) this.baseHeight = baseHeight;
             if (getParent() != null) getParent().requestLayout();
@@ -68,6 +72,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
     private Header header;
     private RecyclerView content;
 
+    private final boolean[] hasNestedScroll = new boolean[2];
     private final RecyclerView.OnScrollListener scrollListener = new RecyclerView.OnScrollListener() {
         @Override
         public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
@@ -75,9 +80,6 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             header.applyGrowth(contentOffset);
         }
     };
-
-    private boolean hasTouchNestedScroll = false;
-    private boolean hasNonTouchNestedScroll = false;
 
     public ProfileCoordinatorLayout(@NonNull Context context) {
         super(context);
@@ -123,26 +125,20 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
 
     @Override
     public boolean onStartNestedScroll(@NonNull View child, @NonNull View target, int axes, int type) {
-        boolean has = type == ViewCompat.TYPE_TOUCH ? hasTouchNestedScroll : hasNonTouchNestedScroll;
-        return !has && target == content && (axes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0;
+        return !hasNestedScroll[type] && target == content && (axes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0;
     }
 
     @Override
     public void onNestedScrollAccepted(@NonNull View child, @NonNull View target, int axes, int type) {
-        if (type == ViewCompat.TYPE_TOUCH) hasTouchNestedScroll = true;
-        else hasNonTouchNestedScroll = true;
+        hasNestedScroll[type] = true;
     }
 
     @Override
     public void onStopNestedScroll(@NonNull View target, int type) {
-        if (type == ViewCompat.TYPE_NON_TOUCH) {
-            snapContentOffset();
-            hasNonTouchNestedScroll = false;
-        } else {
-            // If hasNonTouchNestedScroll, there'll be a fling animation that we didn't block
-            if (!hasNonTouchNestedScroll) snapContentOffset();
-            hasTouchNestedScroll = false;
+        if (type == ViewCompat.TYPE_NON_TOUCH || !hasNestedScroll[ViewCompat.TYPE_NON_TOUCH]) {
+            snapContentOffset(); // If hasNestedScroll[TYPE_NON_TOUCH], there'll be a fling animation that we didn't block
         }
+        hasNestedScroll[type] = false;
     }
 
     @Override
@@ -172,8 +168,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
 
     @Override
     public int getNestedScrollAxes() {
-        if (hasNonTouchNestedScroll || hasTouchNestedScroll) return ViewCompat.SCROLL_AXIS_VERTICAL;
-        return ViewCompat.SCROLL_AXIS_NONE;
+        return hasNestedScroll[ViewCompat.TYPE_TOUCH] || hasNestedScroll[ViewCompat.TYPE_NON_TOUCH] ? ViewCompat.SCROLL_AXIS_VERTICAL : ViewCompat.SCROLL_AXIS_NONE;
     }
 
     private int getContentOffset() {
@@ -191,7 +186,6 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             if (Math.abs(delta) < Math.abs(distance)) distance = delta;
         }
         return changeContentOffset(header.growth - distance, true);
-
     }
 
     private boolean changeContentOffset(int targetGrowth, boolean animated) {

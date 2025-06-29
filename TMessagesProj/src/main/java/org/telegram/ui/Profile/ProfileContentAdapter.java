@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.text.*;
@@ -20,12 +21,12 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.*;
 import org.telegram.messenger.browser.Browser;
-import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_bots;
@@ -54,6 +55,7 @@ import java.time.LocalDate;
 import java.time.Period;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 
 import static org.telegram.ui.Profile.ProfileContentView.*;
@@ -64,7 +66,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
             VIEW_TYPE_TEXT_DETAIL = 2,
             VIEW_TYPE_ABOUT_LINK = 3,
             VIEW_TYPE_TEXT = 4,
-            VIEW_TYPE_DIVIDER = 5,
+            // VIEW_TYPE_DIVIDER = 5,
             VIEW_TYPE_NOTIFICATIONS_CHECK = 6,
             VIEW_TYPE_SHADOW = 7,
             VIEW_TYPE_USER = 8,
@@ -87,9 +89,6 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
 
     private final ProfileActivityReplacement fragment;
     private final Theme.ResourcesProvider resourcesProvider;
-    private final SharedMediaLayout sharedMediaLayout;
-    private BotLocation botLocation;
-    private BotBiometry botBiometry;
 
     private Rows rows = new Rows();
     private CharacterStyle loadingSpan;
@@ -99,12 +98,33 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
 
     public ProfileContentAdapter(ProfileActivityReplacement fragment) {
         this.fragment = fragment;
-        this.sharedMediaLayout = fragment.sharedMediaLayout;
         this.resourcesProvider = fragment.getResourceProvider();
     }
 
     public Rows getRows() {
         return rows;
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    public void setRows(Rows newRows, boolean reload) {
+        if (newRows == rows) return;
+        if (owner != null && owner.isComputingLayout()) {
+            owner.post(() -> setRows(newRows, reload));
+            return;
+        }
+        if (reload || rows.count() == 0 || newRows.count() == 0 || owner == null) {
+            this.rows = newRows;
+            if (owner != null) notifyDataSetChanged();
+        } else {
+            RowDiffer differ = new RowDiffer(rows, newRows);
+            this.rows = newRows;
+            try {
+                DiffUtil.calculateDiff(differ).dispatchUpdatesTo(this);
+            } catch (Exception e) {
+                FileLog.e(e);
+                notifyDataSetChanged();
+            }
+        }
     }
 
     @Override
@@ -125,6 +145,11 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
     }
 
     @Override
+    public int getItemViewType(int position) {
+        return Rows.VIEW_TYPES.get(rows.kind(position));
+    }
+
+    @Override
     public boolean isEnabled(RecyclerView.ViewHolder holder) {
         boolean hasNotification = rows.has(Rows.Notification);
         if (hasNotification) {
@@ -133,11 +158,11 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                     || kind == Rows.Language || kind == Rows.SetUsername || kind == Rows.Bio
                     || kind == Rows.Version || kind == Rows.Data || kind == Rows.Chat
                     || kind == Rows.Question || kind == Rows.Devices || kind == Rows.Filters
-                    || kind == Rows.Stickers || kind == Rows.Faq || kind == Rows.Policy
+                    || kind == Rows.Faq || kind == Rows.Policy || kind == Rows.Stars
                     || kind == Rows.SendLogs || kind == Rows.SendLastLogs || kind == Rows.ClearLogs
                     || kind == Rows.SwitchBackend || kind == Rows.SetAvatar || kind == Rows.AddToGroupButton
                     || kind == Rows.Premium || kind == Rows.PremiumGifting || kind == Rows.Business
-                    || kind == Rows.LiteMode || kind == Rows.Birthday || kind == Rows.Channel || kind == Rows.Stars;
+                    || kind == Rows.LiteMode || kind == Rows.Birthday || kind == Rows.Channel;
         }
         if (holder.itemView instanceof UserCell) {
             UserCell userCell = (UserCell) holder.itemView;
@@ -148,7 +173,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
             }
         }
         int type = holder.getItemViewType();
-        return type != VIEW_TYPE_HEADER && type != VIEW_TYPE_DIVIDER && type != VIEW_TYPE_SHADOW &&
+        return type != VIEW_TYPE_HEADER && type != 5 && type != VIEW_TYPE_SHADOW &&
                 type != VIEW_TYPE_EMPTY && /* type != VIEW_TYPE_BOTTOM_PADDING && */ type != VIEW_TYPE_SHARED_MEDIA &&
                 type != 9 && type != 10 && type != VIEW_TYPE_BOT_APP; // These are legacy ones, left for compatibility
     }
@@ -284,12 +309,6 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                 view.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
                 break;
             }
-            case VIEW_TYPE_DIVIDER: {
-                view = new DividerCell(context, resourcesProvider);
-                view.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
-                view.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(4), 0, 0);
-                break;
-            }
             case VIEW_TYPE_NOTIFICATIONS_CHECK: {
                 view = new NotificationsCheckCell(context, 23, 70, false, resourcesProvider);
                 view.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
@@ -301,7 +320,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                 break;
             }
             case VIEW_TYPE_SHADOW: {
-                view = new ShadowSectionCell(context, resourcesProvider);
+                view = new ShadowSectionCell(context, 12, getThemedColor(Theme.key_windowBackgroundGray), resourcesProvider);
                 break;
             }
             case VIEW_TYPE_SHADOW_TEXT: {
@@ -372,9 +391,9 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                 break;
             }
             case VIEW_TYPE_SHARED_MEDIA: {
-                ViewGroup oldParent = (ViewGroup) sharedMediaLayout.getParent();
-                if (oldParent != null) oldParent.removeView(sharedMediaLayout);
-                view = sharedMediaLayout;
+                ViewGroup oldParent = (ViewGroup) fragment.sharedMediaLayout.getParent();
+                if (oldParent != null) oldParent.removeView(fragment.sharedMediaLayout);
+                view = fragment.sharedMediaLayout;
                 break;
             }
 
@@ -399,7 +418,11 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                 }
                 cell.getTextView().setPadding(0, AndroidUtilities.dp(14), 0, AndroidUtilities.dp(14));
                 view = cell;
-                view.setBackgroundDrawable(Theme.getThemedDrawable(context, R.drawable.greydivider_bottom, getThemedColor(Theme.key_windowBackgroundGrayShadow)));
+                Drawable shadow = Theme.getThemedDrawable(context, R.drawable.greydivider_bottom, getThemedColor(Theme.key_windowBackgroundGrayShadow));
+                Drawable background = new ColorDrawable(getThemedColor(Theme.key_windowBackgroundGray));
+                CombinedDrawable combined = new CombinedDrawable(background, shadow, 0, 0);
+                combined.setFullsize(true);
+                view.setBackground(combined);
                 break;
             }
         }
@@ -645,14 +668,13 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
             }
             case VIEW_TYPE_SHADOW: {
                 View sectionCell = holder.itemView;
+                ShadowSectionCell sectionCell = (ShadowSectionCell) holder.itemView;
                 sectionCell.setTag(pos);
-                int drawable;
                 if (kind == Rows.InfoSection && !rows.has(Rows.LastSection) && !rows.has(Rows.SecretSettingsSection) && !rows.has(Rows.SharedMedia) && !rows.has(Rows.MembersSection) || kind == Rows.SecretSettingsSection || kind == Rows.LastSection || kind == Rows.MembersSection && !rows.has(Rows.LastSection) && !rows.has(Rows.SharedMedia)) {
-                    drawable = R.drawable.greydivider_bottom;
+                    sectionCell.setTopBottom(true, false);
                 } else {
-                    drawable = R.drawable.greydivider;
+                    sectionCell.setTopBottom(true, true);
                 }
-                sectionCell.setBackgroundDrawable(Theme.getThemedDrawable(sectionCell.getContext(), drawable, getThemedColor(Theme.key_windowBackgroundGrayShadow)));
                 break;
             }
             case VIEW_TYPE_SUGGESTION: {
@@ -674,7 +696,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
             case VIEW_TYPE_LOCATION: {
                 ProfileLocationCell locationCell = (ProfileLocationCell) holder.itemView;
                 TLRPC.UserFull userFull = fragment.getMessagesController().getUserFull(fragment.getUserId());
-                locationCell.set(userFull != null ? userFull.business_location : null, !rows.has(Rows.NotificationsDivider) && !fragment.isMyProfile());
+                locationCell.set(userFull != null ? userFull.business_location : null, !fragment.isMyProfile());
                 break;
             }
             case VIEW_TYPE_COLORFUL_TEXT: {
@@ -697,7 +719,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                 TLRPC.UserFull userInfo = fragment.getMessagesController().getUserFull(fragment.getUserId());
                 TL_account.TL_businessWorkHours workHours = userInfo != null ? userInfo.business_work_hours : null;
                 ProfileHoursCell hoursCell = (ProfileHoursCell) holder.itemView;
-                boolean divider = !rows.has(Rows.NotificationsDivider) && !fragment.isMyProfile() || rows.has(Rows.BizLocation);
+                boolean divider = !fragment.isMyProfile() || rows.has(Rows.BizLocation);
                 hoursCell.setOnTimezoneSwitchClick(view -> hoursCell.set(workHours, true, !hoursCell.isShowInMyTimezone(), divider));
                 hoursCell.set(workHours, hoursCell.isExpanded(), hoursCell.isShowInMyTimezone(), divider);
                 break;
@@ -764,6 +786,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                         cell.setText(null);
                     }
                 } else if (kind == Rows.InfoAffiliate) {
+                } else if (kind == Rows.AffiliateInfo) {
                     final TLRPC.User botUser = fragment.getCurrentUser();
                     if (botUser != null && botUser.bot && botUser.bot_can_edit) {
                         cell.setFixedSize(0);
@@ -773,11 +796,18 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                         cell.setText(LocaleController.formatString(R.string.ProfileBotAffiliateProgramInfo, UserObject.getUserName(botUser), AffiliateProgramFragment.percents(userInfo != null && userInfo.starref_program != null ? userInfo.starref_program.commission_permille : 0)));
                     }
                 }
+
+                int drawable;
                 if (kind == Rows.InfoSection && !rows.has(Rows.LastSection) && !rows.has(Rows.SecretSettingsSection) && !rows.has(Rows.SharedMedia) && !rows.has(Rows.MembersSection) || kind == Rows.SecretSettingsSection || kind == Rows.LastSection || kind == Rows.MembersSection && !rows.has(Rows.LastSection) && !rows.has(Rows.SharedMedia)) {
-                    cell.setBackgroundDrawable(Theme.getThemedDrawable(context, R.drawable.greydivider_bottom, getThemedColor(Theme.key_windowBackgroundGrayShadow)));
+                    drawable = R.drawable.greydivider_bottom;
                 } else {
-                    cell.setBackgroundDrawable(Theme.getThemedDrawable(context, R.drawable.greydivider, getThemedColor(Theme.key_windowBackgroundGrayShadow)));
+                    drawable = R.drawable.greydivider;
                 }
+                Drawable shadow = Theme.getThemedDrawable(context, drawable, getThemedColor(Theme.key_windowBackgroundGrayShadow));
+                Drawable background = new ColorDrawable(getThemedColor(Theme.key_windowBackgroundGray));
+                CombinedDrawable combined = new CombinedDrawable(background, shadow, 0, 0);
+                combined.setFullsize(true);
+                cell.setBackground(combined);
                 break;
             }
             case VIEW_TYPE_NOTIFICATIONS_CHECK: {
@@ -963,6 +993,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                     textCell.setTextAndValueAndIcon(LocaleController.getString(R.string.Language), LocaleController.getCurrentLanguageName(), false, R.drawable.msg2_language, false);
                     textCell.setImageLeft(23);
                 } else if (kind == Rows.Notifications) {
+                } else if (kind == Rows.Notification) {
                     textCell.setTextAndIcon(LocaleController.getString(R.string.NotificationsAndSounds), R.drawable.msg2_notifications, true);
                 } else if (kind == Rows.Privacy) {
                     textCell.setTextAndIcon(LocaleController.getString(R.string.PrivacySettings), R.drawable.msg2_secret, true);
@@ -972,8 +1003,6 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                     textCell.setTextAndIcon(LocaleController.getString(R.string.ChatSettings), R.drawable.msg2_discussion, true);
                 } else if (kind == Rows.Filters) {
                     textCell.setTextAndIcon(LocaleController.getString(R.string.Filters), R.drawable.msg2_folder, true);
-                } else if (kind == Rows.Stickers) {
-                    textCell.setTextAndIcon(LocaleController.getString(R.string.StickersName), R.drawable.msg2_sticker, true);
                 } else if (kind == Rows.LiteMode) {
                     textCell.setTextAndIcon(LocaleController.getString(R.string.PowerUsage), R.drawable.msg2_battery, true);
                 } else if (kind == Rows.Question) {
@@ -1021,9 +1050,11 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                     textCell.setTextAndIcon(LocaleController.getString(R.string.SendAGift), R.drawable.menu_gift, false);
                     textCell.setImageLeft(23);
                 } else if (kind == Rows.BotPermissionLocation) {
+                    BotLocation botLocation = rows.payload(Rows.BotPermissionLocation);
                     String text = LocaleController.getString(R.string.BotProfilePermissionLocation);
                     textCell.setTextAndCheckAndColorfulIcon(text, botLocation != null && botLocation.granted(), R.drawable.filled_access_location, getThemedColor(Theme.key_color_green), rows.has(Rows.BotPermissionBiometry));
                 } else if (kind == Rows.BotPermissionBiometry) {
+                    BotBiometry botBiometry = rows.payload(Rows.BotPermissionBiometry);
                     String text = LocaleController.getString(R.string.BotProfilePermissionBiometry);
                     textCell.setTextAndCheckAndColorfulIcon(text, botBiometry != null && botBiometry.granted(), R.drawable.filled_access_fingerprint, getThemedColor(Theme.key_color_orange), false);
                 } else if (kind == Rows.BotPermissionEmojiStatus) {
@@ -1036,13 +1067,11 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
             }
             case VIEW_TYPE_USER:
                 /* UserCell userCell = (UserCell) holder.itemView;
+                List<TLRPC.ChatParticipant> participants = rows.payload(Rows.Members);
+                UserCell userCell = (UserCell) holder.itemView;
                 TLRPC.ChatParticipant part;
                 try {
-                    if (!visibleSortedUsers.isEmpty()) {
-                        part = visibleChatParticipants.get(visibleSortedUsers.get(position - membersStartRow));
-                    } else {
-                        part = visibleChatParticipants.get(position - membersStartRow);
-                    }
+                    part = participants.get(pos - rows.position(Rows.Members));
                 } catch (Exception e) {
                     part = null;
                     FileLog.e(e);
@@ -1066,14 +1095,15 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                         if (part instanceof TLRPC.TL_chatParticipantCreator) {
                             role = LocaleController.getString(R.string.ChannelCreator);
                         } else if (part instanceof TLRPC.TL_chatParticipantAdmin) {
-                            role = getString(R.string.ChannelAdmin);
+                            role = LocaleController.getString(R.string.ChannelAdmin);
                         } else {
                             role = null;
                         }
                     }
+                    boolean divider = pos != rows.position(Rows.Members) + participants.size() - 1;
                     userCell.setAdminRole(role);
-                    userCell.setData(getMessagesController().getUser(part.user_id), null, null, 0, position != membersEndRow - 1);
-                } */
+                    userCell.setData(fragment.getMessagesController().getUser(part.user_id), null, null, 0, divider);
+                }
                 break;
         }
     }
