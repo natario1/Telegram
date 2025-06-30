@@ -250,6 +250,14 @@ public class StoriesViewPager extends ViewPager {
         return null;
     }
 
+    public void unset() {
+        this.dialogs = new ArrayList<>();
+        this.daysDialogId = 0;
+        this.days = null;
+        setAdapter(null);
+        setAdapter(pagerAdapter);
+    }
+
     public void setPeerIds(ArrayList<Long> peerIds, int currentAccount, int position) {
         this.dialogs = peerIds;
         this.currentAccount = currentAccount;

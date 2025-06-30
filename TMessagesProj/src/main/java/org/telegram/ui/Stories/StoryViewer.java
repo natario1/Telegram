@@ -2457,6 +2457,10 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
             }
         }
 
+        if (storiesViewPager != null) {
+            storiesViewPager.unset();
+        }
+
         globalInstances.remove(this);
         doOnAnimationReadyRunnables.clear();
         selfStoriesViewsOffset = 0;
