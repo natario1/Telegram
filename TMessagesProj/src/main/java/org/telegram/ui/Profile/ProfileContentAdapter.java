@@ -484,14 +484,12 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                 boolean containsQr = false;
                 boolean containsGift = false;
                 if (kind == Rows.InfoBirthday) {
-                    TLRPC.UserFull userFull = fragment.getMessagesController().getUserFull(fragment.getUserId());
-                    if (userFull != null && userFull.birthday != null) {
-                        final boolean today = BirthdayController.isToday(userFull);
-                        final boolean withYear = (userFull.birthday.flags & 1) != 0;
-                        final int age = withYear ? Period.between(LocalDate.of(userFull.birthday.year, userFull.birthday.month, userFull.birthday.day), LocalDate.now()).getYears() : -1;
-
-                        String text = UserInfoActivity.birthdayString(userFull.birthday);
-
+                    TL_account.TL_birthday birthday = rows.payload(kind);
+                    if (birthday != null) {
+                        final boolean today = BirthdayController.isToday(fragment.getMessagesController().getUserFull(fragment.getUserId()));
+                        final boolean withYear = (birthday.flags & 1) != 0;
+                        final int age = withYear ? Period.between(LocalDate.of(birthday.year, birthday.month, birthday.day), LocalDate.now()).getYears() : -1;
+                        String text = UserInfoActivity.birthdayString(birthday);
                         if (withYear) {
                             text = LocaleController.formatPluralString(today ? "ProfileBirthdayTodayValueYear" : "ProfileBirthdayValueYear", age, text);
                         } else {
@@ -711,8 +709,8 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
             } */
             case VIEW_TYPE_LOCATION: {
                 ProfileLocationCell locationCell = (ProfileLocationCell) holder.itemView;
-                TLRPC.UserFull userFull = fragment.getMessagesController().getUserFull(fragment.getUserId());
-                locationCell.set(userFull != null ? userFull.business_location : null, !fragment.isMyProfile());
+                TLRPC.TL_businessLocation location = rows.payload(kind);
+                locationCell.set(location, !fragment.isMyProfile());
                 break;
             }
             case VIEW_TYPE_COLORFUL_TEXT: {
@@ -732,12 +730,13 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                 break;
             }
             case VIEW_TYPE_HOURS: {
-                TLRPC.UserFull userInfo = fragment.getMessagesController().getUserFull(fragment.getUserId());
-                TL_account.TL_businessWorkHours workHours = userInfo != null ? userInfo.business_work_hours : null;
-                ProfileHoursCell hoursCell = (ProfileHoursCell) holder.itemView;
-                boolean divider = rows.has(Rows.InfoBizLocation);
-                hoursCell.setOnTimezoneSwitchClick(view -> hoursCell.set(workHours, true, !hoursCell.isShowInMyTimezone(), divider));
-                hoursCell.set(workHours, hoursCell.isExpanded(), hoursCell.isShowInMyTimezone(), divider);
+                if (kind == Rows.InfoBizHours) {
+                    TL_account.TL_businessWorkHours workHours = rows.payload(kind);
+                    ProfileHoursCell hoursCell = (ProfileHoursCell) holder.itemView;
+                    boolean divider = rows.has(Rows.InfoBizLocation);
+                    hoursCell.setOnTimezoneSwitchClick(view -> hoursCell.set(workHours, true, !hoursCell.isShowInMyTimezone(), divider));
+                    hoursCell.set(workHours, hoursCell.isExpanded(), hoursCell.isShowInMyTimezone(), divider);
+                }
                 break;
             }
             case VIEW_TYPE_SHADOW_TEXT: {
@@ -997,8 +996,8 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                     textCell.setTextAndIcon(LocaleController.getString(R.string.AddToContacts), R.drawable.msg_contact_add, false);
                     textCell.setColors(Theme.key_windowBackgroundWhiteBlueIcon, Theme.key_windowBackgroundWhiteBlueButton);
                 } else if (kind == Rows.ActionsReportReaction) {
-                    long reportReactionFromDialogId = fragment.getArguments().getLong("report_reaction_from_dialog_id", 0);
-                    TLRPC.Chat chat = fragment.getMessagesController().getChat(-reportReactionFromDialogId);
+                    Long fromDialogId = rows.payload(kind);
+                    TLRPC.Chat chat = fragment.getMessagesController().getChat(fromDialogId == null ? 0 : -fromDialogId);
                     if (chat != null && ChatObject.canBlockUsers(chat)) {
                         textCell.setTextAndIcon(LocaleController.getString(R.string.ReportReactionAndBan), R.drawable.msg_block2, false);
                     } else {

@@ -188,6 +188,10 @@ public class ProfileHoursCell extends LinearLayout {
         return showInMyTimezone;
     }
 
+    public boolean hasDivider() {
+        return needDivider;
+    }
+
     public void set(TL_account.TL_businessWorkHours value, boolean expanded, boolean showInMyTimezone, boolean divider) {
         this.showInMyTimezone = showInMyTimezone;
         this.expanded = expanded;

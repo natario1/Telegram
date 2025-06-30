@@ -1578,6 +1578,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                         return;
                     }
                     View parent = (View) searchItem.getParent();
+                    if (parent == null) return;
                     searchItem.setTranslationX(parent.getMeasuredWidth() - searchItem.getRight());
                 }
             });
