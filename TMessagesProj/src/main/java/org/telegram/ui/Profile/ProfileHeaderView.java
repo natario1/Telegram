@@ -17,6 +17,7 @@ import org.telegram.ui.Stars.StarGiftPatterns;
 import java.util.ArrayList;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
+import static org.telegram.messenger.AndroidUtilities.lerp;
 
 public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
 
@@ -28,18 +29,20 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
     private final Rect blurBounds = new Rect();
     private final SizeNotifierFrameLayout root;
 
-    private final AnimatedFloat hasGradientAnimated = new AnimatedFloat(this, 350, CubicBezierInterpolator.EASE_OUT_QUINT);
-    private final AnimatedColor gradientColor1Animated = new AnimatedColor(this, 350, CubicBezierInterpolator.EASE_OUT_QUINT);
-    private final AnimatedColor gradientColor2Animated = new AnimatedColor(this, 350, CubicBezierInterpolator.EASE_OUT_QUINT);
-    private int gradientColor1;
-    private int gradientColor2;
-    private boolean hasGradient;
-    private final Paint gradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private LinearGradient gradient;
-    private final int[] gradientParams = new int[2];
-    private final float[] gradientPositions = new float[]{0, 1};
-    private int plainColor;
+    private final AnimatedFloat hasThemeAnimated = new AnimatedFloat(this, 350, CubicBezierInterpolator.EASE_OUT_QUINT);
+    private final AnimatedColor themeColor1Animated = new AnimatedColor(this, 350, CubicBezierInterpolator.EASE_OUT_QUINT);
+    private final AnimatedColor themeColor2Animated = new AnimatedColor(this, 350, CubicBezierInterpolator.EASE_OUT_QUINT);
+    private boolean hasTheme;
+    private int themeColor1;
+    private int themeColor2;
+
     private final Paint plainPaint = new Paint();
+    private int plainColor;
+
+    private final Paint gradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private RadialGradient gradient;
+    private int gradientArg;
+    private final Matrix gradientMatrix = new Matrix();
 
     private final AnimatedFloat emojiLoadedT = new AnimatedFloat(this, 0, 440, CubicBezierInterpolator.EASE_OUT_QUINT);
     private final AnimatedFloat emojiFullT = new AnimatedFloat(this, 0, 440, CubicBezierInterpolator.EASE_OUT_QUINT);
@@ -128,20 +131,19 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
         return Theme.getColor(key, resourcesProvider);
     }
 
-    // actionBarBackgroundColor
     public int getAverageColor() {
-        return hasGradient ? ColorUtils.blendARGB(gradientColor1, gradientColor2, 0.25f) : plainColor;
+        return hasTheme ? ColorUtils.blendARGB(themeColor1, themeColor2, 0.25f) : plainColor;
     }
 
     public void updateColors(MessagesController.PeerColor peerColor, boolean animated) {
         if (peerColor != null) {
-            hasGradient = true;
-            gradientColor1 = peerColor.getBgColor1(Theme.isCurrentThemeDark());
-            gradientColor2 = peerColor.getBgColor2(Theme.isCurrentThemeDark());
+            hasTheme = true;
+            themeColor1 = peerColor.getBgColor1(Theme.isCurrentThemeDark());
+            themeColor2 = peerColor.getStoryColor1(Theme.isCurrentThemeDark());
             if (peerColor.patternColor != 0) {
                 emojiColor = peerColor.patternColor;
             } else {
-                emojiColor = PeerColorActivity.adaptProfileEmojiColor(gradientColor1);
+                emojiColor = PeerColorActivity.adaptProfileEmojiColor(themeColor1);
             }
         } else {
             if (AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_actionBarDefault)) > .8f) {
@@ -152,11 +154,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
                 emojiColor = PeerColorActivity.adaptProfileEmojiColor(getThemedColor(Theme.key_actionBarDefault));
             }
         }
-        hasGradient = peerColor != null;
+        hasTheme = peerColor != null;
         getAverageColor();
         if (!animated) {
-            gradientColor1Animated.set(gradientColor1, true);
-            gradientColor2Animated.set(gradientColor2, true);
+            themeColor1Animated.set(themeColor1, true);
+            themeColor2Animated.set(themeColor2, true);
         }
         invalidate();
     }
@@ -208,37 +210,52 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
         canvas.translate(0, hidden);
         int visible = getMeasuredHeight() - (int) hidden; // 'v'
         int paintable = (int) (visible * (1.0f - actionModeProgress));  // y1
+        int width = getMeasuredWidth();
 
         if (paintable != 0) {
             // Set up plain and gradient paints
+            plainPaint.setAlpha(255);
             plainPaint.setColor(plainColor);
-            int gradient1 = gradientColor1Animated.set(this.gradientColor1);
-            int gradient2 = gradientColor2Animated.set(this.gradientColor2);
-            if (gradient == null || gradientParams[0] != gradient1 || gradientParams[1] != gradient2) {
-                gradientParams[0] = gradient1;
-                gradientParams[1] = gradient2;
-                gradient = new LinearGradient(0, 0, 0, unit * 2, gradientParams, gradientPositions, Shader.TileMode.CLAMP);
+            int themeBackground = themeColor1Animated.set(this.themeColor1);
+            int themeOverlay = themeColor2Animated.set(this.themeColor2);
+            if (gradient == null || gradientArg != themeOverlay) {
+                gradientArg = themeOverlay;
+                gradient = new RadialGradient(0.5F, 0.5F, 0.5F, themeOverlay, ColorUtils.setAlphaComponent(themeOverlay, 0), Shader.TileMode.CLAMP);
                 gradientPaint.setShader(gradient);
             }
 
             // Blend them based on progress
             // WIP: progress factor is (playProfileAnimation == 0 ? 1f : avatarAnimationProgress)
-            final float progress = hasGradientAnimated.set(hasGradient);
+            final float progress = hasThemeAnimated.set(hasTheme);
             if (progress < 1) {
-                canvas.drawRect(0, 0, getMeasuredWidth(), paintable, plainPaint);
+                canvas.drawRect(0, 0, width, paintable, plainPaint);
             }
             if (progress > 0) {
-                gradientPaint.setAlpha((int) (0xFF * progress));
-                canvas.drawRect(0, 0, getMeasuredWidth(), paintable, gradientPaint);
+                plainPaint.setAlpha((int) (0xFF * progress));
+                plainPaint.setColor(themeBackground);
+                canvas.drawRect(0, 0, width, paintable, plainPaint);
+
+                // Gradient: as the header collapses, it translates, shrinks and fades
+                float p = Math.min(1F, (float) growth / snapGrowths[1]);
+                float shrink = lerp(0.6F, 1F, p);
+                float centerY = lerp(0F, paintable / 2F, p);
+                float alpha = lerp(0.2F, 0.6F, p);
+                float size = Math.min(width - dp(60), dp(398));
+                gradientMatrix.setScale(size, size);
+                gradientMatrix.postTranslate((width - size) / 2F, centerY - size / 2F);
+                gradientMatrix.postScale(shrink, shrink, width / 2F, centerY);
+                gradient.setLocalMatrix(gradientMatrix);
+                gradientPaint.setAlpha((int) (0xFF * progress * alpha));
+                canvas.drawRect(0, 0, width, paintable, gradientPaint);
             }
 
             if (hasEmoji && emojiLoadedT.set(isEmojiLoaded()) > 0) {
                 canvas.save();
-                canvas.clipRect(0, 0, getMeasuredWidth(), paintable);
+                canvas.clipRect(0, 0, width, paintable);
                 StarGiftPatterns.drawProfilePattern(
                         canvas,
                         emoji,
-                        getMeasuredWidth(),
+                        width,
                         dp(142), // WIP: proper value
                         Math.min(1f, (float) growth / unit),
                         emojiFullT.set(isEmojiCollectible)
@@ -250,7 +267,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
         if (paintable != visible) {
             int color = getThemedColor(Theme.key_windowBackgroundWhite);
             plainPaint.setColor(color);
-            blurBounds.set(0, paintable, getMeasuredWidth(), (int) visible);
+            blurBounds.set(0, paintable, width, visible);
             root.drawBlurRect(canvas, getY(), blurBounds, plainPaint, true);
         }
         /*WIP: if (parentLayout != null) {
