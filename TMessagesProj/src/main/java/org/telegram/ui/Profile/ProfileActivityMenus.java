@@ -1,13 +1,16 @@
 package org.telegram.ui.Profile;
 
 
-import android.animation.AnimatorSet;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.*;
 import android.graphics.drawable.Drawable;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewPropertyAnimator;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
@@ -16,10 +19,9 @@ import androidx.core.graphics.ColorUtils;
 import org.telegram.messenger.*;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.ui.ActionBar.*;
-import org.telegram.ui.Components.AutoDeletePopupWrapper;
-import org.telegram.ui.Components.CombinedDrawable;
-import org.telegram.ui.Components.LayoutHelper;
-import org.telegram.ui.Components.TimerDrawable;
+import org.telegram.ui.Components.*;
+
+import java.util.List;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
 
@@ -56,48 +58,60 @@ public class ProfileActivityMenus {
     public final static int AB_USER_UNBLOCK_ID = 53;
     public final static int AB_MAIN_ID = 999;
 
-    private final ActionBarMenuItem mainMenuItem;
-    private final ActionBarMenuItem editMenuItem;
+    private ActionBarMenuItem mainMenuItem;
 
-    private final ActionBarMenuItem qrMenuItem;
-    private boolean qrMenuItemVisible;
-    private AnimatorSet qrMenuItemAnimator;
+    private ActionBarMenuItem editMenuItem;
+    private boolean editMenuItemNeeded;
+
+    private ActionBarMenuItem qrMenuItem;
+    private boolean qrMenuItemNeeded;
+    private boolean qrMenuItemDisplayable;
+
+    private boolean actionMode; // mirrors mediaHeaderVisible
 
     private final ImageView ttlIndicator;
     private AutoDeletePopupWrapper ttlPopupWrapper;
     private TimerDrawable ttlTimerDrawable;
 
+    private final ActionBar actionBar;
     private final Theme.ResourcesProvider resourceProvider;
     private final Context context;
 
     public ProfileActivityMenus(
             Context context,
             Theme.ResourcesProvider resourceProvider,
-            ActionBar actionBar,
-            boolean qr
+            ActionBar actionBar
     ) {
         this.resourceProvider = resourceProvider;
         this.context = context;
-
-        ActionBarMenu menu = actionBar.createMenu();
-        menu.removeAllViews();
-
-        if (qr) {
-            qrMenuItem = menu.addItem(AB_QR_ID, R.drawable.msg_qr_mini, resourceProvider);
-            qrMenuItem.setContentDescription(LocaleController.getString(R.string.GetQRCode));
-            updateQrItem(true, false);
-        } else {
-            qrMenuItem = null;
-        }
-
-        editMenuItem = menu.addItem(AB_EDIT_ID, R.drawable.group_edit_profile, resourceProvider);
-        editMenuItem.setContentDescription(LocaleController.getString(R.string.Edit));
-
-        mainMenuItem = menu.addItem(AB_MAIN_ID, R.drawable.ic_ab_other, resourceProvider);
-        mainMenuItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
+        this.actionBar = actionBar;
 
         ttlIndicator = new ImageView(context);
         ttlIndicator.setImageResource(R.drawable.msg_mini_autodelete_timer);
+    }
+
+    public void deinitialize() {
+        ActionBarMenu menu = actionBar.createMenu();
+        menu.removeView(mainMenuItem);
+        menu.removeView(qrMenuItem);
+        menu.removeView(editMenuItem);
+    }
+
+    public void initialize() {
+        ActionBarMenu menu = actionBar.createMenu();
+
+        qrMenuItem = menu.addItem(AB_QR_ID, R.drawable.msg_qr_mini, resourceProvider);
+        qrMenuItem.setContentDescription(LocaleController.getString(R.string.GetQRCode));
+        updateQrItemVisibility(false, null);
+
+        editMenuItem = menu.addItem(AB_EDIT_ID, R.drawable.group_edit_profile, resourceProvider);
+        editMenuItem.setContentDescription(LocaleController.getString(R.string.Edit));
+        updateEditItemVisibility(false, null);
+
+        mainMenuItem = menu.addItem(AB_MAIN_ID, R.drawable.ic_ab_other, resourceProvider);
+        mainMenuItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
+        updateMainItemVisibility(false, null);
+
         mainMenuItem.addView(ttlIndicator, LayoutHelper.createFrame(12, 12, Gravity.CENTER_VERTICAL | Gravity.LEFT, 8, 2, 0, 0));
         updateTtlIndicator(false, false);
     }
@@ -110,6 +124,8 @@ public class ProfileActivityMenus {
         int rawForeground = peerColor != null ? Color.WHITE : getColor(Theme.key_actionBarDefaultIcon);
         int foreground = ColorUtils.blendARGB(rawForeground, getColor(Theme.key_actionBarActionModeDefaultIcon), actionModeProgress);
         mainMenuItem.setIconColor(rawForeground);
+        editMenuItem.setIconColor(rawForeground);
+        qrMenuItem.setIconColor(rawForeground);
         ttlIndicator.setColorFilter(new PorterDuffColorFilter(foreground, PorterDuff.Mode.MULTIPLY));
         if (ttlPopupWrapper != null && ttlPopupWrapper.textView != null) {
             ttlPopupWrapper.textView.invalidate();
@@ -125,46 +141,132 @@ public class ProfileActivityMenus {
         if (ttlPopupWrapper != null) ttlPopupWrapper.updateItems(ttl);
     }
 
-    // WIP: Only show if extraHeight / AndroidUtilities.dp(88f) > .5f && searchTransitionProgress > .5f
-    public void updateQrItem(boolean visible, boolean animated) {
-        if (qrMenuItem == null) return;
-        if (animated && visible == qrMenuItemVisible) return;
-        qrMenuItemVisible = visible;
-        if (qrMenuItemAnimator != null) qrMenuItemAnimator.cancel();
-        qrMenuItem.setClickable(visible);
-        float alpha = visible ? 1F : 0F;
-        float scale = visible ? 1F : 0F;
-        if (animated) {
-            if (!(qrMenuItem.getVisibility() == View.GONE && !visible)) {
-                qrMenuItem.setVisibility(View.VISIBLE);
-            }
-            qrMenuItemAnimator = new AnimatorSet();
-            qrMenuItemAnimator.setInterpolator(visible ? new DecelerateInterpolator() : new AccelerateInterpolator());
-            qrMenuItemAnimator.playTogether(
-                    ObjectAnimator.ofFloat(qrMenuItem, View.ALPHA, alpha),
-                    ObjectAnimator.ofFloat(qrMenuItem, View.SCALE_Y, scale)
-                    // WIP: ObjectAnimator.ofFloat(avatarsViewPagerIndicatorView, View.TRANSLATION_X, ...)
-            );
-            qrMenuItemAnimator.setDuration(150);
-            qrMenuItemAnimator.start();
-        } else {
-            qrMenuItem.setScaleY(scale);
-            qrMenuItem.setAlpha(alpha);
-            qrMenuItem.setVisibility(visible ? View.VISIBLE : View.GONE);
+    public void setActionMode(boolean actionMode, SharedMediaLayout sharedMediaLayout, List<Animator> animators) {
+        if (actionMode == this.actionMode) return;
+        this.actionMode = actionMode;
+        updateQrItemVisibility(animators != null, animators);
+        updateEditItemVisibility(animators != null, animators);
+        updateMainItemVisibility(animators != null, animators);
+
+        View mediaSearch = sharedMediaLayout.getSearchItem(); // search
+        View mediaMore = sharedMediaLayout.photoVideoOptionsItem; // dots
+        View mediaAnimatable = sharedMediaLayout.getSearchOptionsItem(); // overlay that animates between the two
+
+        boolean showsMore = sharedMediaLayout.isOptionsItemVisible();
+        boolean showsSearch = !showsMore && sharedMediaLayout.isSearchItemVisible();
+        boolean startsVisible = animators != null || actionMode;
+        if (mediaSearch != null) {
+            mediaSearch.setVisibility(startsVisible && showsSearch ? View.VISIBLE : View.INVISIBLE);
         }
-        qrMenuItemVisible = visible;
+        if (mediaMore != null) {
+            mediaMore.setVisibility(startsVisible && showsMore ? View.VISIBLE : View.INVISIBLE);
+        }
+        if (actionMode && (showsMore || showsSearch)) {
+            if (mediaAnimatable != null) mediaAnimatable.setVisibility(View.VISIBLE);
+            if (showsMore) {
+                // false then true prevents the default animation
+                sharedMediaLayout.animateSearchToOptions(false, false);
+                sharedMediaLayout.animateSearchToOptions(true, false);
+            } else {
+                // Quickly go to 'more', then animate to 'search'
+                sharedMediaLayout.animateSearchToOptions(true, false);
+                sharedMediaLayout.animateSearchToOptions(false, animators != null);
+            }
+        } else {
+            if (mediaAnimatable != null) mediaAnimatable.setVisibility(View.GONE);
+        }
+
+        if (animators != null) {
+            if (mediaSearch != null && showsSearch) {
+                animators.add(ObjectAnimator.ofFloat(mediaSearch, View.ALPHA, actionMode ? 1.0f : 0.0f));
+                animators.add(ObjectAnimator.ofFloat(mediaSearch, View.TRANSLATION_Y, actionMode ? 0.0f : dp(10)));
+            }
+            if (mediaMore != null && showsMore) {
+                animators.add(ObjectAnimator.ofFloat(sharedMediaLayout.photoVideoOptionsItem, View.ALPHA, actionMode ? 1.0f : 0.0f));
+                animators.add(ObjectAnimator.ofFloat(sharedMediaLayout.photoVideoOptionsItem, View.TRANSLATION_Y, actionMode ? 0.0f : dp(10)));
+            }
+            ValueAnimator anim = ValueAnimator.ofFloat(0F, 1F);
+            anim.addListener(new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    if (actionMode) return;
+                    if (showsMore && mediaMore != null) mediaMore.setVisibility(View.INVISIBLE);
+                    if (showsSearch && mediaSearch != null) mediaSearch.setVisibility(View.INVISIBLE);
+                }
+            });
+            animators.add(anim);
+
+        }
     }
 
-    public void updateEditItem(boolean visible, boolean animated) {
-        if (visible && editMenuItem.getVisibility() != View.VISIBLE) {
-            editMenuItem.setVisibility(View.VISIBLE);
-            if (animated) {
-                editMenuItem.setAlpha(0);
-                editMenuItem.animate().alpha(1f).setDuration(150).start();
+    private static Animator.AnimatorListener hideOnEnd(View view) {
+        return new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                view.setVisibility(View.GONE);
             }
-        } else if (!visible && editMenuItem.getVisibility() != View.GONE) {
-            editMenuItem.setVisibility(View.GONE);
+        };
+    }
+
+    private static void updateItemVisibility(View item, boolean visible, boolean animated, List<Animator> animators) {
+        float alpha = visible ? 1F : 0F;
+        float scale = visible ? 1F : 0F;
+        item.animate().setListener(null).cancel();
+        item.setClickable(visible);
+        if (!animated) {
+            item.setVisibility(visible ? View.VISIBLE : View.GONE);
+            item.setTranslationY(0F);
+            item.setScaleY(scale);
+            item.setAlpha(alpha);
+        } else if (animators != null) {
+            item.setVisibility(View.VISIBLE);
+            animators.add(ObjectAnimator.ofFloat(item, View.TRANSLATION_Y, !visible ? -dp(10) : 0.0f));
+            item.setScaleY(1F);
+            animators.add(ObjectAnimator.ofFloat(item, View.ALPHA, alpha));
+            if (!visible) animators.get(animators.size() - 1).addListener(hideOnEnd(item));
+        } else {
+            ViewPropertyAnimator animator = item.animate();
+            item.setVisibility(View.VISIBLE);
+            animator.translationY(0F);
+            animator.scaleY(scale);
+            animator.alpha(alpha);
+            animator.setInterpolator(visible ? new DecelerateInterpolator() : new AccelerateInterpolator());
+            animator.setDuration(150).setListener(visible ? null : hideOnEnd(item)).start();
         }
+    }
+
+    private void updateMainItemVisibility(boolean animated, List<Animator> animators) {
+        boolean isVisible = !actionMode;
+        updateItemVisibility(mainMenuItem, isVisible, animated, animators);
+    }
+
+    public void setQrItemNeeded(boolean needed, boolean animated) {
+        if (needed == qrMenuItemNeeded) return;
+        qrMenuItemNeeded = needed;
+        updateQrItemVisibility(animated, null);
+    }
+
+    // WIP: searchTransitionProgress > .5f
+    public void setQrItemDisplayable(boolean displayable, boolean animated) {
+        if (displayable == qrMenuItemDisplayable) return;
+        qrMenuItemDisplayable = displayable;
+        updateQrItemVisibility(animated, null);
+    }
+
+    private void updateQrItemVisibility(boolean animated, List<Animator> animators) {
+        boolean isVisible = qrMenuItemNeeded && qrMenuItemDisplayable && !actionMode;
+        updateItemVisibility(qrMenuItem, isVisible, animated, animators);
+    }
+
+    public void setEditItemNeeded(boolean needed, boolean animated) {
+        if (needed == editMenuItemNeeded) return;
+        editMenuItemNeeded = needed;
+        updateEditItemVisibility(animated, null);
+    }
+
+    private void updateEditItemVisibility(boolean animated, List<Animator> animators) {
+        boolean isVisible = editMenuItemNeeded && !actionMode;
+        updateItemVisibility(editMenuItem, isVisible, animated, animators);
     }
 
     public void updateEditColorItem(boolean isPremium) {

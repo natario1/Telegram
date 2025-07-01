@@ -1,5 +1,6 @@
 package org.telegram.ui;
 
+import android.animation.*;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.Dialog;
@@ -131,6 +132,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
     private float mediaHeaderAnimationProgress = 0F;
     private boolean mediaHeaderVisible = false;
+    private AnimatorSet mediaHeaderAnimator;
+
     private int versionClickCount = 0;
     private int botPermissionEmojiStatusReqId;
 
@@ -299,11 +302,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (getParentActivity() == null) return;
         TLRPC.EmojiStatus peerColorEmojiStatus = null;
         int peerColorFallbackId = 0;
+        long profileEmojiId = 0;
         if (userId != 0) {
             TLRPC.User user = getMessagesController().getUser(userId);
             if (user == null) return;
             peerColorEmojiStatus = user.emoji_status;
             peerColorFallbackId = UserObject.getProfileColorId(user);
+            profileEmojiId = UserObject.getProfileEmojiId(user);
             if (menuHandler != null) {
                 menuHandler.updateUsernameRelatedItems(UserObject.getPublicUsername(user) != null);
             }
@@ -313,6 +318,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (chat == null) return;
             peerColorEmojiStatus = chat.emoji_status;
             peerColorFallbackId = ChatObject.getProfileColorId(chat);
+            profileEmojiId = ChatObject.getProfileEmojiId(chat);
         }
         if (flagSecure != null) {
             flagSecure.invalidate();
@@ -326,19 +332,26 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
         if (wasPeerColor != peerColor) {
             // WIP: updatedPeerColor() method.
-            updateColors();
+            updateColors(true);
+        }
+        if (headerView != null) {
+            boolean collectible = peerColorEmojiStatus instanceof TLRPC.TL_emojiStatusCollectible;
+            headerView.setBackgroundEmojiId(profileEmojiId, collectible, true);
         }
         if (menuHandler != null) {
-            menuHandler.updateQrItem(true, true);
+            menuHandler.setQrItemNeeded(true, true);
         }
     }
 
-    private void updateColors() {
+    private void updateColors(boolean animated) {
         if (rootLayout != null) {
             rootLayout.updateColors(peerColor, mediaHeaderAnimationProgress);
         }
         if (menuHandler != null) {
             menuHandler.updateColors(peerColor, mediaHeaderAnimationProgress);
+        }
+        if (headerView != null) {
+            headerView.updateColors(peerColor, animated);
         }
         if (sharedMediaLayout != null && sharedMediaLayout.scrollSlidingTextTabStrip != null) {
             sharedMediaLayout.scrollSlidingTextTabStrip.updateColors();
@@ -351,13 +364,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private void updateMenuData(boolean animated) {
         if (menuHandler == null) return;
         menuHandler.clearMainMenu();
-        boolean editMenuItemVisible = false;
+        boolean editMenuItemNeeded = false;
         boolean appendLogout = false;
         if (userId != 0) {
             TLRPC.User user = getMessagesController().getUser(userId);
             if (user == null) return;
             if (UserObject.isUserSelf(user)) {
-                editMenuItemVisible = isMyProfile;
+                editMenuItemNeeded = isMyProfile;
                 appendLogout = !isMyProfile;
                 menuHandler.appendMainMenuSubItem(AB_EDIT_INFO_ID);
                 if (imageUpdater != null) menuHandler.appendMainMenuSubItem(AB_ADD_PHOTO_ID);
@@ -369,7 +382,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     menuHandler.updateUsernameRelatedItems(UserObject.getPublicUsername(user) != null);
                 }
             } else {
-                editMenuItemVisible = user.bot && user.bot_can_edit;
+                editMenuItemNeeded = user.bot && user.bot_can_edit;
                 if (user.bot || getContactsController().contactsDict.get(user.id) == null) {
                     if (MessagesController.isSupportUser(user)) {
                         menuHandler.appendBlockUnblockItem(false, isUserBlocked);
@@ -420,9 +433,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
             if (ChatObject.isChannel(chat)) {
                 if (topicId != 0) {
-                    editMenuItemVisible = ChatObject.canManageTopic(currentAccount, chat, topicId);
+                    editMenuItemNeeded = ChatObject.canManageTopic(currentAccount, chat, topicId);
                 } else {
-                    editMenuItemVisible = ChatObject.hasAdminRights(chat) || chat.megagroup && ChatObject.canChangeChatInfo(chat);
+                    editMenuItemNeeded = ChatObject.hasAdminRights(chat) || chat.megagroup && ChatObject.canChangeChatInfo(chat);
                 }
                 if (topicId == 0 && chatInfo != null && (chatInfo.can_view_stats || chatInfo.can_view_revenue || chatInfo.can_view_stars_revenue || getMessagesController().getStoriesController().canPostStories(getDialogId()))) {
                     menuHandler.appendMainMenuSubItem(AB_STATISTICS_ID);
@@ -452,7 +465,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     if (!chat.creator && !chat.left && !chat.kicked) menuHandler.appendLeaveGroupItem(false, true);
                 }
             } else {
-                editMenuItemVisible = ChatObject.canChangeChatInfo(chat);
+                editMenuItemNeeded = ChatObject.canChangeChatInfo(chat);
                 if (!ChatObject.isKickedFromChat(chat) && !ChatObject.isLeftFromChat(chat)) {
                     if (chatInfo == null || !chatInfo.participants_hidden || ChatObject.hasAdminRights(chat)) {
                         menuHandler.appendMainMenuSubItem(AB_SEARCH_MEMBERS_ID);
@@ -464,7 +477,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 menuHandler.appendMainMenuSubItem(AB_SHORTCUT_ID);
             }
         }
-        menuHandler.updateEditItem(editMenuItemVisible && !mediaHeaderVisible, animated);
+        menuHandler.setEditItemNeeded(editMenuItemNeeded, animated);
         if (appendLogout) {
             menuHandler.appendMainMenuSubItem(AB_LOGOUT_ID);
         }
@@ -1123,6 +1136,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             imageUpdater.onResume();
             setParentActivityTitle(getString(R.string.Settings));
         }
+        checkMediaHeaderVisible();
         updateProfileData(true);
         updateLandscapeData();
     }
@@ -1261,6 +1275,61 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
     // TRANSITIONS
 
+    private void checkMediaHeaderVisible() {
+        // WIP: if (openAnimationInProgress) return;
+        boolean searchVisible = imageUpdater == null && actionBar != null && actionBar.isSearchFieldVisible();
+        if (!searchVisible) {
+            View sharedMedia = listView == null ? null : listView.findRowView(Rows.SharedMedia);
+            setMediaHeaderVisible(sharedMedia != null && sharedMedia.getTop() <= 0);
+        } else {
+            setMediaHeaderVisible(true);
+        }
+        if (headerView != null && menuHandler != null) {
+            int growth = headerView.getGrowth();
+            menuHandler.setQrItemDisplayable(growth > dp(72), true);
+        }
+    }
+
+    private void setMediaHeaderVisible(boolean visible) {
+        if (visible == this.mediaHeaderVisible || sharedMediaLayout == null) return;
+        this.mediaHeaderVisible = visible;
+        if (mediaHeaderAnimator != null) mediaHeaderAnimator.cancel();
+
+        // WIP: updateStoriesViewBounds(false);
+        if (actionBar != null) actionBar.createMenu().requestLayout();
+
+        ArrayList<Animator> animators = new ArrayList<>();
+        if (menuHandler != null) {
+            menuHandler.setActionMode(visible, sharedMediaLayout, animators);
+        }
+        ValueAnimator callbackAnimator = ValueAnimator.ofFloat(mediaHeaderAnimationProgress, visible ? 1.0f : 0.0f);
+        callbackAnimator.addUpdateListener(animation -> {
+            // ACTIONBAR_HEADER_PROGRESS
+            mediaHeaderAnimationProgress = (float) animation.getAnimatedValue();
+            if (headerView != null) headerView.setActionModeProgress(mediaHeaderAnimationProgress);
+            // WIP: if (storyView != null) storyView.setActionBarActionMode(value);
+            // WIP: if (giftsView != null) giftsView.setActionBarActionMode(value);
+            updateColors(false);
+        });
+        animators.add(callbackAnimator);
+        // WIP: animators.add(ObjectAnimator.ofFloat(onlineTextView[1], View.ALPHA, visible ? 0.0f : 1.0f));
+        // WIP: if (myProfile) animators.add(ObjectAnimator.ofFloat(onlineTextView[3], View.ALPHA, visible ? 0.0f : 1.0f));
+        // WIP: animators.add(ObjectAnimator.ofFloat(mediaCounterTextView, View.ALPHA, visible ? 1.0f : 0.0f));
+        // WIP: animation for header shadow alpha => 0 (HEADER_SHADOW, when mediaHeader)
+        /* WIP: if (storyView != null || giftsView != null) {
+            ValueAnimator va = ValueAnimator.ofFloat(0, 1);
+            va.addUpdateListener(a -> updateStoriesViewBounds(true));
+            animators.add(va);
+        } */
+        mediaHeaderAnimator = new AnimatorSet();
+        mediaHeaderAnimator.playTogether(animators);
+        mediaHeaderAnimator.setInterpolator(CubicBezierInterpolator.DEFAULT);
+        // WIP: delayed animation for header shadow alpha => 1 (HEADER_SHADOW, when !mediaHeader)
+        mediaHeaderAnimator.setDuration(150);
+        mediaHeaderAnimator.start();
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.needCheckSystemBarColors, true);
+    }
+
     @Override
     public void onTransitionAnimationStart(boolean isOpen, boolean backward) {
         super.onTransitionAnimationStart(isOpen, backward);
@@ -1278,6 +1347,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         super.onTransitionAnimationEnd(isOpen, backward);
         if (isOpen) {
             if (rootLayout != null) rootLayout.hideBlurredView();
+            checkMediaHeaderVisible();
         }
     }
 
@@ -1411,17 +1481,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
         Theme.createChatResources(context, false);
         checkThemeResourceProvider();
         versionClickCount = 0;
-
-        boolean qr = userId == getUserConfig().clientUserId && !isMyProfile;
-        if (qr && ContactsController.getInstance(currentAccount).getPrivacyRules(ContactsController.PRIVACY_RULES_TYPE_ADDED_BY_PHONE) == null) {
-            ContactsController.getInstance(currentAccount).loadPrivacySettings();
-        }
+        if (sharedMediaLayout != null) sharedMediaLayout.onDestroy();
+        if (menuHandler != null) menuHandler.deinitialize();
 
         // Menu
-        menuHandler = new ProfileActivityMenus(context, resourceProvider, actionBar, qr);
+        menuHandler = new ProfileActivityMenus(context, resourceProvider, actionBar);
 
         // Shared media
-        if (sharedMediaLayout != null) sharedMediaLayout.onDestroy();
         int initialTab = -1; // WIP
         sharedMediaLayout = new SharedMediaLayout(context, getDialogId(), sharedMediaPreloader, userInfo != null ? userInfo.common_chats_count : 0, chatMembersOrder, chatInfo, userInfo, initialTab, this, this, SharedMediaLayout.VIEW_TYPE_PROFILE_ACTIVITY, getResourceProvider()) {
             @Override
@@ -1448,8 +1514,25 @@ public class ProfileActivityReplacement extends BaseFragment implements
             protected int getInitialTab() {
                 return TAB_STORIES;
             }
+
+            @Override
+            protected void showActionMode(boolean show) {
+                super.showActionMode(show);
+                if (isMyProfile) {
+                    disableScroll(show);
+                }
+            }
         };
         sharedMediaLayout.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.MATCH_PARENT));
+
+        // sharedMediaLayout adds some action bar items, and order matters
+        boolean qr = userId == getUserConfig().clientUserId && !isMyProfile;
+        if (qr && ContactsController.getInstance(currentAccount).getPrivacyRules(ContactsController.PRIVACY_RULES_TYPE_ADDED_BY_PHONE) == null) {
+            ContactsController.getInstance(currentAccount).loadPrivacySettings();
+        }
+        menuHandler.initialize();
+        menuHandler.setActionMode(false, sharedMediaLayout, null);
+        menuHandler.setQrItemNeeded(qr, false);
 
         // Root view
         rootLayout = new ProfileActivityRootLayout(context, resourceProvider, actionBar) {
@@ -1474,6 +1557,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 }
                 return super.dispatchTouchEvent(ev);
             }
+
+            @Override
+            protected void onLayout(boolean changed, int l, int t, int r, int b) {
+                super.onLayout(changed, l, t, r, b);
+                checkMediaHeaderVisible();
+            }
         };
         rootLayout.needBlur = true;
 
@@ -1482,7 +1571,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout.addView(coordinator);
 
         // Header
-        headerView = new ProfileHeaderView(actionBar);
+        headerView = new ProfileHeaderView(rootLayout, actionBar, getResourceProvider());
         coordinator.addHeader(headerView);
 
         // List
@@ -1493,6 +1582,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
                     AndroidUtilities.hideKeyboard(getParentActivity().getCurrentFocus());
                 }
+            }
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                checkMediaHeaderVisible();
             }
         });
         listView.setOnItemLongClickListener(this::handleListLongClick);
@@ -1511,13 +1605,14 @@ public class ProfileActivityReplacement extends BaseFragment implements
         listView.setAdapter(listAdapter);
 
         // Decorations
+        rootLayout.blurBehindViews.add(headerView);
+        rootLayout.blurBehindViews.add(sharedMediaLayout);
         rootLayout.blurredView.setOnClickListener(e -> finishPreviewFragment());
         rootLayout.addDecorationViews();
         updateBirthdayData();
 
         // Updates
-        rootLayout.updateColors(peerColor, 0F);
-        menuHandler.updateColors(peerColor, 0F);
+        updateColors(false);
         updateListData("createView");
         updateProfileData(true);
         updateMenuData(false);
@@ -1549,7 +1644,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
         ThemeDescription.ThemeDescriptionDelegate themeDelegate = () -> {
             // WIP
-            updateColors();
+            updateColors(true);
         };
         arrayList.add(new ThemeDescription(null, 0, null, null, null, themeDelegate, Theme.key_actionBarDefaultIcon));
         arrayList.add(new ThemeDescription(null, 0, null, null, null, themeDelegate, Theme.key_avatar_actionBarSelectorBlue));
@@ -1746,7 +1841,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         } else if (id == NotificationCenter.closeChats) {
             removeSelfFromStack(true);
         } else if (id == NotificationCenter.privacyRulesUpdated) {
-            if (menuHandler != null) menuHandler.updateQrItem(true, true);
+            if (menuHandler != null) menuHandler.setQrItemNeeded(true, true);
         } else if (id == NotificationCenter.currentUserPremiumStatusChanged) {
             updatePremiumData();
         } else if (id == NotificationCenter.userIsPremiumBlockedUpadted) {

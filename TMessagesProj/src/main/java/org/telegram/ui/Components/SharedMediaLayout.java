@@ -4338,6 +4338,10 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
         if (archivedStoriesAdapter != null && archivedStoriesAdapter.storiesList != null) {
             archivedStoriesAdapter.destroy();
         }
+
+        if (photoVideoOptionsItem != null) actionBar.removeView(photoVideoOptionsItem);
+        if (optionsSearchImageView != null) actionBar.removeView(optionsSearchImageView);
+        if (saveItem != null) actionBar.removeView(saveItem);
     }
 
     private void checkCurrentTabValid() {

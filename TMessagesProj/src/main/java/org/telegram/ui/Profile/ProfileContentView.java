@@ -27,7 +27,6 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
 
     private final ActionBar actionBar;
     private final SharedMediaLayout sharedMediaLayout;
-    private RecyclerListView sharedMediaScrollingList;
 
     public ProfileContentView(
             @NonNull ActionBar actionBar,
@@ -98,7 +97,8 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
 
     @Override
     public boolean dispatchNestedPreScroll(int dx, int dy, int[] consumed, int[] offsetInWindow, int type) {
-        boolean res = super.dispatchNestedPreScroll(dx, dy, consumed, offsetInWindow, type);
+        boolean preventScroll = actionBar.isSearchFieldVisible();
+        boolean res = preventScroll || super.dispatchNestedPreScroll(dx, dy, consumed, offsetInWindow, type);
         RecyclerListView inner = sharedMediaLayout.getCurrentListView();
         int leftover = dy - consumed[1];
         if (inner != null && sharedMediaLayout.getTop() == 0 && inner.canScrollVertically(leftover)) {
@@ -107,6 +107,8 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
             inner.scrollBy(0, leftover);
             consumed[1] = leftover;
             res = true;
+        } else if (preventScroll) {
+            consumed[1] = dy;
         }
         return res;
     }
