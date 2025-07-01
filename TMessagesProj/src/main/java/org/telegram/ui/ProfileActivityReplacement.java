@@ -335,8 +335,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
             updateColors(true);
         }
         if (headerView != null) {
-            boolean collectible = peerColorEmojiStatus instanceof TLRPC.TL_emojiStatusCollectible;
-            headerView.setBackgroundEmojiId(profileEmojiId, collectible, true);
+            // boolean collectible = peerColorEmojiStatus instanceof TLRPC.TL_emojiStatusCollectible;
+            headerView.setBackgroundEmojiId(profileEmojiId, true);
         }
         if (menuHandler != null) {
             menuHandler.setQrItemNeeded(true, true);

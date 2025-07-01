@@ -1,13 +1,11 @@
 package org.telegram.ui.Stars;
 
-import static org.telegram.messenger.AndroidUtilities.dp;
-import static org.telegram.messenger.AndroidUtilities.dpf2;
-
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.ui.ActionBar.Theme;
+
+import static org.telegram.messenger.AndroidUtilities.*;
 
 public class StarGiftPatterns {
 
@@ -207,6 +205,59 @@ public class StarGiftPatterns {
             pattern.setAlpha((int) (0xFF * alpha * thisAlpha));
             pattern.draw(canvas);
         }
+    }
+
+    private static final float[] radialData = new float[]{
+            // Vertical line
+            60.00F, 1.571F, 18.67F, 0,
+            68.67F, -1.571F, 17.33F, 0,
+            // Horizontal line (r)
+            133.17F, -0.050F, 15.67F, .75F,
+            85.15F, -0.059F, 17.33F, .75F,
+            // Top diagonal line (r)
+            64.10F, 0.464F, 18F, 0,
+            107.18F, 0.468F, 15.67F, 0,
+            // Almost top (r)
+            84.91F, 1.012F, 15.33F, 1,
+            // Bottom diagonal line (r)
+            72.11F, -0.588F, 18F, 0,
+            117.21F, -0.554F, 16.67F, 0,
+            // Almost bottom (r)
+            94.83F, -1.088F, 18.67F, 1
+    };
+    private static final int radialPoints = radialData.length / 4;
+
+    public static void drawProfileRadialPattern(Canvas canvas, Drawable pattern, float cx, float cy, float ty, float alpha, float progress) {
+        float x, y, opacity, factor, angle, halfSize, length;
+        for (int p = 0; p < radialPoints; p ++) {
+            // Regular layout
+            halfSize = dpf2(radialData[p*4+2]) / 2F;
+            angle = radialData[p*4+1];
+            length = radialData[p*4];
+            x = dpf2(length) * (float) Math.cos(angle);
+            y = dpf2(length) * (float) Math.sin(angle);
+            opacity = alpha * lerp(1F, .6F, (length - 60F) / 80F);
+
+            // Progress animation
+            factor = 0.4F * radialData[p*4+3]
+                  + 0.1F * (((float) Math.sin(-angle) + 1F) / 2F)
+                  + 0.5F * (length - 60F) / 80F;
+            factor = (float) Math.pow(progress, 1.0 - factor * 0.9);
+            x *= factor;
+            y *= factor;
+            opacity *= lerp(.7F, 1F, factor);
+            halfSize *= lerp(.7F, 1F, factor);
+            y = lerp(cy, ty, factor) - y;
+
+            drawSinglePattern(canvas, pattern, halfSize, cx + x, y, opacity);
+            if (p >= 2) drawSinglePattern(canvas, pattern, halfSize, cx - x, y, opacity);
+        }
+    }
+
+    private static void drawSinglePattern(Canvas canvas, Drawable pattern, float halfSize, float cx, float cy, float alpha) {
+        pattern.setBounds((int) (cx - halfSize), (int) (cy - halfSize), (int) (cx + halfSize), (int) (cy + halfSize));
+        pattern.setAlpha((int) (0xFF * alpha));
+        pattern.draw(canvas);
     }
 
 }

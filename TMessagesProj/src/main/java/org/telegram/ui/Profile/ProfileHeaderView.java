@@ -24,8 +24,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
     private final ActionBar actionBar;
     private final Theme.ResourcesProvider resourcesProvider;
     private float actionModeProgress = 0F;
-    // Used for QR menu item display too
-    private final int unit = dp(72);
     private final Rect blurBounds = new Rect();
     private final SizeNotifierFrameLayout root;
 
@@ -44,14 +42,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
     private int gradientArg;
     private final Matrix gradientMatrix = new Matrix();
 
-    private final AnimatedFloat emojiLoadedT = new AnimatedFloat(this, 0, 440, CubicBezierInterpolator.EASE_OUT_QUINT);
-    private final AnimatedFloat emojiFullT = new AnimatedFloat(this, 0, 440, CubicBezierInterpolator.EASE_OUT_QUINT);
+    private final AnimatedFloat emojiFadeIn = new AnimatedFloat(this, 0, 440, CubicBezierInterpolator.EASE_OUT_QUINT);
     private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emoji = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, false, dp(20), AnimatedEmojiDrawable.CACHE_TYPE_ALERT_PREVIEW_STATIC);
     private int emojiColor;
     private boolean hasEmoji;
     private boolean isEmojiLoaded;
-    private boolean isEmojiCollectible;
-
 
     public ProfileHeaderView(
             SizeNotifierFrameLayout root,
@@ -137,7 +132,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
 
     public void updateColors(MessagesController.PeerColor peerColor, boolean animated) {
         if (peerColor != null) {
-            hasTheme = true;
             themeColor1 = peerColor.getBgColor1(Theme.isCurrentThemeDark());
             themeColor2 = peerColor.getStoryColor1(Theme.isCurrentThemeDark());
             if (peerColor.patternColor != 0) {
@@ -154,6 +148,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
                 emojiColor = PeerColorActivity.adaptProfileEmojiColor(getThemedColor(Theme.key_actionBarDefault));
             }
         }
+        emoji.setColor(emojiColor);
         hasTheme = peerColor != null;
         getAverageColor();
         if (!animated) {
@@ -165,11 +160,10 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
 
     // EMOJI
 
-    public void setBackgroundEmojiId(long emojiId, boolean isCollectible, boolean animated) {
+    public void setBackgroundEmojiId(long emojiId, boolean animated) {
         emoji.set(emojiId, animated);
         emoji.setColor(emojiColor);
-        isEmojiCollectible = isCollectible;
-        if (!animated) emojiFullT.force(isCollectible);
+        if (!animated) emojiFadeIn.force(true);
         hasEmoji = hasEmoji || emojiId != 0 && emojiId != -1;
         invalidate();
     }
@@ -224,43 +218,46 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
                 gradientPaint.setShader(gradient);
             }
 
-            // Blend them based on progress
-            // WIP: progress factor is (playProfileAnimation == 0 ? 1f : avatarAnimationProgress)
-            final float progress = hasThemeAnimated.set(hasTheme);
-            if (progress < 1) {
+            // Compute animation progress
+            // WIP: themeProgress factor is (playProfileAnimation == 0 ? 1f : avatarAnimationProgress)
+            final float themeProgress = hasThemeAnimated.set(hasTheme);
+            float growthProgress = Math.min(1F, (float) growth / snapGrowths[1]);
+
+            // Blend colors based on progress
+            if (themeProgress < 1) {
                 canvas.drawRect(0, 0, width, paintable, plainPaint);
             }
-            if (progress > 0) {
-                plainPaint.setAlpha((int) (0xFF * progress));
+            if (themeProgress > 0) {
+                plainPaint.setAlpha((int) (0xFF * themeProgress));
                 plainPaint.setColor(themeBackground);
                 canvas.drawRect(0, 0, width, paintable, plainPaint);
 
                 // Gradient: as the header collapses, it translates, shrinks and fades
-                float p = Math.min(1F, (float) growth / snapGrowths[1]);
-                float shrink = lerp(0.6F, 1F, p);
-                float centerY = lerp(0F, paintable / 2F, p);
-                float alpha = lerp(0.2F, 0.6F, p);
-                float size = Math.min(width - dp(60), dp(398));
+                float shrink = lerp(0.6F, 1F, growthProgress);
+                float centerY = lerp(0F, paintable / 2F, growthProgress);
+                float alpha = lerp(0.2F, 0.5F, growthProgress);
+                float size = Math.min(width - dp(72), dp(398));
                 gradientMatrix.setScale(size, size);
                 gradientMatrix.postTranslate((width - size) / 2F, centerY - size / 2F);
                 gradientMatrix.postScale(shrink, shrink, width / 2F, centerY);
                 gradient.setLocalMatrix(gradientMatrix);
-                gradientPaint.setAlpha((int) (0xFF * progress * alpha));
+                gradientPaint.setAlpha((int) (0xFF * themeProgress * alpha));
                 canvas.drawRect(0, 0, width, paintable, gradientPaint);
             }
 
-            if (hasEmoji && emojiLoadedT.set(isEmojiLoaded()) > 0) {
-                canvas.save();
-                canvas.clipRect(0, 0, width, paintable);
-                StarGiftPatterns.drawProfilePattern(
+            if (hasEmoji && isEmojiLoaded() && growthProgress > 0F) {
+                float loadProgress = emojiFadeIn.set(isEmojiLoaded);
+                float alpha = loadProgress * lerp(0.4F, 1F, growthProgress);
+                float centerY = lerp(0F, paintable / 2F, growthProgress);
+                StarGiftPatterns.drawProfileRadialPattern(
                         canvas,
                         emoji,
-                        width,
-                        dp(142), // WIP: proper value
-                        Math.min(1f, (float) growth / unit),
-                        emojiFullT.set(isEmojiCollectible)
+                        width / 2F,
+                        centerY,
+                        paintable / 2F,
+                        0.5F * alpha,
+                        (growthProgress - 0.3F) / 0.7F
                 );
-                canvas.restore();
             }
         }
 
