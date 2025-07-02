@@ -1,18 +1,21 @@
 package org.telegram.ui.Profile;
 
+import android.content.Context;
 import android.graphics.*;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
+import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
-import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.*;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_stars;
@@ -20,7 +23,9 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Components.*;
+import org.telegram.ui.Components.Forum.ForumUtilities;
 import org.telegram.ui.PeerColorActivity;
+import org.telegram.ui.PhotoViewer;
 import org.telegram.ui.Stars.StarGiftPatterns;
 import org.telegram.ui.Stars.StarsController;
 
@@ -32,6 +37,19 @@ import static org.telegram.messenger.AndroidUtilities.lerp;
 import static org.telegram.ui.Stars.StarsController.findAttribute;
 
 public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implements NotificationCenter.NotificationCenterDelegate {
+
+    private final static float GIFT_LAYOUT_INSET = 1.37F; // makes room for the radial background
+    private final static float[][] GIFTS_LAYOUT = new float[][]{
+            // horizontal
+            { 108.76F, 0.0766F, GIFT_LAYOUT_INSET * 25.3F, .9F },
+            { 103.01F, -3.1287F, GIFT_LAYOUT_INSET * 25.3F, .9F },
+            // bottom
+            { 78.48F, -2.6779F, GIFT_LAYOUT_INSET * 25.3F, .6F },
+            { 79.43F, -0.3653F, GIFT_LAYOUT_INSET * 25.3F, 0 },
+            // top
+            { 76.54F, 0.4711F, GIFT_LAYOUT_INSET * 25.3F, .6F },
+            { 76.84F, 2.5831F, GIFT_LAYOUT_INSET * 25.3F, 0 }
+    };
 
     private final int currentAccount;
     private final long dialogId;
@@ -67,37 +85,70 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private final List<Gift> gifts = new ArrayList<>();
     private Gift pressedGift;
 
-    private final static float GIFT_LAYOUT_INSET = 1.37F; // makes room for the radial background
-    private final static float[][] GIFTS_LAYOUT = new float[][]{
-            // horizontal
-            { 108.76F, 0.0766F, GIFT_LAYOUT_INSET * 25.3F, .9F },
-            { 103.01F, -3.1287F, GIFT_LAYOUT_INSET * 25.3F, .9F },
-            // bottom
-            { 78.48F, -2.6779F, GIFT_LAYOUT_INSET * 25.3F, .6F },
-            { 79.43F, -0.3653F, GIFT_LAYOUT_INSET * 25.3F, 0 },
-            // top
-            { 76.54F, 0.4711F, GIFT_LAYOUT_INSET * 25.3F, .6F },
-            { 76.84F, 2.5831F, GIFT_LAYOUT_INSET * 25.3F, 0 }
-    };
+    private final AvatarDrawable avatarDrawable = new AvatarDrawable();
+    private final AvatarImageView avatarImage;
+    private ImageLocation avatarLoadedLocation;
+
+    private TLRPC.FileLocation uploadedAvatarSmall;
+    private TLRPC.FileLocation uploadedAvatarBig;
+
+    private final float attractorHiddenCenterY = dp(16);
 
     public ProfileHeaderView(
+            @NonNull Context context,
             int currentAccount,
             long dialogId,
             SizeNotifierFrameLayout root,
             @NonNull ActionBar actionBar,
             Theme.ResourcesProvider resourcesProvider
     ) {
-        super(actionBar.getContext());
+        super(context);
         this.currentAccount = currentAccount;
         this.dialogId = dialogId;
         this.root = root;
         this.actionBar = actionBar;
         this.resourcesProvider = resourcesProvider;
+        this.avatarImage = new AvatarImageView(context) {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(info);
+                if (getImageReceiver().hasNotThumb()) {
+                    info.setText(LocaleController.getString(R.string.AccDescrProfilePicture));
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, LocaleController.getString(R.string.Open)));
+                        info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_LONG_CLICK, LocaleController.getString(R.string.AccDescrOpenInPhotoViewer)));
+                    }
+                } else {
+                    info.setVisibleToUser(false);
+                }
+            }
+            @Override
+            protected void dispatchDraw(Canvas canvas) {
+                super.dispatchDraw(canvas);
+                if (animatedEmojiDrawable != null && animatedEmojiDrawable.getImageReceiver() != null) {
+                    animatedEmojiDrawable.getImageReceiver().startAnimation();
+                }
+            }
+        };
+
+        avatarImage.getImageReceiver().setAllowDecodeSingleFrame(true);
+        avatarDrawable.setProfile(true);
+        avatarDrawable.setRoundRadius(dp(45));
+        avatarImage.setRoundRadius(dp(45));
+
+        addView(avatarImage, new FrameLayout.LayoutParams(dp(90), dp(90), Gravity.CENTER_HORIZONTAL | Gravity.TOP));
         setWillNotDraw(false);
         setBackgroundColor(getThemedColor(Theme.key_avatar_backgroundActionBarBlue));
     }
 
-    public void onConfigurationChanged(Point size) {
+    // MISC
+
+    public void setActionModeProgress(float progress) {
+        actionModeProgress = progress;
+        invalidate();
+    }
+
+    public void setDisplaySize(Point size) {
         int baseHeight = ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0);
         int overscrollHeight = dp(48);
         int availableHeight = size.y - baseHeight;
@@ -122,6 +173,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         changeGrowth(mid, true);
     }
 
+    // GROWTH
+
     @Override
     protected int onContentTouch(int dy) {
         if (growth <= snapGrowths[1] || snapGrowths.length < 3) return dy;
@@ -141,6 +194,24 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     @Override
     protected void onGrowthChanged(int growth) {
         super.onGrowthChanged(growth);
+        float hidden = -getTranslationY();
+        float visible = getMeasuredHeight() - hidden;
+        float defaultHalfSize = avatarImage.getMeasuredWidth() / 2F;
+        float centerY;
+        float scale;
+        if (growth >= snapGrowths[1] && snapGrowths.length > 2) {
+            float progress = (float) (growth - snapGrowths[1]) / (snapGrowths[2] - snapGrowths[1]);
+            centerY = visible / 2F;
+            scale = lerp(1F, 2F, progress);
+        } else {
+            float progress = Math.min(1F, (float) growth / snapGrowths[1]);
+            centerY = lerp(-attractorHiddenCenterY, visible / 2F, CubicBezierInterpolator.EASE_OUT.getInterpolation(progress));
+            scale = lerp(attractorHiddenCenterY/defaultHalfSize, 1F, CubicBezierInterpolator.EASE_IN.getInterpolation(progress));
+        }
+        avatarImage.setTranslationY(hidden + centerY - defaultHalfSize);
+        avatarImage.setScaleX(scale);
+        avatarImage.setScaleY(scale);
+        avatarImage.setVisibility(centerY == 0F ? View.INVISIBLE : View.VISIBLE);
         invalidate();
     }
 
@@ -156,6 +227,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     public void getThemeDescriptions(ArrayList<ThemeDescription> arrayList) {
         arrayList.add(new ThemeDescription(this, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_avatar_backgroundActionBarBlue));
+        arrayList.add(new ThemeDescription(avatarImage, 0, null, null, Theme.avatarDrawables, null, Theme.key_avatar_text));
+        arrayList.add(new ThemeDescription(avatarImage, 0, null, null, new Drawable[]{avatarDrawable}, null, Theme.key_avatar_backgroundInProfileBlue));
     }
 
     private int getThemedColor(int key) {
@@ -407,14 +480,81 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         if (!unchanged) invalidate();
     }
 
+    // AVATAR
 
+    public void setAvatarUser(@NonNull TLRPC.User user, TLRPC.UserFull userInfo) {
+        avatarDrawable.setInfo(currentAccount, user);
 
-    // CANVAS
-
-    public void setActionModeProgress(float progress) {
-        actionModeProgress = progress;
-        invalidate();
+        final ImageLocation imageLocation = ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_BIG);
+        final ImageLocation thumbLocation = ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_SMALL);
+        final ImageLocation videoThumbLocation = ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_VIDEO_BIG);
+        VectorAvatarThumbDrawable vectorAvatarThumbDrawable = null;
+        TLRPC.VideoSize vectorAvatar = null;
+        if (userInfo != null) {
+            vectorAvatar = FileLoader.getVectorMarkupVideoSize(user.photo != null && user.photo.personal ? userInfo.personal_photo : userInfo.profile_photo);
+            if (vectorAvatar != null) {
+                vectorAvatarThumbDrawable = new VectorAvatarThumbDrawable(vectorAvatar, user.premium, VectorAvatarThumbDrawable.TYPE_PROFILE);
+            }
+        }
+        final ImageLocation videoLocation = null; // WIP: avatarsViewPager.getCurrentVideoLocation(thumbLocation, imageLocation);
+        if (uploadedAvatarSmall == null) {
+            // WIP: avatarsViewPager.initIfEmpty(vectorAvatarThumbDrawable, imageLocation, thumbLocation, reload);
+        }
+        if (uploadedAvatarBig == null) {
+            if (vectorAvatar != null) {
+                avatarImage.setImageDrawable(vectorAvatarThumbDrawable);
+            } else if (videoThumbLocation != null && !user.photo.personal) {
+                avatarImage.getImageReceiver().setVideoThumbIsSame(true);
+                avatarImage.setImage(videoThumbLocation, "avatar", thumbLocation, "50_50", avatarDrawable, user);
+            } else {
+                avatarImage.setImage(videoLocation, ImageLoader.AUTOPLAY_FILTER, thumbLocation, "50_50", avatarDrawable, user);
+            }
+        }
+        onAvatarChanged(user, imageLocation, user.photo != null ? user.photo.photo_big : null);
     }
+
+    public void setAvatarChat(@NonNull TLRPC.Chat chat, long topicId) {
+        MessagesController controller = MessagesController.getInstance(currentAccount);
+        chat = ChatObject.isMonoForum(chat) ? controller.getMonoForumLinkedChat(chat.id) : chat;
+
+        ImageLocation imageLocation = null;
+        ImageLocation thumbLocation = null;
+        ImageLocation videoLocation = null;
+        if (topicId == 0) {
+            avatarDrawable.setInfo(currentAccount, chat);
+            imageLocation = ImageLocation.getForUserOrChat(chat, ImageLocation.TYPE_BIG);
+            thumbLocation = ImageLocation.getForUserOrChat(chat, ImageLocation.TYPE_SMALL);
+            // WIP: videoLocation = avatarsViewPager.getCurrentVideoLocation(thumbLocation, imageLocation);
+        } else {
+            TLRPC.TL_forumTopic topic = MessagesController.getInstance(currentAccount).getTopicsController().findTopic(chat.id, topicId);
+            ForumUtilities.setTopicIcon(avatarImage, topic, true, true, resourcesProvider);
+        }
+
+        // WIP: avatarsViewPager.initIfEmpty(null, imageLocation, thumbLocation, reload);
+        if (uploadedAvatarBig == null) {
+            String filter = videoLocation != null && videoLocation.imageType == FileLoader.IMAGE_TYPE_ANIMATION ? ImageLoader.AUTOPLAY_FILTER : null;
+            avatarImage.setImage(videoLocation, filter, thumbLocation, "50_50", avatarDrawable, chat);
+        }
+        onAvatarChanged(chat, imageLocation, chat.photo != null && topicId == 0 ? chat.photo.photo_big : null);
+    }
+
+    public void unsetAvatar() {
+        avatarImage.setImageDrawable(null);
+        // WIP: avatarsViewPager.onDestroy();
+    }
+
+    private void onAvatarChanged(Object parentObject, ImageLocation imageLocation, TLRPC.FileLocation photoBig) {
+        if (imageLocation != null && (avatarLoadedLocation == null || imageLocation.photoId != avatarLoadedLocation.photoId)) {
+            avatarLoadedLocation = imageLocation;
+            FileLoader.getInstance(currentAccount).loadFile(imageLocation, parentObject, null, FileLoader.PRIORITY_LOW, 1);
+        }
+        avatarImage.getImageReceiver().setVisible(
+                !PhotoViewer.isShowingImage(photoBig), // WIP: && (getLastStoryViewer() == null || getLastStoryViewer().transitionViewHolder.view != avatarImage),
+                true // WIP: storyView != null
+        );
+    }
+
+    // GENERIC
 
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
@@ -442,7 +582,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             // WIP: themeProgress factor is (playProfileAnimation == 0 ? 1f : avatarAnimationProgress)
             final float themeProgress = hasThemeAnimated.set(hasTheme);
             float growthProgress = Math.min(1F, (float) growth / snapGrowths[1]);
-            float attractorY = lerp(0F, paintable / 2F, growthProgress);
+            float attractorY = lerp(-attractorHiddenCenterY, paintable / 2F, growthProgress);
 
             // Blend colors based on progress
             if (themeProgress < 1) {

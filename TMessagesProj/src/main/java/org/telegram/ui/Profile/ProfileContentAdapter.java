@@ -162,7 +162,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                     || kind == Rows.HelpQuestion || kind == Rows.MySettingsDevices || kind == Rows.MySettingsFilters
                     || kind == Rows.HelpFaq || kind == Rows.HelpPolicy || kind == Rows.FeaturesStars
                     || kind == Rows.DebugSendLogs || kind == Rows.DebugSendLastLogs || kind == Rows.DebugClearLogs
-                    || kind == Rows.DebugSwitchBackend || kind == Rows.SetAvatar || kind == Rows.ActionsAddToGroupButton
+                    || kind == Rows.DebugSwitchBackend || kind == Rows.ActionsAddToGroupButton
                     || kind == Rows.FeaturesPremium || kind == Rows.FeaturesGift || kind == Rows.FeaturesBusiness
                     || kind == Rows.MySettingsLiteMode || kind == Rows.InfoBirthday || kind == Rows.PersonalChannel;
         }
@@ -1040,16 +1040,6 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                     textCell.setText("Switch Backend", false);
                 } else if (kind == Rows.MySettingsDevices) {
                     textCell.setTextAndIcon(LocaleController.getString(R.string.Devices), R.drawable.msg2_devices, true);
-                } else if (kind == Rows.SetAvatar) {
-                    if (cellCameraDrawable == null) {
-                        cellCameraDrawable = new RLottieDrawable(R.raw.camera_outline, R.raw.camera_outline + "_cell", dp(42), dp(42), false, null);
-                    }
-                    cellCameraDrawable.setCustomEndFrame(86);
-                    cellCameraDrawable.setCurrentFrame(85, false);
-                    textCell.setTextAndIcon(LocaleController.getString(R.string.SetProfilePhoto), cellCameraDrawable, false);
-                    textCell.setColors(Theme.key_windowBackgroundWhiteBlueIcon, Theme.key_windowBackgroundWhiteBlueButton);
-                    textCell.getImageView().setPadding(0, 0, 0, dp(8));
-                    textCell.setImageLeft(12);
                 } else if (kind == Rows.ActionsAddToGroupButton) {
                     textCell.setTextAndIcon(LocaleController.getString(R.string.AddToGroupOrChannel), R.drawable.msg_groups_create, false);
                 } else if (kind == Rows.FeaturesPremium) {

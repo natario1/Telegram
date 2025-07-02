@@ -310,6 +310,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
             peerColorEmojiStatus = user.emoji_status;
             peerColorFallbackId = UserObject.getProfileColorId(user);
             profileEmojiId = UserObject.getProfileEmojiId(user);
+            if (headerView != null) {
+                headerView.setAvatarUser(user, userInfo);
+            }
             if (menuHandler != null) {
                 menuHandler.updateUsernameRelatedItems(UserObject.getPublicUsername(user) != null);
             }
@@ -320,6 +323,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
             peerColorEmojiStatus = chat.emoji_status;
             peerColorFallbackId = ChatObject.getProfileColorId(chat);
             profileEmojiId = ChatObject.getProfileEmojiId(chat);
+            headerView.setAvatarChat(chat, topicId);
+
         }
         if (flagSecure != null) {
             flagSecure.invalidate();
@@ -523,7 +528,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             final Point size = new Point();
             final Display display = getParentActivity().getWindowManager().getDefaultDisplay();
             display.getSize(size);
-            headerView.onConfigurationChanged(size);
+            headerView.setDisplaySize(size);
         }
     }
 
@@ -1119,6 +1124,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
             birthdayEffectFetcher.detach(true);
             birthdayEffectFetcher = null;
         }
+        if (headerView != null) {
+            headerView.unsetAvatar();
+        }
         unsubscribeFromNotifications();
     }
 
@@ -1573,7 +1581,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout.addView(coordinator);
 
         // Header
-        headerView = new ProfileHeaderView(currentAccount, getDialogId(), rootLayout, actionBar, getResourceProvider());
+        headerView = new ProfileHeaderView(context, currentAccount, getDialogId(), rootLayout, actionBar, getResourceProvider());
         coordinator.addHeader(headerView);
 
         // List
@@ -1956,31 +1964,30 @@ public class ProfileActivityReplacement extends BaseFragment implements
         TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
         if (user == null) user = UserConfig.getInstance(currentAccount).getCurrentUser();
         if (user == null) return;
-        TextCell setAvatarCell = listView != null ? listView.findRowView(Rows.SetAvatar) : null;
-        RLottieImageView setAvatarImage = setAvatarCell != null ? setAvatarCell.getImageView() : null;
+        // TextCell setAvatarCell = null;
+        // RLottieImageView setAvatarImage = setAvatarCell != null ? setAvatarCell.getImageView() : null;
         imageUpdater.openMenu(user.photo != null && user.photo.photo_big != null && !(user.photo instanceof TLRPC.TL_userProfilePhotoEmpty), () -> {
             MessagesController.getInstance(currentAccount).deleteUserPhoto(null);
-            if (setAvatarImage != null) {
-                setAvatarImage.getAnimatedDrawable().setCurrentFrame(0);
-            }
+            // if (setAvatarImage != null) {
+            //     setAvatarImage.getAnimatedDrawable().setCurrentFrame(0);
+            // }
         }, dialog -> {
             if (!imageUpdater.isUploadingImage()) {
-                if (setAvatarImage != null) {
-                    setAvatarImage.getAnimatedDrawable().setCustomEndFrame(86);
-                    setAvatarImage.playAnimation();
-                }
+                // if (setAvatarImage != null) {
+                //     setAvatarImage.getAnimatedDrawable().setCustomEndFrame(86);
+                //     setAvatarImage.playAnimation();
+                // }
             } else {
-                if (setAvatarImage != null) {
-                    setAvatarImage.getAnimatedDrawable().setCurrentFrame(0, false);
-                }
+                // if (setAvatarImage != null) {
+                //     setAvatarImage.getAnimatedDrawable().setCurrentFrame(0, false);
+                // }
             }
         }, 0);
-        if (setAvatarImage != null) {
-            setAvatarImage.getAnimatedDrawable().setCurrentFrame(0);
-            setAvatarImage.getAnimatedDrawable().setCustomEndFrame(43);
-            setAvatarImage.playAnimation();
-        }
-        return;
+        // if (setAvatarImage != null) {
+        //     setAvatarImage.getAnimatedDrawable().setCurrentFrame(0);
+        //     setAvatarImage.getAnimatedDrawable().setCustomEndFrame(43);
+        //     setAvatarImage.playAnimation();
+        // }
     }
 
     private void handleAddContact() {

@@ -289,9 +289,6 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
             return kind;
         }
 
-        public final static int SetAvatar = newKind(VIEW_TYPE_TEXT);
-        public final static int SetAvatarSection = newKind(VIEW_TYPE_SHADOW);
-
         public final static int Members = newKind(VIEW_TYPE_USER);
         public final static int MembersShadow = newKind(VIEW_TYPE_SHADOW);
         public final static int MembersAdd = newKind(VIEW_TYPE_TEXT);
