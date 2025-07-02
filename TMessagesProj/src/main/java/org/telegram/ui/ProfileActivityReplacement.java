@@ -11,6 +11,7 @@ import android.content.res.Configuration;
 import android.graphics.*;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
@@ -104,7 +105,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private boolean chatMembersLoading;
     private boolean chatMembersEndReached;
     private int chatMembersOnline = -1;
-    private int chatMembersForceShow = 0; // TODO: implement
+    private int chatMembersForceShow = 0; // WIP: implement
 
     private long userId;
     private TLRPC.UserFull userInfo;
@@ -1383,9 +1384,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
     }
 
     @Override
-    public boolean onMemberClick(TLRPC.ChatParticipant participant, boolean b, boolean resultOnly, View view) {
-        // WIP
-        return false;
+    public boolean onMemberClick(TLRPC.ChatParticipant participant, boolean isLong, boolean resultOnly, View view) {
+        return handleMemberPress(participant, isLong, resultOnly, view);
     }
 
     @Override
@@ -1510,6 +1510,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
             @Override
             protected int getInitialTab() {
                 return TAB_STORIES;
+            }
+
+            @Override
+            protected boolean onMemberClick(TLRPC.ChatParticipant participant, boolean isLong, View view) {
+                return handleMemberPress(participant, isLong, false, view);
             }
 
             @Override
@@ -2472,7 +2477,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         } else if (kind == Rows.Members) {
             List<TLRPC.ChatParticipant> participants = adapter.getRows().payload(Rows.Members);
             TLRPC.ChatParticipant participant = participants.get(position - adapter.getRows().position(Rows.Members));
-            return onMemberClick(participant, false, false, view);
+            return handleMemberPress(participant, false, false, view);
         } else if (kind == Rows.MembersAdd) {
             handleAddMember();
         } else if (kind == Rows.InfoLocation) {
@@ -2978,7 +2983,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         else if (kind == Rows.Members) {
             List<TLRPC.ChatParticipant> participants = adapter.getRows().payload(Rows.Members);
             TLRPC.ChatParticipant participant = participants.get(position - adapter.getRows().position(Rows.Members));
-            return onMemberClick(participant, true, false, view);
+            return handleMemberPress(participant, true, false, view);
         }
         else if (kind == Rows.InfoBirthday) {
             if (handleListPressWithItemOptions(kind, view)) return true;
@@ -3664,6 +3669,196 @@ public class ProfileActivityReplacement extends BaseFragment implements
         presentFragment(fragment);
     }
 
+
+    private void handleEditRights(int action, TLRPC.User user, TLRPC.ChatParticipant participant, TLRPC.TL_chatAdminRights adminRights, TLRPC.TL_chatBannedRights bannedRights, String rank, boolean editingAdmin) {
+        if (chat == null) return;
+        boolean[] needShowBulletin = new boolean[1];
+        ChatRightsEditActivity fragment = new ChatRightsEditActivity(user.id, chatId, adminRights, chat.default_banned_rights, bannedRights, rank, action, true, false, null) {
+            @Override
+            public void onTransitionAnimationEnd(boolean isOpen, boolean backward) {
+                if (!isOpen && backward && needShowBulletin[0] && BulletinFactory.canShowBulletin(this)) {
+                    BulletinFactory.createPromoteToAdminBulletin(this, user.first_name).show();
+                }
+            }
+        };
+        fragment.setDelegate(new ChatRightsEditActivity.ChatRightsEditActivityDelegate() {
+            @Override
+            public void didSetRights(int rights, TLRPC.TL_chatAdminRights rightsAdmin, TLRPC.TL_chatBannedRights rightsBanned, String rank) {
+                if (action == 0) {
+                    if (participant instanceof TLRPC.TL_chatChannelParticipant) {
+                        TLRPC.TL_chatChannelParticipant channelParticipant1 = ((TLRPC.TL_chatChannelParticipant) participant);
+                        if (rights == 1) {
+                            channelParticipant1.channelParticipant = new TLRPC.TL_channelParticipantAdmin();
+                            channelParticipant1.channelParticipant.flags |= 4;
+                        } else {
+                            channelParticipant1.channelParticipant = new TLRPC.TL_channelParticipant();
+                        }
+                        channelParticipant1.channelParticipant.inviter_id = getUserConfig().getClientUserId();
+                        channelParticipant1.channelParticipant.peer = new TLRPC.TL_peerUser();
+                        channelParticipant1.channelParticipant.peer.user_id = participant.user_id;
+                        channelParticipant1.channelParticipant.date = participant.date;
+                        channelParticipant1.channelParticipant.banned_rights = rightsBanned;
+                        channelParticipant1.channelParticipant.admin_rights = rightsAdmin;
+                        channelParticipant1.channelParticipant.rank = rank;
+                    } else if (participant != null) {
+                        TLRPC.ChatParticipant newParticipant;
+                        if (rights == 1) {
+                            newParticipant = new TLRPC.TL_chatParticipantAdmin();
+                        } else {
+                            newParticipant = new TLRPC.TL_chatParticipant();
+                        }
+                        newParticipant.user_id = participant.user_id;
+                        newParticipant.date = participant.date;
+                        newParticipant.inviter_id = participant.inviter_id;
+                        int index = chatInfo.participants.participants.indexOf(participant);
+                        if (index >= 0) {
+                            chatInfo.participants.participants.set(index, newParticipant);
+                        }
+                    }
+                    if (rights == 1 && !editingAdmin) {
+                        needShowBulletin[0] = true;
+                    }
+                } else if (action == 1) {
+                    if (rights == 0) {
+                        if (chat.megagroup && chatInfo != null && chatInfo.participants != null) {
+                            boolean changed = false;
+                            for (int a = 0; a < chatInfo.participants.participants.size(); a++) {
+                                TLRPC.ChannelParticipant p = ((TLRPC.TL_chatChannelParticipant) chatInfo.participants.participants.get(a)).channelParticipant;
+                                if (MessageObject.getPeerId(p.peer) == participant.user_id) {
+                                    chatInfo.participants_count--;
+                                    chatInfo.participants.participants.remove(a);
+                                    changed = true;
+                                    break;
+                                }
+                            }
+                            if (chatInfo != null && chatInfo.participants != null) {
+                                for (int a = 0; a < chatInfo.participants.participants.size(); a++) {
+                                    TLRPC.ChatParticipant p = chatInfo.participants.participants.get(a);
+                                    if (p.user_id == participant.user_id) {
+                                        chatInfo.participants.participants.remove(a);
+                                        changed = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (changed) {
+                                updateChatMembersData(true);
+                            }
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void didChangeOwner(TLRPC.User user) {
+                UndoView undoView = getUndoView();
+                undoView.showWithAction(-chatId, chat.megagroup ? UndoView.ACTION_OWNER_TRANSFERED_GROUP : UndoView.ACTION_OWNER_TRANSFERED_CHANNEL, user);
+            }
+        });
+        presentFragment(fragment);
+    }
+
+    private boolean handleMemberPress(TLRPC.ChatParticipant participant, boolean isLong, boolean resultOnly, View view) {
+        if (getParentActivity() == null) return false;
+        if (!isLong) {
+            if (participant.user_id == getUserConfig().getClientUserId()) return false;
+            Bundle args = new Bundle();
+            args.putLong("user_id", participant.user_id);
+            args.putBoolean("preload_messages", true);
+            presentFragment(new ProfileActivityReplacement(args));
+            return true;
+        }
+        TLRPC.User user = getMessagesController().getUser(participant.user_id);
+        if (user == null || participant.user_id == getUserConfig().getClientUserId()) {
+            return false;
+        }
+        long selectedUser = participant.user_id;
+        boolean allowKick;
+        boolean canEditAdmin;
+        boolean canRestrict;
+        boolean editingAdmin;
+        final TLRPC.ChannelParticipant channelParticipant;
+
+        if (ChatObject.isChannel(chat)) {
+            channelParticipant = ((TLRPC.TL_chatChannelParticipant) participant).channelParticipant;
+            TLRPC.User u = getMessagesController().getUser(participant.user_id);
+            canEditAdmin = ChatObject.canAddAdmins(chat);
+            if (canEditAdmin && (channelParticipant instanceof TLRPC.TL_channelParticipantCreator || channelParticipant instanceof TLRPC.TL_channelParticipantAdmin && !channelParticipant.can_edit)) {
+                canEditAdmin = false;
+            }
+            allowKick = canRestrict = ChatObject.canBlockUsers(chat) && (!(channelParticipant instanceof TLRPC.TL_channelParticipantAdmin || channelParticipant instanceof TLRPC.TL_channelParticipantCreator) || channelParticipant.can_edit);
+            if (chat.gigagroup) {
+                canRestrict = false;
+            }
+            editingAdmin = channelParticipant instanceof TLRPC.TL_channelParticipantAdmin;
+        } else {
+            channelParticipant = null;
+            allowKick = chat.creator || participant instanceof TLRPC.TL_chatParticipant && (ChatObject.canBlockUsers(chat) || participant.inviter_id == getUserConfig().getClientUserId());
+            canEditAdmin = chat.creator;
+            canRestrict = chat.creator;
+            editingAdmin = participant instanceof TLRPC.TL_chatParticipantAdmin;
+        }
+
+        boolean result = (canEditAdmin || canRestrict || allowKick);
+        if (resultOnly || !result) {
+            return result;
+        }
+
+        Utilities.Callback<Integer> openRightsEdit = action -> {
+            if (channelParticipant != null) {
+                handleEditRights(action, user, participant, channelParticipant.admin_rights, channelParticipant.banned_rights, channelParticipant.rank, editingAdmin);
+            } else {
+                handleEditRights(action, user, participant, null, null, "", editingAdmin);
+            }
+        };
+
+        ItemOptions.makeOptions(this, view)
+                .setScrimViewBackground(new ColorDrawable(Theme.getColor(Theme.key_windowBackgroundWhite)))
+                .addIf(canEditAdmin, R.drawable.msg_admins, editingAdmin ? LocaleController.getString(R.string.EditAdminRights) : LocaleController.getString(R.string.SetAsAdmin), () -> openRightsEdit.run(0))
+                .addIf(canRestrict, R.drawable.msg_permissions, LocaleController.getString(R.string.ChangePermissions), () -> {
+                    if (channelParticipant instanceof TLRPC.TL_channelParticipantAdmin || participant instanceof TLRPC.TL_chatParticipantAdmin) {
+                        showDialog(
+                                new AlertDialog.Builder(getParentActivity(), getResourceProvider())
+                                        .setTitle(LocaleController.getString(R.string.AppName))
+                                        .setMessage(formatString("AdminWillBeRemoved", R.string.AdminWillBeRemoved, ContactsController.formatName(user.first_name, user.last_name)))
+                                        .setPositiveButton(LocaleController.getString(R.string.OK), (dialog, which) -> openRightsEdit.run(1))
+                                        .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                                        .create()
+                        );
+                    } else {
+                        openRightsEdit.run(1);
+                    }
+                })
+                .addIf(allowKick, R.drawable.msg_remove, LocaleController.getString(R.string.KickFromGroup), true, () -> {
+                    handleKickUser(selectedUser, participant);
+                })
+                .setMinWidth(190)
+                .show();
+        return true;
+    }
+
+    private void handleKickUser(long uid, TLRPC.ChatParticipant participant) {
+        if (uid != 0) {
+            TLRPC.User user = getMessagesController().getUser(uid);
+            getMessagesController().deleteParticipantFromChat(chatId, user);
+            if (chat != null && user != null && BulletinFactory.canShowBulletin(this)) {
+                BulletinFactory.createRemoveFromChatBulletin(this, user, chat.title).show();
+            }
+            if (chatInfo.participants.participants.remove(participant)) {
+                updateChatMembersData(true);
+            }
+        } else {
+            getNotificationCenter().removeObserver(this, NotificationCenter.closeChats);
+            if (AndroidUtilities.isTablet()) {
+                getNotificationCenter().postNotificationName(NotificationCenter.closeChats, -chatId);
+            } else {
+                getNotificationCenter().postNotificationName(NotificationCenter.closeChats);
+            }
+            getMessagesController().deleteParticipantFromChat(chatId, getMessagesController().getUser(getUserConfig().getClientUserId()));
+            // WIP: playProfileAnimation = 0;
+            finishFragment();
+        }
+    }
 
     private static class RoundRectPopup extends ActionBarPopupWindow.ActionBarPopupWindowLayout {
 
