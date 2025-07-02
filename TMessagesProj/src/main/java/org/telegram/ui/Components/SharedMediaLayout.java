@@ -135,11 +135,7 @@ import org.telegram.ui.Stories.bots.BotPreviewsEditContainer;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 import org.telegram.ui.Stories.recorder.StoryRecorder;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Objects;
+import java.util.*;
 
 @SuppressWarnings("unchecked")
 public class SharedMediaLayout extends FrameLayout implements NotificationCenter.NotificationCenterDelegate, DialogCell.DialogCellDelegate {
@@ -1450,7 +1446,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
         return -1;
     }
 
-    public SharedMediaLayout(Context context, long did, SharedMediaPreloader preloader, int commonGroupsCount, ArrayList<Integer> sortedUsers, TLRPC.ChatFull chatInfo, TLRPC.UserFull userInfo, int initialTab, BaseFragment parent, Delegate delegate, int viewType, Theme.ResourcesProvider resourcesProvider) {
+    public SharedMediaLayout(Context context, long did, SharedMediaPreloader preloader, int commonGroupsCount, List<TLRPC.ChatParticipant> sortedUsers, TLRPC.ChatFull chatInfo, TLRPC.UserFull userInfo, int initialTab, BaseFragment parent, Delegate delegate, int viewType, Theme.ResourcesProvider resourcesProvider) {
         super(context);
         this.viewType = viewType;
         this.resourcesProvider = resourcesProvider;
@@ -2922,17 +2918,10 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
             mediaPages[a].listView.setOnItemClickListener((view, position, x, y) -> {
                 if (mediaPage.selectedType == TAB_GROUPUSERS) {
                     if (view instanceof UserCell) {
-                        TLRPC.ChatParticipant participant;
-                        final int i;
-                        if (!chatUsersAdapter.sortedUsers.isEmpty()) {
-                            i = chatUsersAdapter.sortedUsers.get(position);
-                        } else {
-                            i = position;
-                        }
-                        participant = chatUsersAdapter.chatInfo.participants.participants.get(i);
-                        if (i < 0 || i >= chatUsersAdapter.chatInfo.participants.participants.size()) {
+                        if (position >= chatUsersAdapter.sortedUsers.size()) {
                             return;
                         }
+                        TLRPC.ChatParticipant participant = chatUsersAdapter.sortedUsers.get(position);
                         onMemberClick(participant, false, view);
                     } else if (mediaPage.listView.getAdapter() == groupUsersSearchAdapter) {
                         long user_id;
@@ -3106,18 +3095,10 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                         return true;
                     }
                     if (mediaPage.selectedType == TAB_GROUPUSERS && view instanceof UserCell) {
-                        final TLRPC.ChatParticipant participant;
-                        int index = position;
-                        if (!chatUsersAdapter.sortedUsers.isEmpty()) {
-                            if (position >= chatUsersAdapter.sortedUsers.size()) {
-                                return false;
-                            }
-                            index = chatUsersAdapter.sortedUsers.get(position);
-                        }
-                        if (index < 0 || index >= chatUsersAdapter.chatInfo.participants.participants.size()) {
+                        if (position >= chatUsersAdapter.sortedUsers.size()) {
                             return false;
                         }
-                        participant = chatUsersAdapter.chatInfo.participants.participants.get(index);
+                        final TLRPC.ChatParticipant participant = chatUsersAdapter.sortedUsers.get(position);
                         RecyclerListView listView = (RecyclerListView) view.getParent();
                         for (int i = 0; i < listView.getChildCount(); ++i) {
                             View child = listView.getChildAt(i);
@@ -5950,7 +5931,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
         }
     }
 
-    public void setChatUsers(ArrayList<Integer> sortedUsers, TLRPC.ChatFull chatInfo) {
+    public void setChatUsers(List<TLRPC.ChatParticipant> sortedUsers, TLRPC.ChatFull chatInfo) {
         for (int a = 0; a < mediaPages.length; a++) {
             if (mediaPages[a].selectedType == TAB_GROUPUSERS) {
                 if (mediaPages[a].listView.getAdapter() != null && mediaPages[a].listView.getAdapter().getItemCount() != 0 && profileActivity.getMessagesController().getStoriesController().hasLoadingStories()) {
@@ -9384,7 +9365,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
 
         private Context mContext;
         private TLRPC.ChatFull chatInfo;
-        private ArrayList<Integer> sortedUsers;
+        private List<TLRPC.ChatParticipant> sortedUsers;
 
         public ChatUsersAdapter(Context context) {
             mContext = context;
@@ -9397,10 +9378,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
 
         @Override
         public int getItemCount() {
-            if (chatInfo != null && chatInfo.participants.participants.isEmpty()) {
-                return 1;
-            }
-            return chatInfo != null ? chatInfo.participants.participants.size() : 0;
+            return sortedUsers == null ? 0 : sortedUsers.size();
         }
 
         @Override
@@ -9421,12 +9399,7 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                 return;
             }
             UserCell userCell = (UserCell) holder.itemView;
-            TLRPC.ChatParticipant part;
-            if (!sortedUsers.isEmpty()) {
-                part = chatInfo.participants.participants.get(sortedUsers.get(position));
-            } else {
-                part = chatInfo.participants.participants.get(position);
-            }
+            TLRPC.ChatParticipant part = sortedUsers.get(position);
             if (part != null) {
                 String role;
                 if (part instanceof TLRPC.TL_chatChannelParticipant) {
@@ -9452,13 +9425,13 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                     }
                 }
                 userCell.setAdminRole(role);
-                userCell.setData(profileActivity.getMessagesController().getUser(part.user_id), null, null, 0, position != chatInfo.participants.participants.size() - 1);
+                userCell.setData(profileActivity.getMessagesController().getUser(part.user_id), null, null, 0, position != getItemCount() - 1);
             }
         }
 
         @Override
         public int getItemViewType(int i) {
-            if (chatInfo != null && chatInfo.participants.participants.isEmpty()) {
+            if (sortedUsers != null && sortedUsers.isEmpty()) {
                 return VIEW_TYPE_GROUPUSER_EMPTY;
             }
             return VIEW_TYPE_GROUPUSER;

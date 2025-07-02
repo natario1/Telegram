@@ -851,7 +851,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                         }
                         int count = chatMembers.size();
                         if ((count <= 5 || !hasMedia || chatMembersForceShow == 1) && chatMembersForceShow != 2) {
-                            rows.appendList(Rows.Members, sortMembers(chatMembers, chatMembersOrder));
+                            rows.appendList(Rows.Members, sortMembers());
                             chatMembersForceShow = 1;
                             if (sharedMediaLayout != null) {
                                 sharedMediaLayout.setChatUsers(null, null);
@@ -862,8 +862,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                                 if (!chatMembersOrder.isEmpty()) {
                                     chatMembersForceShow = 2;
                                 }
-                                // WIP: ensure order and chatInfo match
-                                sharedMediaLayout.setChatUsers(chatMembersOrder, chatInfo);
+                                sharedMediaLayout.setChatUsers(sortMembers(), chatInfo);
                             }
                         }
                     } else {
@@ -891,14 +890,14 @@ public class ProfileActivityReplacement extends BaseFragment implements
                         }
                         int count = chatMembers.size();
                         if (count <= 5 || !hasMedia) {
-                            rows.appendList(Rows.Members, sortMembers(chatMembers, chatMembersOrder));
+                            rows.appendList(Rows.Members, sortMembers());
                             if (sharedMediaLayout != null) {
                                 sharedMediaLayout.setChatUsers(null, null);
                             }
                         } else {
                             if (!rows.has(Rows.MembersAdd)) rows.append(Rows.MembersShadow);
                             if (sharedMediaLayout != null) {
-                                sharedMediaLayout.setChatUsers(chatMembersOrder, chatInfo);
+                                sharedMediaLayout.setChatUsers(sortMembers(), chatInfo);
                             }
                         }
                     } else {
@@ -923,12 +922,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
         });
     }
 
-    private List<TLRPC.ChatParticipant> sortMembers(LongSparseArray<TLRPC.ChatParticipant> raw, ArrayList<Integer> order) {
-        int count = raw.size();
+    private List<TLRPC.ChatParticipant> sortMembers() {
+        int count = chatMembers.size();
         ArrayList<TLRPC.ChatParticipant> sorted = new ArrayList<>(Collections.nCopies(count, null));
         for (int i = 0; i < count; i++) {
-            int index = order.size() > i ? order.get(i) : i;
-            if (index >= 0 && index < count) sorted.set(index, raw.valueAt(i));
+            int index = chatMembersOrder.size() > i ? chatMembersOrder.get(i) : i;
+            if (index >= 0 && index < count) sorted.set(index, chatMembers.valueAt(i));
         }
         return sorted.stream().filter(Objects::nonNull).toList();
     }
@@ -968,7 +967,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (notify && listView != null) {
                 listView.updateRows((rows) -> rows.copy((row, kind) -> {
                     if (kind == Rows.Members) {
-                        row.appendList(kind, sortMembers(chatMembers, chatMembersOrder));
+                        row.appendList(kind, sortMembers());
                         return false;
                     }
                     return true;
@@ -976,7 +975,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
             if (sharedMediaLayout != null && listView != null && listView.getRowPosition(Rows.SharedMedia) >= 0) {
                 if ((chatMembersOrder.size() > 5 || chatMembersForceShow == 2) && chatMembersForceShow != 1) {
-                    sharedMediaLayout.setChatUsers(chatMembersOrder, chatInfo);
+                    sharedMediaLayout.setChatUsers(sortMembers(), chatInfo);
                 }
             }
         } else if (chatInfo instanceof TLRPC.TL_channelFull && chatInfo.participants_count > 200) {
@@ -1487,7 +1486,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
         // Shared media
         int initialTab = -1; // WIP
-        sharedMediaLayout = new SharedMediaLayout(context, getDialogId(), sharedMediaPreloader, userInfo != null ? userInfo.common_chats_count : 0, chatMembersOrder, chatInfo, userInfo, initialTab, this, this, SharedMediaLayout.VIEW_TYPE_PROFILE_ACTIVITY, getResourceProvider()) {
+        sharedMediaLayout = new SharedMediaLayout(context, getDialogId(), sharedMediaPreloader, userInfo != null ? userInfo.common_chats_count : 0, sortMembers(), chatInfo, userInfo, initialTab, this, this, SharedMediaLayout.VIEW_TYPE_PROFILE_ACTIVITY, getResourceProvider()) {
             @Override
             protected boolean isSelf() {
                 return isMyProfile;

@@ -3118,7 +3118,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
         } else if (users != null) {
             initialTab = SharedMediaLayout.TAB_GROUPUSERS;
         }
-        sharedMediaLayout = new SharedMediaLayout(context, did, sharedMediaPreloader, userInfo != null ? userInfo.common_chats_count : 0, sortedUsers, chatInfo, userInfo, initialTab, this, this, SharedMediaLayout.VIEW_TYPE_PROFILE_ACTIVITY, resourcesProvider) {
+        sharedMediaLayout = new SharedMediaLayout(context, did, sharedMediaPreloader, userInfo != null ? userInfo.common_chats_count : 0, null, chatInfo, userInfo, initialTab, this, this, SharedMediaLayout.VIEW_TYPE_PROFILE_ACTIVITY, resourcesProvider) {
             @Override
             protected int processColor(int color) {
                 return dontApplyPeerColor(color);
@@ -8569,7 +8569,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                 AndroidUtilities.updateVisibleRows(listView);
             }
             if (sharedMediaLayout != null && sharedMediaRow != -1 && (sortedUsers.size() > 5 || usersForceShowingIn == 2) && usersForceShowingIn != 1) {
-                sharedMediaLayout.setChatUsers(sortedUsers, chatInfo);
+                // sharedMediaLayout.setChatUsers(sortedUsers, chatInfo);
             }
         } else if (chatInfo instanceof TLRPC.TL_channelFull && chatInfo.participants_count > 200) {
             onlineCount = chatInfo.online_count;
@@ -9142,7 +9142,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                             if (!sortedUsers.isEmpty()) {
                                 usersForceShowingIn = 2;
                             }
-                            sharedMediaLayout.setChatUsers(sortedUsers, chatInfo);
+                            // sharedMediaLayout.setChatUsers(sortedUsers, chatInfo);
                         }
                     }
                 } else {
@@ -9188,7 +9188,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                             membersSectionRow = rowCount++;
                         }
                         if (sharedMediaLayout != null) {
-                            sharedMediaLayout.setChatUsers(sortedUsers, chatInfo);
+                            // sharedMediaLayout.setChatUsers(sortedUsers, chatInfo);
                         }
                     }
                 } else {
