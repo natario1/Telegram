@@ -3,24 +3,38 @@ package org.telegram.ui.Profile;
 import android.graphics.*;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
+import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
+import android.view.View;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.browser.Browser;
+import org.telegram.tgnet.TLRPC;
+import org.telegram.tgnet.tl.TL_stars;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Components.*;
 import org.telegram.ui.PeerColorActivity;
 import org.telegram.ui.Stars.StarGiftPatterns;
+import org.telegram.ui.Stars.StarsController;
 
-import java.util.ArrayList;
+import java.util.*;
+import java.util.stream.IntStream;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.lerp;
+import static org.telegram.ui.Stars.StarsController.findAttribute;
 
-public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
+public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implements NotificationCenter.NotificationCenterDelegate {
 
+    private final int currentAccount;
+    private final long dialogId;
     private final ActionBar actionBar;
     private final Theme.ResourcesProvider resourcesProvider;
     private float actionModeProgress = 0F;
@@ -47,13 +61,35 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
     private int emojiColor;
     private boolean hasEmoji;
     private boolean isEmojiLoaded;
+    private TLRPC.EmojiStatus emojiStatus;
+
+    private final AnimatedFloat hasGiftsAnimated = new AnimatedFloat(this, 350, CubicBezierInterpolator.EASE_OUT_QUINT);
+    private final List<Gift> gifts = new ArrayList<>();
+    private Gift pressedGift;
+
+    private final static float GIFT_LAYOUT_INSET = 1.37F; // makes room for the radial background
+    private final static float[][] GIFTS_LAYOUT = new float[][]{
+            // horizontal
+            { 108.76F, 0.0766F, GIFT_LAYOUT_INSET * 25.3F, .9F },
+            { 103.01F, -3.1287F, GIFT_LAYOUT_INSET * 25.3F, .9F },
+            // bottom
+            { 78.48F, -2.6779F, GIFT_LAYOUT_INSET * 25.3F, .6F },
+            { 79.43F, -0.3653F, GIFT_LAYOUT_INSET * 25.3F, 0 },
+            // top
+            { 76.54F, 0.4711F, GIFT_LAYOUT_INSET * 25.3F, .6F },
+            { 76.84F, 2.5831F, GIFT_LAYOUT_INSET * 25.3F, 0 }
+    };
 
     public ProfileHeaderView(
+            int currentAccount,
+            long dialogId,
             SizeNotifierFrameLayout root,
             @NonNull ActionBar actionBar,
             Theme.ResourcesProvider resourcesProvider
     ) {
         super(actionBar.getContext());
+        this.currentAccount = currentAccount;
+        this.dialogId = dialogId;
         this.root = root;
         this.actionBar = actionBar;
         this.resourcesProvider = resourcesProvider;
@@ -156,16 +192,20 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
             themeColor2Animated.set(themeColor2, true);
         }
         invalidate();
+        updateGifts();
     }
 
     // EMOJI
 
-    public void setBackgroundEmojiId(long emojiId, boolean animated) {
+    public void setEmojiInfo(long emojiId, TLRPC.EmojiStatus emojiStatus, boolean animated) {
         emoji.set(emojiId, animated);
         emoji.setColor(emojiColor);
         if (!animated) emojiFadeIn.force(true);
         hasEmoji = hasEmoji || emojiId != 0 && emojiId != -1;
         invalidate();
+
+        this.emojiStatus = emojiStatus;
+        updateGifts();
     }
 
     private boolean isEmojiLoaded() {
@@ -179,14 +219,194 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        for (Gift gift : gifts) {
+            gift.attach(this, true);
+        }
         emoji.attach();
+        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.starUserGiftsLoaded);
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.starUserGiftsLoaded);
         emoji.detach();
+        for (Gift gift : gifts) {
+            gift.attach(this, false);
+        }
     }
+
+    // GIFTS
+
+
+    @Override
+    public void didReceivedNotification(int id, int account, Object... args) {
+        if (id == NotificationCenter.starUserGiftsLoaded) {
+            if ((long) args[0] == dialogId) {
+                updateGifts();
+            }
+        }
+    }
+
+    private static class Gift extends Drawable implements StarGiftPatterns.RadialPatternElement {
+        private boolean attached;
+        private final TL_stars.TL_starGiftUnique content;
+        private final RadialGradient gradientShader;
+        private final Matrix gradientMatrix = new Matrix();
+        private final Paint gradientPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final AnimatedEmojiDrawable emoji;
+        private float[] radialInfo = GIFTS_LAYOUT[0];
+        public ButtonBounce bounce;
+
+        private Gift(TL_stars.TL_starGiftUnique gift, int currentAccount) {
+            super();
+            this.content = gift;
+            TL_stars.starGiftAttributeBackdrop backdrop = findAttribute(gift.attributes, TL_stars.starGiftAttributeBackdrop.class);
+            int color = backdrop.center_color | 0xFF000000;
+            gradientShader = new RadialGradient(0.5F, 0.5F, 0.5F, color, ColorUtils.setAlphaComponent(color, 0), Shader.TileMode.CLAMP);
+            gradientPaint.setShader(gradientShader);
+            emoji = AnimatedEmojiDrawable.make(currentAccount, AnimatedEmojiDrawable.CACHE_TYPE_MESSAGES, gift.getDocument());
+        }
+
+        @Override
+        public float[] getRadialInfo() {
+            return radialInfo;
+        }
+
+        @Override
+        public Drawable getRadialDrawable() {
+            return this;
+        }
+
+        @Override
+        public int getOpacity() {
+            return PixelFormat.TRANSLUCENT;
+        }
+
+        @Override
+        public void setColorFilter(@Nullable ColorFilter colorFilter) {}
+
+        @Override
+        protected void onBoundsChange(@NonNull Rect bounds) {
+            super.onBoundsChange(bounds);
+            Rect copy = new Rect(bounds);
+            float inset = bounds.width() - (float) bounds.width() / GIFT_LAYOUT_INSET;
+            copy.inset((int) (inset / 2), (int) (inset / 2));
+            emoji.setBounds(copy);
+        }
+
+        @Override
+        public void setAlpha(int alpha) {
+            emoji.setAlpha(alpha);
+            gradientPaint.setAlpha(alpha);
+        }
+
+        @Override
+        public void draw(@NonNull Canvas canvas) {
+            Rect bounds = getBounds();
+            gradientMatrix.setScale(bounds.width(), bounds.width());
+            gradientMatrix.postTranslate(bounds.left, bounds.top);
+            gradientShader.setLocalMatrix(gradientMatrix);
+            canvas.drawRect(bounds.left, bounds.top, bounds.right, bounds.bottom, gradientPaint);
+            if (bounce != null) {
+                float scale = 1F + 0.15F * bounce.isPressedProgress();
+                canvas.save();
+                canvas.scale(scale, scale, bounds.centerX(), bounds.centerY());
+                emoji.draw(canvas);
+                canvas.restore();
+            } else {
+                emoji.draw(canvas);
+            }
+        }
+
+        private void attach(View view, boolean attached) {
+            if (attached == this.attached) return;
+            this.attached = attached;
+            if (attached) emoji.addView(view);
+            else emoji.removeView(view);
+            bounce = attached ? new ButtonBounce(view) : null;
+        }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        float x = event.getX() + getTranslationX();
+        float y = event.getY() + getTranslationY();
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                for (Gift gift : gifts) {
+                    if (gift.getBounds().contains((int) x, (int) y)) {
+                        pressedGift = gift;
+                        pressedGift.bounce.setPressed(true);
+                        return true;
+                    }
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+                if (pressedGift != null && pressedGift.getBounds().contains((int) x, (int) y)) {
+                    Browser.openUrl(getContext(), "https://t.me/nft/" + pressedGift.content.slug);
+                    performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                }
+            case MotionEvent.ACTION_CANCEL:
+            case MotionEvent.ACTION_MOVE:
+                if (pressedGift != null) pressedGift.bounce.setPressed(false);
+                pressedGift = null;
+                break;
+        }
+        return pressedGift != null;
+    }
+
+    public void updateGifts() {
+        if (!MessagesController.getInstance(currentAccount).enableGiftsInProfile) return;
+
+        List<Gift> oldGifts = gifts;
+        List<Gift> newGifts = new ArrayList<>();
+        Set<Long> ignored = new HashSet<>();
+        if (emojiStatus instanceof TLRPC.TL_emojiStatusCollectible) {
+            ignored.add(((TLRPC.TL_emojiStatusCollectible) emojiStatus).collectible_id);
+        }
+
+        StarsController.GiftsList list = StarsController.getInstance(currentAccount).getProfileGiftsList(dialogId);
+        if (list != null) {
+            for (int i = 0; i < list.gifts.size(); i++) {
+                final TL_stars.SavedStarGift savedGift = list.gifts.get(i);
+                if (!savedGift.unsaved
+                        && savedGift.pinned_to_top
+                        && savedGift.gift instanceof TL_stars.TL_starGiftUnique
+                        && savedGift.gift.getDocument() != null
+                        && ignored.add(savedGift.gift.id)) {
+                    Gift reused = null;
+                    for (Gift gift : oldGifts) {
+                        if (gift.content.id == savedGift.gift.id) {
+                            reused = gift;
+                            break;
+                        }
+                    }
+                    if (reused != null) oldGifts.remove(reused);
+                    reused = reused != null ? reused : new Gift((TL_stars.TL_starGiftUnique) savedGift.gift, currentAccount);
+                    reused.radialInfo = GIFTS_LAYOUT[newGifts.size()];
+                    newGifts.add(reused);
+                    if (newGifts.size() == GIFTS_LAYOUT.length) break;
+                }
+            }
+        }
+
+        boolean unchanged = newGifts.size() == gifts.size() && IntStream
+                .range(0, gifts.size())
+                .allMatch(i -> gifts.get(i).content.id == newGifts.get(i).content.id);
+        for (Gift gift : oldGifts) {
+            gift.attach(this, false);
+        }
+        this.gifts.clear();
+        this.gifts.addAll(newGifts);
+        if (isAttachedToWindow()) {
+            for (Gift gift : newGifts) {
+                gift.attach(this, true);
+            }
+        }
+        if (!unchanged) invalidate();
+    }
+
 
 
     // CANVAS
@@ -222,6 +442,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
             // WIP: themeProgress factor is (playProfileAnimation == 0 ? 1f : avatarAnimationProgress)
             final float themeProgress = hasThemeAnimated.set(hasTheme);
             float growthProgress = Math.min(1F, (float) growth / snapGrowths[1]);
+            float attractorY = lerp(0F, paintable / 2F, growthProgress);
 
             // Blend colors based on progress
             if (themeProgress < 1) {
@@ -234,30 +455,31 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header {
 
                 // Gradient: as the header collapses, it translates, shrinks and fades
                 float shrink = lerp(0.6F, 1F, growthProgress);
-                float centerY = lerp(0F, paintable / 2F, growthProgress);
                 float alpha = lerp(0.2F, 0.5F, growthProgress);
                 float size = Math.min(width - dp(72), dp(398));
                 gradientMatrix.setScale(size, size);
-                gradientMatrix.postTranslate((width - size) / 2F, centerY - size / 2F);
-                gradientMatrix.postScale(shrink, shrink, width / 2F, centerY);
+                gradientMatrix.postTranslate((width - size) / 2F, attractorY - size / 2F);
+                gradientMatrix.postScale(shrink, shrink, width / 2F, attractorY);
                 gradient.setLocalMatrix(gradientMatrix);
                 gradientPaint.setAlpha((int) (0xFF * themeProgress * alpha));
                 canvas.drawRect(0, 0, width, paintable, gradientPaint);
             }
 
+            // Emoji pattern
             if (hasEmoji && isEmojiLoaded() && growthProgress > 0F) {
-                float loadProgress = emojiFadeIn.set(isEmojiLoaded);
-                float alpha = loadProgress * lerp(0.4F, 1F, growthProgress);
-                float centerY = lerp(0F, paintable / 2F, growthProgress);
-                StarGiftPatterns.drawProfileRadialPattern(
-                        canvas,
-                        emoji,
-                        width / 2F,
-                        centerY,
-                        paintable / 2F,
-                        0.5F * alpha,
-                        (growthProgress - 0.3F) / 0.7F
-                );
+                float alpha = lerp(.2F, .5F, growthProgress);
+                float progress = emojiFadeIn.set(isEmojiLoaded) * growthProgress;
+                StarGiftPatterns.drawRadialPattern(canvas, emoji, width / 2F, attractorY, (baseHeight + snapGrowths[1]) / 2F, alpha, progress);
+            } else {
+                emojiFadeIn.set(isEmojiLoaded);
+            }
+
+            // Gift pattern
+            if (!gifts.isEmpty() && growthProgress > 0F) {
+                float progress = hasGiftsAnimated.set(true) * growthProgress;
+                StarGiftPatterns.drawRadialPattern(canvas, gifts, width / 2F, attractorY, (baseHeight + snapGrowths[1]) / 2F, -1F, progress);
+            } else {
+                hasGiftsAnimated.set(false);
             }
         }
 

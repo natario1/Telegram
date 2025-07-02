@@ -4,6 +4,9 @@ import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.ui.Components.CubicBezierInterpolator;
+
+import java.util.List;
 
 import static org.telegram.messenger.AndroidUtilities.*;
 
@@ -209,54 +212,74 @@ public class StarGiftPatterns {
 
     private static final float[] radialData = new float[]{
             // Vertical line
-            60.00F, 1.571F, 18.67F, 0,
-            68.67F, -1.571F, 17.33F, 0,
+            60.00F, 1.571F, 18.67F, .3F,
+            68.67F, -1.571F, 17.33F, .3F,
             // Horizontal line (r)
-            133.17F, -0.050F, 15.67F, .75F,
-            85.15F, -0.059F, 17.33F, .75F,
+            133.17F, -0.050F, 15.67F, .6F,
+            85.15F, -0.059F, 17.33F, .4F,
             // Top diagonal line (r)
             64.10F, 0.464F, 18F, 0,
-            107.18F, 0.468F, 15.67F, 0,
+            107.18F, 0.468F, 15.67F, .15F,
             // Almost top (r)
-            84.91F, 1.012F, 15.33F, 1,
+            84.91F, 1.012F, 15.33F, .5F,
             // Bottom diagonal line (r)
             72.11F, -0.588F, 18F, 0,
-            117.21F, -0.554F, 16.67F, 0,
+            117.21F, -0.554F, 16.67F, .15F,
             // Almost bottom (r)
-            94.83F, -1.088F, 18.67F, 1
+            94.83F, -1.088F, 18.67F, .7F
     };
     private static final int radialPoints = radialData.length / 4;
 
-    public static void drawProfileRadialPattern(Canvas canvas, Drawable pattern, float cx, float cy, float ty, float alpha, float progress) {
-        float x, y, opacity, factor, angle, halfSize, length;
-        for (int p = 0; p < radialPoints; p ++) {
-            // Regular layout
-            halfSize = dpf2(radialData[p*4+2]) / 2F;
-            angle = radialData[p*4+1];
-            length = radialData[p*4];
-            x = dpf2(length) * (float) Math.cos(angle);
-            y = dpf2(length) * (float) Math.sin(angle);
-            opacity = alpha * lerp(1F, .6F, (length - 60F) / 80F);
-
-            // Progress animation
-            factor = 0.4F * radialData[p*4+3]
-                  + 0.1F * (((float) Math.sin(-angle) + 1F) / 2F)
-                  + 0.5F * (length - 60F) / 80F;
-            factor = (float) Math.pow(progress, 1.0 - factor * 0.9);
-            x *= factor;
-            y *= factor;
-            opacity *= lerp(.7F, 1F, factor);
-            halfSize *= lerp(.7F, 1F, factor);
-            y = lerp(cy, ty, factor) - y;
-
-            drawSinglePattern(canvas, pattern, halfSize, cx + x, y, opacity);
-            if (p >= 2) drawSinglePattern(canvas, pattern, halfSize, cx - x, y, opacity);
+    public static void drawRadialPattern(Canvas canvas, Drawable pattern, float cx, float cy, float ty, float alpha, float progress) {
+        for (int p = 0; p < radialPoints; p++) {
+            boolean flip = p >= 2;
+            drawRadialPatternElement(canvas, pattern, radialData[p*4], radialData[p*4+1], radialData[p*4+2], radialData[p*4+3], cx, cy, ty, alpha, progress, flip ? p : -1);
         }
     }
 
-    private static void drawSinglePattern(Canvas canvas, Drawable pattern, float halfSize, float cx, float cy, float alpha) {
+    public static void drawRadialPattern(Canvas canvas, List<? extends RadialPatternElement> elements, float cx, float cy, float ty, float alpha, float progress) {
+        for (int p = 0; p < elements.size(); p ++) {
+            float[] info = elements.get(p).getRadialInfo();
+            drawRadialPatternElement(canvas, elements.get(p).getRadialDrawable(), info[0], info[1], info[2], info[3], cx, cy, ty, alpha, progress, -1);
+        }
+    }
+
+    private static void drawRadialPatternElement(Canvas canvas, Drawable drawable, float length, float angle, float size, float friction, float cx, float ay, float ty, float alpha, float progress, int flipIndex) {
+        if (flipIndex >= 0) {
+            // Add a tiny friction delta to the flipped element for a more natural animation
+            drawRadialPatternElement(canvas, drawable, length, angle, size, friction, cx, ay, ty, alpha, progress, -1);
+            drawRadialPatternElement(canvas, drawable, length, (float) Math.PI - angle, size, friction + (flipIndex % 2 == 0 ? 0.05F : -0.05F), cx, ay, ty, alpha, progress, -1);
+            return;
+        }
+        // Regular layout
+        float halfSize = dpf2(size) / 2F;
+        float x = dpf2(length) * (float) Math.cos(angle);
+        float y = dpf2(length) * (float) Math.sin(angle);
+        alpha *= lerp(1F, .6F, (length - 60F) / 80F);
+
+        // Progress animation
+        float clip0 = .3F * (1F - friction);
+        float clip1 = 1F - .3F * friction;
+        progress = Math.max(0F, Math.min(1F, (progress - clip0) / (clip1 - clip0)));
+        float shrink = (float) Math.pow(progress, lerp(3F, 0.33F, friction)); // ease in or out depending on friction
+        x *= shrink;
+        y *= shrink;
+        alpha *= lerp(.6F, 1F, shrink);
+        halfSize *= lerp(.6F, 1F, shrink);
+        float cy = lerp(ay, ty, CubicBezierInterpolator.EASE_OUT.getInterpolation(progress));
+
+        // Users can pass alpha = -1 to disable alpha interpolation
+        drawable.setAlpha(alpha < 0F ? 0xFF : (int) (0xFF * alpha));
+        drawAt(canvas, drawable, halfSize, cx + x, cy - y);
+    }
+
+    public interface RadialPatternElement {
+        float[] getRadialInfo();
+        Drawable getRadialDrawable();
+    }
+
+    private static void drawAt(Canvas canvas, Drawable pattern, float halfSize, float cx, float cy) {
         pattern.setBounds((int) (cx - halfSize), (int) (cy - halfSize), (int) (cx + halfSize), (int) (cy + halfSize));
-        pattern.setAlpha((int) (0xFF * alpha));
         pattern.draw(canvas);
     }
 

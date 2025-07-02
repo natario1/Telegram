@@ -335,8 +335,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             updateColors(true);
         }
         if (headerView != null) {
-            // boolean collectible = peerColorEmojiStatus instanceof TLRPC.TL_emojiStatusCollectible;
-            headerView.setBackgroundEmojiId(profileEmojiId, true);
+            headerView.setEmojiInfo(profileEmojiId, peerColorEmojiStatus, true);
         }
         if (menuHandler != null) {
             menuHandler.setQrItemNeeded(true, true);
@@ -1308,7 +1307,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
             mediaHeaderAnimationProgress = (float) animation.getAnimatedValue();
             if (headerView != null) headerView.setActionModeProgress(mediaHeaderAnimationProgress);
             // WIP: if (storyView != null) storyView.setActionBarActionMode(value);
-            // WIP: if (giftsView != null) giftsView.setActionBarActionMode(value);
             updateColors(false);
         });
         animators.add(callbackAnimator);
@@ -1316,7 +1314,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         // WIP: if (myProfile) animators.add(ObjectAnimator.ofFloat(onlineTextView[3], View.ALPHA, visible ? 0.0f : 1.0f));
         // WIP: animators.add(ObjectAnimator.ofFloat(mediaCounterTextView, View.ALPHA, visible ? 1.0f : 0.0f));
         // WIP: animation for header shadow alpha => 0 (HEADER_SHADOW, when mediaHeader)
-        /* WIP: if (storyView != null || giftsView != null) {
+        /* WIP: if (storyView != null) {
             ValueAnimator va = ValueAnimator.ofFloat(0, 1);
             va.addUpdateListener(a -> updateStoriesViewBounds(true));
             animators.add(va);
@@ -1355,7 +1353,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
     // MISC
 
     public void updateGifts() {
-        // WIP giftsView.update()
+        if (headerView != null) headerView.updateGifts();
     }
 
     public void prepareBlurBitmap() {
@@ -1571,7 +1569,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout.addView(coordinator);
 
         // Header
-        headerView = new ProfileHeaderView(rootLayout, actionBar, getResourceProvider());
+        headerView = new ProfileHeaderView(currentAccount, getDialogId(), rootLayout, actionBar, getResourceProvider());
         coordinator.addHeader(headerView);
 
         // List
