@@ -59,6 +59,8 @@ public class ProfileActivityMenus {
     public final static int AB_USER_UNBLOCK_ID = 53;
     public final static int AB_MAIN_ID = 999;
 
+    private final static boolean QR = false; // removed in new design
+
     @Nullable private ActionBarMenuItem mainMenuItem;
 
     @Nullable private ActionBarMenuItem editMenuItem;
@@ -101,9 +103,11 @@ public class ProfileActivityMenus {
     public void initialize() {
         ActionBarMenu menu = actionBar.createMenu();
 
-        qrMenuItem = menu.addItem(AB_QR_ID, R.drawable.msg_qr_mini, resourceProvider);
-        qrMenuItem.setContentDescription(LocaleController.getString(R.string.GetQRCode));
-        updateQrItemVisibility(false, null);
+        if (QR) {
+            qrMenuItem = menu.addItem(AB_QR_ID, R.drawable.msg_qr_mini, resourceProvider);
+            qrMenuItem.setContentDescription(LocaleController.getString(R.string.GetQRCode));
+            updateQrItemVisibility(false, null);
+        }
 
         editMenuItem = menu.addItem(AB_EDIT_ID, R.drawable.group_edit_profile, resourceProvider);
         editMenuItem.setContentDescription(LocaleController.getString(R.string.Edit));

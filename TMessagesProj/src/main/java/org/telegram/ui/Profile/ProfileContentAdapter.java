@@ -634,13 +634,13 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                         detailCell.setImageClickListener(null);
                     } else {
                         detailCell.setImage(drawable, LocaleController.getString(R.string.GiftPremium));
-                        detailCell.setImageClickListener(v -> fragment.handleDetailCellImageClick(kind));
+                        detailCell.setImageClickListener(v -> fragment.handleSendGift());
                     }
                 } else if (containsQr) {
                     Drawable drawable = ContextCompat.getDrawable(detailCell.getContext(), R.drawable.msg_qr_mini);
                     drawable.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_switch2TrackChecked), PorterDuff.Mode.MULTIPLY));
                     detailCell.setImage(drawable, LocaleController.getString(R.string.GetQRCode));
-                    detailCell.setImageClickListener(v -> fragment.handleDetailCellImageClick(kind));
+                    detailCell.setImageClickListener(v -> fragment.handleOpenQr());
                 } else {
                     detailCell.setImage(null);
                     detailCell.setImageClickListener(null);

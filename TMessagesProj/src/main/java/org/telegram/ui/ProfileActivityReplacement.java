@@ -2064,23 +2064,23 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
     }
 
-    public void handleDetailCellImageClick(int kind) {
-        if (kind == Rows.InfoUsername) {
-            Bundle args = new Bundle();
-            args.putLong("chat_id", chatId);
-            args.putLong("user_id", userId);
-            presentFragment(new QrActivity(args));
-        } else if (kind == Rows.InfoBirthday) {
-            if (userId == getUserConfig().getClientUserId()) {
-                presentFragment(new PremiumPreviewFragment("my_profile_gift"));
-                return;
-            }
-            if (UserObject.areGiftsDisabled(userInfo)) {
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.error, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserDisallowedGifts, DialogObject.getShortName(userId)))).show();
-                return;
-            }
-            showDialog(new GiftSheet(getContext(), currentAccount, userId, null, null));
+    public void handleSendGift() {
+        if (userId == getUserConfig().getClientUserId()) {
+            presentFragment(new PremiumPreviewFragment("my_profile_gift"));
+            return;
         }
+        if (UserObject.areGiftsDisabled(userInfo)) {
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.error, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserDisallowedGifts, DialogObject.getShortName(userId)))).show();
+            return;
+        }
+        showDialog(new GiftSheet(getContext(), currentAccount, userId, null, null));
+    }
+
+    public void handleOpenQr() {
+        Bundle args = new Bundle();
+        args.putLong("chat_id", chatId);
+        args.putLong("user_id", userId);
+        presentFragment(new QrActivity(args));
     }
 
     private void handleEditProfileClick() {
@@ -2116,10 +2116,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         } else if (id == AB_EDIT_ID) {
             handleEditProfileClick();
         } else if (id == AB_QR_ID) {
-            Bundle args = new Bundle();
-            args.putLong("chat_id", chatId);
-            args.putLong("user_id", userId);
-            presentFragment(new QrActivity(args));
+            handleOpenQr();
         } else if (id == AB_LOGOUT_ID) {
             presentFragment(new LogoutActivity());
         } else if (id == AB_EDIT_COLOR_ID) {
@@ -2628,7 +2625,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (birthdayEffect != null && birthdayEffect.start()) return true;
             if (handleListPressWithItemOptions(kind, view)) return true;
             TextDetailCell cell = (TextDetailCell) view;
-            if (cell.hasImage()) handleDetailCellImageClick(kind);
+            if (cell.hasImage()) handleSendGift();
         } else {
             return handleListPressWithPopup(kind, view, x, y);
         }
