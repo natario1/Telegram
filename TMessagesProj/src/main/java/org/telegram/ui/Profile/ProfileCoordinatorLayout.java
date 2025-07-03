@@ -53,7 +53,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
         public final void changeGrowth(int targetGrowth, boolean animated) {
             ProfileCoordinatorLayout parent = (ProfileCoordinatorLayout) getParent();
             if (parent != null) {
-                parent.changeContentOffset(targetGrowth, animated);
+                parent.changeContentOffset(targetGrowth, animated, false);
             } else {
                 applyGrowth(targetGrowth);
             }
@@ -185,19 +185,24 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
     private boolean snapContentOffset() {
         if (content == null || header.snapGrowths.length == 0) return false;
         int distance = header.growth - header.snapGrowths[0];
+        boolean last = false;
         for (int s = 1; s < header.snapGrowths.length; s++) {
             int delta = header.growth - header.snapGrowths[s];
-            if (Math.abs(delta) < Math.abs(distance)) distance = delta;
+            if (Math.abs(delta) < Math.abs(distance)) {
+                distance = delta;
+                last = s == header.snapGrowths.length - 1;
+            }
         }
-        return changeContentOffset(header.growth - distance, true);
+        boolean overscroll = last && distance > 0; // snap to legit position faster in this case
+        return changeContentOffset(header.growth - distance, true, overscroll);
     }
 
-    private boolean changeContentOffset(int targetGrowth, boolean animated) {
+    private boolean changeContentOffset(int targetGrowth, boolean animated, boolean fast) {
         int coerced = Math.max(Math.min(targetGrowth, header.maxGrowth), 0);
         int distance = header.growth - coerced;
         if (distance == 0) return false;
         if (animated) {
-            content.smoothScrollBy(0, distance, 200, CubicBezierInterpolator.EASE_OUT_QUINT);
+            content.smoothScrollBy(0, distance, fast ? 100 : 200, CubicBezierInterpolator.EASE_OUT_QUINT);
         } else {
             content.scrollBy(0, distance);
         }

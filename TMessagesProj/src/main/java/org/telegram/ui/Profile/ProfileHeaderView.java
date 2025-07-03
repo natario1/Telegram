@@ -161,7 +161,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             int max = Math.min(availableHeight - overscrollHeight, HEIGHT_MAX - ActionBar.getCurrentActionBarHeight() - statusBarHeight);
             configureGrowth(max + overscrollHeight, new int[]{0, mid, max});
         } else {
-            configureGrowth(mid, new int[]{0, mid});
+            configureGrowth(mid + overscrollHeight, new int[]{0, mid});
         }
         attractorMaxY = baseHeight + mid - AVATAR_BOTTOM_PADDING - AVATAR_DIAMETER/2F;
         // Animate to mid value
@@ -184,6 +184,18 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             factor = AndroidUtilities.lerp(4F, 0.6F, t);
         }
         return Math.round(dy * factor);
+        if (dy > 0) {
+            return dy; // no resistance when shrinking
+        }
+        if (snapGrowths.length >= 3 && growth > snapGrowths[1] && growth < snapGrowths[2]) {
+            float progress = ((float) (growth - snapGrowths[1])) / (snapGrowths[2] - snapGrowths[1]);
+            float factor = progress < .3F ? lerp(.3F, .1F, progress / .3F) : lerp(4F, .5F, progress);
+            return Math.round(dy * factor);
+        }
+        if (growth >= snapGrowths[snapGrowths.length - 1]) {
+            return Math.round(dy * 0.1F); // overscroll
+        }
+        return dy;
     }
 
     @Override
