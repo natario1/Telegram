@@ -1615,7 +1615,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
         listView.setAdapter(listAdapter);
 
         // Decorations
-        rootLayout.blurBehindViews.add(headerView);
         rootLayout.blurBehindViews.add(sharedMediaLayout);
         rootLayout.blurredView.setOnClickListener(e -> finishPreviewFragment());
         rootLayout.addDecorationViews();

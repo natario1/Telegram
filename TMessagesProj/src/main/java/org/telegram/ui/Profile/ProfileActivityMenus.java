@@ -14,6 +14,7 @@ import android.view.ViewPropertyAnimator;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import org.telegram.messenger.*;
@@ -58,12 +59,12 @@ public class ProfileActivityMenus {
     public final static int AB_USER_UNBLOCK_ID = 53;
     public final static int AB_MAIN_ID = 999;
 
-    private ActionBarMenuItem mainMenuItem;
+    @Nullable private ActionBarMenuItem mainMenuItem;
 
-    private ActionBarMenuItem editMenuItem;
+    @Nullable private ActionBarMenuItem editMenuItem;
     private boolean editMenuItemNeeded;
 
-    private ActionBarMenuItem qrMenuItem;
+    @Nullable private ActionBarMenuItem qrMenuItem;
     private boolean qrMenuItemNeeded;
     private boolean qrMenuItemDisplayable;
 
@@ -123,9 +124,9 @@ public class ProfileActivityMenus {
     public void updateColors(MessagesController.PeerColor peerColor, float actionModeProgress) {
         int rawForeground = peerColor != null ? Color.WHITE : getColor(Theme.key_actionBarDefaultIcon);
         int foreground = ColorUtils.blendARGB(rawForeground, getColor(Theme.key_actionBarActionModeDefaultIcon), actionModeProgress);
-        mainMenuItem.setIconColor(rawForeground);
-        editMenuItem.setIconColor(rawForeground);
-        qrMenuItem.setIconColor(rawForeground);
+        if (mainMenuItem != null) mainMenuItem.setIconColor(rawForeground);
+        if (editMenuItem != null) editMenuItem.setIconColor(rawForeground);
+        if (qrMenuItem != null) qrMenuItem.setIconColor(rawForeground);
         ttlIndicator.setColorFilter(new PorterDuffColorFilter(foreground, PorterDuff.Mode.MULTIPLY));
         if (ttlPopupWrapper != null && ttlPopupWrapper.textView != null) {
             ttlPopupWrapper.textView.invalidate();
@@ -208,7 +209,8 @@ public class ProfileActivityMenus {
         };
     }
 
-    private static void updateItemVisibility(View item, boolean visible, boolean animated, List<Animator> animators) {
+    private static void updateItemVisibility(@Nullable View item, boolean visible, boolean animated, List<Animator> animators) {
+        if (item == null) return;
         float alpha = visible ? 1F : 0F;
         float scale = visible ? 1F : 0F;
         item.animate().setListener(null).cancel();
@@ -270,6 +272,7 @@ public class ProfileActivityMenus {
     }
 
     public void updateEditColorItem(boolean isPremium) {
+        if (mainMenuItem == null) return;
         ActionBarMenuSubItem item = (ActionBarMenuSubItem) mainMenuItem.getSubItem(AB_EDIT_COLOR_ID);
         if (item == null) return;
         if (isPremium) {
@@ -288,10 +291,12 @@ public class ProfileActivityMenus {
 
     public void updateStartSecretChatItem(TL_account.RequirementToContact requirementToContact) {
         // Starting a secret chat is only allowed if contact is not restricted, e.g., premium only
+        if (mainMenuItem == null) return;
         mainMenuItem.setSubItemShown(AB_START_SECRET_CHAT_ID, DialogObject.isEmpty(requirementToContact));
     }
 
     public void updateUsernameRelatedItems(boolean hasUsername) {
+        if (mainMenuItem == null) return;
         ActionBarMenuSubItem linkItem = (ActionBarMenuSubItem) mainMenuItem.getSubItem(AB_PROFILE_COPY_LINK_ID);
         ActionBarMenuSubItem usernameItem = (ActionBarMenuSubItem) mainMenuItem.getSubItem(AB_PROFILE_SET_USERNAME_ID);
         if (linkItem != null) {
@@ -305,22 +310,26 @@ public class ProfileActivityMenus {
     }
 
     public void updateBotViewPrivacyItem(boolean hasPrivacyPolicy) {
+        if (mainMenuItem == null) return;
         mainMenuItem.setSubItemShown(AB_BOT_VIEW_PRIVACY_ID, hasPrivacyPolicy);
     }
 
     public void updateSendGiftsItem(boolean canSendGifts) {
+        if (mainMenuItem == null) return;
         mainMenuItem.setSubItemShown(AB_SEND_GIFTS_ID, canSendGifts);
     }
 
     public void clearMainMenu() {
+        if (mainMenuItem == null) return;
         mainMenuItem.removeAllSubItems();
     }
 
     public boolean hasMainMenuSubItem(int id) {
-        return mainMenuItem.getSubItem(id) != null;
+        return mainMenuItem != null && mainMenuItem.getSubItem(id) != null;
     }
 
     public void appendMainMenuSubItem(int id) {
+        if (mainMenuItem == null) return;
         if (id == AB_CONTACT_SHARE_ID) {
             mainMenuItem.addSubItem(id, R.drawable.msg_share, LocaleController.getString(R.string.ShareContact));
         } else if (id == AB_CONTACT_DELETE_ID) {
@@ -366,11 +375,13 @@ public class ProfileActivityMenus {
     }
 
     public void appendSendGiftsItem(boolean channel) {
+        if (mainMenuItem == null) return;
         int text = channel ? R.string.ProfileSendAGiftToChannel : R.string.ProfileSendAGift;
         mainMenuItem.addSubItem(AB_SEND_GIFTS_ID, R.drawable.msg_gift_premium, LocaleController.getString(text));
     }
 
     public void appendBlockUnblockItem(boolean bot, boolean blocked) {
+        if (mainMenuItem == null) return;
         if (bot) {
             if (blocked) {
                 mainMenuItem.addSubItem(AB_BOT_UNBLOCK_ID, R.drawable.msg_retry, LocaleController.getString(R.string.BotRestart));
@@ -386,11 +397,13 @@ public class ProfileActivityMenus {
     }
 
     public void appendLeaveGroupItem(boolean megagroup, boolean channel) {
+        if (mainMenuItem == null) return;
         int title = megagroup ? R.string.LeaveMegaMenu : channel ? R.string.LeaveChannelMenu : R.string.DeleteAndExit;
         mainMenuItem.addSubItem(AB_GROUP_LEAVE_ID, R.drawable.msg_leave, LocaleController.getString(title));
     }
 
     public void appendAutoDeleteItem(boolean allowExtendedHint, AutoDeletePopupWrapper.Callback callback) {
+        if (mainMenuItem == null) return;
         ttlPopupWrapper = new AutoDeletePopupWrapper(context, mainMenuItem.getPopupLayout().getSwipeBack(), new AutoDeletePopupWrapper.Callback() {
             @Override
             public void dismiss() {
