@@ -132,7 +132,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     }
 
     public void setDisplaySize(Point size) {
-        int baseHeight = ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0);
+        int cutoutTop = 0;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && isAttachedToWindow()) {
+            DisplayCutout cutout = getRootWindowInsets().getDisplayCutout();
+            cutoutTop = cutout == null ? 0 : cutout.getSafeInsetTop();
+        }
         int baseHeight = ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? statusBarHeight : 0);
         int overscrollHeight = dp(48);
         int availableHeight = size.y - baseHeight;
@@ -141,13 +145,20 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         configureHeights(baseHeight);
 
         // Configure growth
-        // WIP: also !isTablet and avatarImage.getImageReceiver().hasNotThumb()
+        // WIP: also avatarImage.getImageReceiver().hasNotThumb()
         boolean landscape = size.x > size.y;
         boolean expandable = !landscape && !AndroidUtilities.isAccessibilityScreenReaderEnabled();
         if ((expandable && snapGrowths.length == 3) || (!expandable && snapGrowths.length == 2)) return;
-        int mid = (int) Math.min(0.7F * availableHeight, dp(246));
+
+        int mid = HEIGHT_MID - ActionBar.getCurrentActionBarHeight() - statusBarHeight;
+        if (actionBar.getOccupyStatusBar() && cutoutTop > 0) {
+            // Not much room for the avatar. Ensure it's not clipped by cutouts.
+            int leftover = (baseHeight + mid) - (AVATAR_BOTTOM_PADDING + AVATAR_DIAMETER);
+            if (leftover < cutoutTop) mid += cutoutTop - leftover;
+        }
+        mid = (int) Math.min(.75F * availableHeight, mid);
         if (expandable) {
-            int max = Math.min(availableHeight - overscrollHeight, dp(398));
+            int max = Math.min(availableHeight - overscrollHeight, HEIGHT_MAX - ActionBar.getCurrentActionBarHeight() - statusBarHeight);
             configureGrowth(max + overscrollHeight, new int[]{0, mid, max});
         } else {
             configureGrowth(mid, new int[]{0, mid});
