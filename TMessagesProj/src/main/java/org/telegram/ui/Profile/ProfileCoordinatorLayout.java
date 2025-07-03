@@ -2,7 +2,6 @@ package org.telegram.ui.Profile;
 
 import android.content.Context;
 import android.view.View;
-import android.view.ViewParent;
 import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.core.view.NestedScrollingParent3;
@@ -63,7 +62,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             // No-op
         }
 
-        protected int onContentTouch(int dy) {
+        protected int onContentScroll(int dy, boolean touch) {
             return dy;
         }
 
@@ -157,10 +156,8 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
 
     @Override
     public void onNestedPreScroll(@NonNull View target, int dx, int dy, @NonNull int[] consumed, int type) {
-        if (type == ViewCompat.TYPE_TOUCH) {
-            int actualDy = header.onContentTouch(dy);
-            consumed[1] = dy - actualDy;
-        }
+        int actualDy = header.onContentScroll(dy, type == ViewCompat.TYPE_TOUCH);
+        consumed[1] = dy - actualDy;
     }
 
     @Override

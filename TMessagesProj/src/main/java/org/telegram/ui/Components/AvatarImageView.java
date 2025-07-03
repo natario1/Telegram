@@ -73,7 +73,11 @@ public class AvatarImageView extends BackupImageView {
 
     public void setForegroundImageDrawable(ImageReceiver.BitmapHolder holder) {
         if (holder != null) {
-            foregroundImageReceiver.setImageBitmap(holder.drawable);
+            if (holder.drawable != null) {
+                foregroundImageReceiver.setImageBitmap(holder.drawable);
+            } else {
+                foregroundImageReceiver.setImageBitmap(holder.bitmap);
+            }
         }
         if (drawableHolder != null) {
             drawableHolder.release();
