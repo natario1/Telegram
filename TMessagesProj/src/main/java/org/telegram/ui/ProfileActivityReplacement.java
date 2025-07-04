@@ -137,6 +137,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
     private int versionClickCount = 0;
     private int botPermissionEmojiStatusReqId;
+    private long banGroupId = 0;
+    private TLRPC.ChannelParticipant banGroupParticipant;
 
     public static ProfileActivityReplacement of(long dialogId) {
         Bundle bundle = new Bundle();
@@ -1014,6 +1016,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         isReportSpam = arguments.getBoolean("reportSpam", false);
         reportReactionMessageId = arguments.getInt("report_reaction_message_id", 0);
         reportReactionFromDialogId = arguments.getLong("report_reaction_from_dialog_id", 0);
+        banGroupId = arguments.getLong("ban_chat_id", 0);
         // WIP: Expand photo and other vars
 
         if (userId != 0) {
@@ -1613,6 +1616,25 @@ public class ProfileActivityReplacement extends BaseFragment implements
         coordinator.addContent(listView);
         ProfileContentAdapter listAdapter = new ProfileContentAdapter(this);
         listView.setAdapter(listAdapter);
+
+        // Ban from group
+        if (banGroupId != 0) {
+            TLRPC.Chat chat = getMessagesController().getChat(banGroupId);
+            if (chat != null) {
+                if (banGroupParticipant == null) {
+                    TLRPC.TL_channels_getParticipant req = new TLRPC.TL_channels_getParticipant();
+                    req.channel = MessagesController.getInputChannel(chat);
+                    req.participant = getMessagesController().getInputPeer(userId);
+                    getConnectionsManager().sendRequest(req, (response, error) -> {
+                        if (response == null) return;
+                        AndroidUtilities.runOnUIThread(() -> banGroupParticipant = ((TLRPC.TL_channels_channelParticipant) response).participant);
+                    });
+                }
+                int height = rootLayout.addBanFromGroupView(() -> { handleBanFromGroup(chat); });
+                listView.setPadding(listView.getPaddingLeft(), listView.getPaddingTop(), listView.getPaddingRight(), height);
+                listView.setBottomGlowOffset(height);
+            }
+        }
 
         // Decorations
         rootLayout.blurBehindViews.add(sharedMediaLayout);
@@ -3861,6 +3883,34 @@ public class ProfileActivityReplacement extends BaseFragment implements
             // WIP: playProfileAnimation = 0;
             finishFragment();
         }
+    }
+
+    private void handleBanFromGroup(TLRPC.Chat group) {
+        ChatRightsEditActivity fragment = new ChatRightsEditActivity(userId, banGroupId, null, group.default_banned_rights, banGroupParticipant != null ? banGroupParticipant.banned_rights : null, "", ChatRightsEditActivity.TYPE_BANNED, true, false, null);
+        fragment.setDelegate(new ChatRightsEditActivity.ChatRightsEditActivityDelegate() {
+            @Override
+            public void didSetRights(int rights, TLRPC.TL_chatAdminRights rightsAdmin, TLRPC.TL_chatBannedRights rightsBanned, String rank) {
+                removeSelfFromStack();
+                TLRPC.User user = getMessagesController().getUser(userId);
+                if (user != null && userId != 0 && fragment.banning && fragment.getParentLayout() != null) {
+                    for (BaseFragment fragment : fragment.getParentLayout().getFragmentStack()) {
+                        if (fragment instanceof ChannelAdminLogActivity) {
+                            ((ChannelAdminLogActivity) fragment).reloadLastMessages();
+                            AndroidUtilities.runOnUIThread(() -> {
+                                BulletinFactory.createRemoveFromChatBulletin(fragment, user, group.title).show();
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+            @Override
+            public void didChangeOwner(TLRPC.User user) {
+                UndoView undoView = getUndoView();
+                undoView.showWithAction(-chatId, group.megagroup ? UndoView.ACTION_OWNER_TRANSFERED_GROUP : UndoView.ACTION_OWNER_TRANSFERED_CHANNEL, user);
+            }
+        });
+        presentFragment(fragment);
     }
 
     private static class RoundRectPopup extends ActionBarPopupWindow.ActionBarPopupWindowLayout {
