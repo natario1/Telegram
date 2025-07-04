@@ -54,6 +54,10 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
     private static final int CIRCLES_MAX = 3;
     public static final String FRAGMENT_TRANSITION_PROPERTY = "fragmentTransitionProgress";
 
+    private static final float THICK = dpf2(2.33F);
+    private static final float NARROW = dpf2(1.5F);
+    private static final float TINY = dpf2(1.125F);
+
     private int readPaintAlpha;
     private final Paint readPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint whitePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -61,7 +65,6 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
     private final int currentAccount;
     private final long dialogId;
     private final boolean isTopic;
-    private final View avatarContainer;
     private final AvatarImageView avatarImage;
 
     private final AnimatedTextView.AnimatedTextDrawable titleDrawable = new AnimatedTextView.AnimatedTextDrawable(false, true, true);
@@ -81,10 +84,17 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
     private boolean progressIsDone;
     private float bounceScale = 1f;
     private float progressToInsets = 1f;
+    private float pullProgress = 0f;
     private float fragmentTransitionProgress;
     private int uploadingStoriesCount;
     private StoriesController.UploadingStory lastUploadingStory;
     private final StoriesUtilities.StoryGradientTools gradientTools = new StoriesUtilities.StoryGradientTools(this, false);
+
+    public void setPullProgress(float pullProgress) {
+        if (this.pullProgress == pullProgress) return;
+        this.pullProgress = pullProgress;
+        invalidate();
+    }
 
     public void setProgressToStoriesInsets(float progressToInsets) {
         if (this.progressToInsets == progressToInsets) {
@@ -137,13 +147,12 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
 
     StoriesController storiesController;
 
-    public ProfileStoriesView(Context context, int currentAccount, long dialogId, boolean isTopic, @NonNull View avatarContainer, AvatarImageView avatarImage, Theme.ResourcesProvider resourcesProvider) {
+    public ProfileStoriesView(Context context, int currentAccount, long dialogId, boolean isTopic, AvatarImageView avatarImage, Theme.ResourcesProvider resourcesProvider) {
         super(context);
 
         this.currentAccount = currentAccount;
         this.dialogId = dialogId;
         this.isTopic = isTopic;
-        this.avatarContainer = avatarContainer;
         this.avatarImage = avatarImage;
         storiesController = MessagesController.getInstance(currentAccount).getStoriesController();
 
@@ -163,7 +172,7 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
         titleDrawable.setCallback(this);
 
         clipOutAvatar.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
-        paint.setStrokeWidth(dpf2(2.33f));
+        paint.setStrokeWidth(THICK);
         paint.setStyle(Paint.Style.STROKE);
         updateStories(false, false);
     }
@@ -173,19 +182,13 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
         return who == titleDrawable || super.verifyDrawable(who);
     }
 
-    private TL_stories.PeerStories peerStories;
-    public void setStories(TL_stories.PeerStories peerStories) {
-        this.peerStories = peerStories;
-        updateStories(true, false);
+    public boolean updateStories() {
+        return updateStories(true, false);
     }
 
-    public void update() {
-        updateStories(true, true);
-    }
-
-    private void updateStories(boolean animated, boolean asUpdate) {
+    public boolean updateStories(boolean animated, boolean asUpdate) {
         if (isTopic) {
-            return;
+            return false;
         }
         final boolean me = dialogId == UserConfig.getInstance(currentAccount).getClientUserId();
         final int now = ConnectionsManager.getInstance(currentAccount).getCurrentTime();
@@ -396,10 +399,7 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
         }
 
         invalidate();
-    }
-
-    public void updateColors() {
-
+        return this.count > 0;
     }
 
     private float expandProgress;
@@ -478,19 +478,16 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
 
     float w;
 
+    private void updateRect1() {
+        rect1.set(0F, 0F, getWidth(), getHeight());
+        // float insets = progressToInsets * lerp(dpf2(4f), dpf2(3.5f), pullProgress);
+        // rect1.inset(insets, insets);
+    }
+
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        float rright = rightAnimated.set(this.right);
-        float avatarPullProgress = Utilities.clamp((avatarContainer.getScaleX() - 1f) / 0.4f, 1f, 0f);
-        float insetMain = AndroidUtilities.lerp(AndroidUtilities.dpf2(4f), AndroidUtilities.dpf2(3.5f), avatarPullProgress);
-        insetMain *= progressToInsets;
-        float ax = avatarContainer.getX() + insetMain * avatarContainer.getScaleX();
-        float ay = avatarContainer.getY() + insetMain * avatarContainer.getScaleY();
-        float aw = (avatarContainer.getWidth() - insetMain * 2) * avatarContainer.getScaleX();
-        float ah = (avatarContainer.getHeight() - insetMain * 2) * avatarContainer.getScaleY();
-        rect1.set(ax, ay, ax + aw, ay + ah);
+        updateRect1();
 
-        float maxX = this.left;
         boolean needsSort = false;
         for (int i = 0; i < circles.size(); ++i) {
             StoryCircle circle = circles.get(i);
@@ -533,7 +530,7 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
         lastUploadingStory = null;
         if (progressToUploading > 0) {
             rect2.set(rect1);
-            rect2.inset(-dpf2(2.66f + 2.23f / 2), -dpf2(2.66f + 2.23f / 2));
+            rect2.inset(THICK / 2F, THICK / 2F);
             unreadPaint = gradientTools.getPaint(rect2);
             if (radialProgress == null) {
                 radialProgress = new RadialProgress(this);
@@ -559,7 +556,7 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
             }
             radialProgress.setDiff(0);
             unreadPaint.setAlpha((int) (255 * segmentsAlpha * progressToUploading));
-            unreadPaint.setStrokeWidth(dpf2(2.33f));
+            unreadPaint.setStrokeWidth(THICK);
             radialProgress.setPaint(unreadPaint);
             radialProgress.setProgressRect((int) rect2.left, (int) rect2.top, (int) rect2.right, (int) rect2.bottom);
             radialProgress.setProgress(Utilities.clamp(uploadingProgress, 1f, 0), true);
@@ -584,7 +581,7 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
 
             if (isFailed) {
                 rect2.set(rect1);
-                rect2.inset(-dpf2(2.66f + 2.23f / 2), -dpf2(2.66f + 2.23f / 2));
+                rect2.inset(THICK / 2, THICK / 2);
                 final Paint paint = StoriesUtilities.getErrorPaint(rect2);
                 paint.setStrokeWidth(AndroidUtilities.dp(2));
                 paint.setAlpha((int) (255 * segmentsAlpha));
@@ -597,12 +594,11 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
                 }
             } else if ((mainCircle != null || uploadingStoriesCount > 0) && segmentsAlpha > 0) {
                 rect2.set(rect1);
-                rect2.inset(-dpf2(2.66f + 2.23f / 2), -dpf2(2.66f + 2.23f / 2));
                 rect3.set(rect1);
-                rect3.inset(-dpf2(2.66f + 1.5f / 2), -dpf2(2.66f + 1.5f / 2));
-                AndroidUtilities.lerp(rect2, rect3, avatarPullProgress, rect3);
+                rect2.inset(THICK / 2F, THICK / 2F);
+                rect3.inset(THICK / 2F, THICK / 2F); // Use NARROW only on stroke width
 
-                float separatorAngle = lerp(0, (float) (dpf2(2 + 2.23f) / (rect1.width() * Math.PI) * 360f), clamp(segmentsCount - 1, 1, 0) * segmentsAlpha);
+                float separatorAngle = lerp(0, (float) ((2 * THICK) / (rect1.width() * Math.PI) * 360f), clamp(segmentsCount - 1, 1, 0) * segmentsAlpha);
                 final float maxCount = 50;
 
                 final int mcount = Math.min(count, (int) maxCount);
@@ -614,7 +610,7 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
                 }
                 float collapsedGapAngle = gap * 2;
 
-                separatorAngle = lerp(collapsedGapAngle, separatorAngle, avatarPullProgress);
+                separatorAngle = lerp(collapsedGapAngle, separatorAngle, pullProgress);
 
                 final float widthAngle = (360 - Math.max(0, animcount) * separatorAngle) / Math.max(1, animcount);
                 readPaint.setColor(ColorUtils.blendARGB(0x5affffff, 0x3a000000, actionBarProgress));
@@ -638,13 +634,13 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
                     if (read < 1) {
                         unreadPaint = gradientTools.getPaint(rect2);
                         unreadPaint.setAlpha((int) (0xFF * (1f - read) * segmentsAlpha));
-                        unreadPaint.setStrokeWidth(dpf2(2.33f));
+                        unreadPaint.setStrokeWidth(THICK);
                         drawArc(canvas, rect2, a, -widthAngle * appear, false, unreadPaint);
                     }
 
                     if (read > 0) {
                         readPaint.setAlpha((int) (readPaintAlpha * read * segmentsAlpha));
-                        readPaint.setStrokeWidth(dpf2(1.5f));
+                        readPaint.setStrokeWidth(NARROW);
                         drawArc(canvas, rect3, a, -widthAngle * appear, false, readPaint);
                     }
 
@@ -677,8 +673,6 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
                 float cx = expandRight - w + r + ix;
                 ix += dp(18) * scale;
 
-                maxX = Math.max(maxX, cx + r);
-
                 rect2.set(cx - r, cy - r, cx + r, cy + r);
                 lerpCentered(rect1, rect2, expandProgress, rect3);
 
@@ -690,8 +684,8 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
             readPaint.setColor(ColorUtils.blendARGB(0x5affffff, 0x80BBC4CC, expandProgress));
             readPaintAlpha = readPaint.getAlpha();
             unreadPaint = gradientTools.getPaint(rect2);
-            unreadPaint.setStrokeWidth(lerp(dpf2(2.33f), dpf2(1.5f), expandProgress));
-            readPaint.setStrokeWidth(lerp(dpf2(1.125f), dpf2(1.5f), expandProgress));
+            unreadPaint.setStrokeWidth(lerp(THICK, NARROW, expandProgress));
+            readPaint.setStrokeWidth(lerp(TINY, NARROW, expandProgress));
             if (expandProgress > 0) {
                 for (int i = 0; i < circles.size(); ++i) {
                     StoryCircle circle = circles.get(i);
@@ -755,7 +749,7 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
         }
 
         if (unreadPaint != null) {
-            unreadPaint.setStrokeWidth(dpf2(2.3f));
+            unreadPaint.setStrokeWidth(THICK);
         }
 
         canvas.restore();
@@ -957,24 +951,9 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
         c.set(cx - r, cy - r, cx + r, cy + r);
     }
 
-    private float left, right, cy;
     private float expandRight, expandY;
     private boolean expandRightPad;
     private final AnimatedFloat expandRightPadAnimated = new AnimatedFloat(this, 0, 350, CubicBezierInterpolator.EASE_OUT_QUINT);
-    private final AnimatedFloat rightAnimated = new AnimatedFloat(this, 0, 350, CubicBezierInterpolator.EASE_OUT_QUINT);
-
-    public void setBounds(float left, float right, float cy, boolean animated) {
-        boolean changed = Math.abs(left - this.left) > 0.1f || Math.abs(right - this.right) > 0.1f || Math.abs(cy - this.cy) > 0.1f;
-        this.left = left;
-        this.right = right;
-        if (!animated) {
-            this.rightAnimated.set(this.right, true);
-        }
-        this.cy = cy;
-        if (changed) {
-            invalidate();
-        }
-    }
 
     public void setExpandCoords(float right, boolean rightPadded, float y) {
         this.expandRight = right;

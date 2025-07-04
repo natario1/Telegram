@@ -31,6 +31,7 @@ import android.webkit.WebStorage;
 import android.webkit.WebView;
 import android.widget.*;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.collection.LongSparseArray;
 import androidx.core.graphics.ColorUtils;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -60,6 +61,8 @@ import org.telegram.ui.Stars.BotStarsActivity;
 import org.telegram.ui.Stars.BotStarsController;
 import org.telegram.ui.Stars.StarsController;
 import org.telegram.ui.Stars.StarsIntroActivity;
+import org.telegram.ui.Stories.StoriesController;
+import org.telegram.ui.Stories.StoryViewer;
 import org.telegram.ui.Stories.recorder.DualCameraView;
 import org.telegram.ui.bots.*;
 
@@ -238,6 +241,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 birthdayEffectFetcher.subscribe(this::updateBirthdayData);
             }
         }
+        if (headerView != null) {
+            headerView.getAvatar().updateStories();
+        }
         updateTtlData();
         updatePremiumData();
         updateListData("setUserInfo");
@@ -270,6 +276,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
         updateTtlData();
         updateOnlineData(false);
         updateListData("setChatInfo");
+        if (headerView != null) {
+            headerView.getAvatar().updateStories();
+        }
         if (menuHandler != null) {
             boolean canPurchase = !BuildVars.IS_BILLING_UNAVAILABLE && !getMessagesController().premiumPurchaseBlocked();
             boolean canSendGifts = chatInfo != null && chatInfo.stargifts_available;
@@ -1606,11 +1615,20 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout.addView(coordinator);
 
         // Header
-        headerView = new ProfileHeaderView(context, currentAccount, getDialogId(), rootLayout, actionBar, getResourceProvider());
+        headerView = new ProfileHeaderView(context, currentAccount, getDialogId(), isTopic(), rootLayout, actionBar, getResourceProvider());
         coordinator.addHeader(headerView);
         ProfileHeaderView.Avatar avatar = headerView.getAvatar();
-        avatar.setOnClickListener(v -> handleAvatarClick(false));
-        avatar.setOnLongClickListener(v -> handleAvatarClick(true));
+        avatar.callback = new ProfileHeaderView.Avatar.Callback() {
+            @Override
+            public void onAvatarClick(@Nullable StoryViewer.PlaceProvider provider) {
+                handleAvatarClick(provider);
+            }
+
+            @Override
+            public boolean onAvatarLongClick() {
+                return !isTopic() && uploadedAvatarBig == null && handleOpenAvatar();
+            }
+        };
 
         // List
         listView = new ProfileContentView(actionBar, sharedMediaLayout, getNotificationCenter());
@@ -1775,8 +1793,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
         getNotificationCenter().addObserver(this, NotificationCenter.topicsDidLoaded);
         getNotificationCenter().addObserver(this, NotificationCenter.updateSearchSettings);
         getNotificationCenter().addObserver(this, NotificationCenter.reloadDialogPhotos);
-        getNotificationCenter().addObserver(this, NotificationCenter.storiesUpdated);
-        getNotificationCenter().addObserver(this, NotificationCenter.storiesReadUpdated);
         getNotificationCenter().addObserver(this, NotificationCenter.userIsPremiumBlockedUpadted);
         getNotificationCenter().addObserver(this, NotificationCenter.currentUserPremiumStatusChanged);
         getNotificationCenter().addObserver(this, NotificationCenter.starBalanceUpdated);
@@ -1795,8 +1811,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
         getNotificationCenter().removeObserver(this, NotificationCenter.topicsDidLoaded);
         getNotificationCenter().removeObserver(this, NotificationCenter.updateSearchSettings);
         getNotificationCenter().removeObserver(this, NotificationCenter.reloadDialogPhotos);
-        getNotificationCenter().removeObserver(this, NotificationCenter.storiesUpdated);
-        getNotificationCenter().removeObserver(this, NotificationCenter.storiesReadUpdated);
         getNotificationCenter().removeObserver(this, NotificationCenter.userIsPremiumBlockedUpadted);
         getNotificationCenter().removeObserver(this, NotificationCenter.currentUserPremiumStatusChanged);
         getNotificationCenter().removeObserver(this, NotificationCenter.starBalanceUpdated);
@@ -1897,7 +1911,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
         } else if (id == NotificationCenter.closeChats) {
             removeSelfFromStack(true);
         } else if (id == NotificationCenter.privacyRulesUpdated) {
-            if (menuHandler != null) menuHandler.setQrItemNeeded(true, true);
+            if (menuHandler == null) return;
+            menuHandler.setQrItemNeeded(true, true);
         } else if (id == NotificationCenter.currentUserPremiumStatusChanged) {
             updatePremiumData();
         } else if (id == NotificationCenter.userIsPremiumBlockedUpadted) {
@@ -1941,6 +1956,23 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (info.user_id == userId) {
                 isBotInfoLoaded = true;
                 updateListData("NotificationCenter.botInfoDidLoad");
+            }
+        } else if (id == NotificationCenter.emojiLoaded) {
+            if (listView == null) return;
+            listView.invalidateViews();
+        } else if (id == NotificationCenter.newSuggestionsAvailable) {
+            if (listView == null) return;
+            listView.notifyRowChange(Rows.SuggestionPassword);
+            listView.notifyRowChange(Rows.SuggestionPhone);
+            listView.notifyRowChange(Rows.SuggestionGrace);
+        } else if (id == NotificationCenter.dialogDeleted) {
+            final long dialogId = (long) args[0];
+            if (getDialogId() == dialogId) {
+                if (parentLayout != null && parentLayout.getLastFragment() == this) {
+                    finishFragment();
+                } else {
+                    removeSelfFromStack();
+                }
             }
         }
     }
@@ -3910,15 +3942,24 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
     }
 
-    private boolean handleAvatarClick(boolean longClick) {
-        if (uploadedAvatarBig != null) return false;
-        if (longClick) {
-            if (!isTopic()) handleOpenAvatar();
-            return false;
+    private void handleAvatarClick(StoryViewer.PlaceProvider placeProvider) {
+        if (placeProvider != null) {
+            long did = getDialogId();
+            StoriesController storiesController = getMessagesController().getStoriesController();
+            if (storiesController.hasStories(did) || storiesController.hasUploadingStories(did) || storiesController.isLastUploadingFailed(did)) {
+                getOrCreateStoryViewer().open(getContext(), did, placeProvider);
+            } else if (userInfo != null && userInfo.stories != null && !userInfo.stories.stories.isEmpty() && userId != getUserConfig().clientUserId) {
+                getOrCreateStoryViewer().open(getContext(), userInfo.stories, placeProvider);
+            } else if (chatInfo != null && chatInfo.stories != null && !chatInfo.stories.stories.isEmpty()) {
+                getOrCreateStoryViewer().open(getContext(), chatInfo.stories, placeProvider);
+            } else if (headerView != null) {
+                headerView.setExpanded(true, true);
+            }
+            return;
         }
         if (isTopic() && !getMessagesController().premiumFeaturesBlocked()) {
             ArrayList<TLRPC.TL_forumTopic> topics = getMessagesController().getTopicsController().getTopics(chatId);
-            if (topics == null) return false;
+            if (topics == null) return;
 
             TLRPC.TL_forumTopic currentTopic = null;
             for (int i = 0; currentTopic == null && i < topics.size(); ++i) {
@@ -3930,9 +3971,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (currentTopic != null && currentTopic.icon_emoji_id != 0) {
                 long documentId = currentTopic.icon_emoji_id;
                 TLRPC.Document document = AnimatedEmojiDrawable.findDocument(currentAccount, documentId);
-                if (document == null) {
-                    return false;
-                }
+                if (document == null) return;
+
                 Bulletin bulletin = BulletinFactory.of(this).createContainsEmojiBulletin(document, BulletinFactory.CONTAINS_EMOJI_IN_TOPIC, set -> {
                     ArrayList<TLRPC.InputStickerSet> inputSets = new ArrayList<>(1);
                     inputSets.add(set);
@@ -3941,12 +3981,17 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 });
                 if (bulletin != null) {
                     bulletin.show();
-                    return true;
+                    return;
                 }
             }
-            return false;
+            return;
         }
-        return (headerView != null && headerView.setExpanded(true, true)) || handleOpenAvatar();
+        if (headerView != null && headerView.setExpanded(true, true)) {
+            return;
+        }
+        if (uploadedAvatarBig == null) {
+            handleOpenAvatar();
+        }
     }
 
     private boolean handleOpenAvatar() {

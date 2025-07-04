@@ -4921,7 +4921,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
         };
         mediaCounterTextView.setAlpha(0.0f);
         avatarContainer2.addView(mediaCounterTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 118.33f, -2, 8, 0));
-        storyView = new ProfileStoriesView(context, currentAccount, getDialogId(), isTopic, avatarContainer, avatarImage, resourcesProvider) {
+        storyView = new ProfileStoriesView(context, currentAccount, getDialogId(), isTopic, avatarImage, resourcesProvider) {
             @Override
             protected void onTap(StoryViewer.PlaceProvider provider) {
                 long did = getDialogId();
@@ -4943,11 +4943,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
             }
         };
         updateStoriesViewBounds(false);
-        if (userInfo != null) {
-            storyView.setStories(userInfo.stories);
-        } else if (chatInfo != null) {
-            storyView.setStories(chatInfo.stories);
-        }
+        storyView.updateStories();
         if (avatarImage != null) {
             avatarImage.setHasStories(needInsetForStories());
         }
@@ -7606,8 +7602,8 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                 if (chatInfo != null && (chatInfo.call == null && !hasVoiceChatItem || chatInfo.call != null && hasVoiceChatItem)) {
                     createActionBarMenu(false);
                 }
-                if (storyView != null && chatInfo != null) {
-                    storyView.setStories(chatInfo.stories);
+                if (storyView != null) {
+                    storyView.updateStories();
                 }
                 if (giftsView != null) {
                     giftsView.update();
@@ -7653,8 +7649,8 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
 
                 updateAutoDeleteItem();
                 updateTtlIcon();
-                if (storyView != null && chatInfo != null) {
-                    storyView.setStories(chatInfo.stories);
+                if (storyView != null) {
+                    storyView.updateStories();
                 }
                 if (giftsView != null) {
                     giftsView.update();
@@ -7679,7 +7675,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
             if (uid == userId) {
                 userInfo = (TLRPC.UserFull) args[1];
                 if (storyView != null) {
-                    storyView.setStories(userInfo.stories);
+                    storyView.updateStories();
                 }
                 if (giftsView != null) {
                     giftsView.update();
@@ -7789,11 +7785,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                 updateAvatarRoundRadius();
             }
             if (storyView != null) {
-                if (userInfo != null) {
-                    storyView.setStories(userInfo.stories);
-                } else if (chatInfo != null) {
-                    storyView.setStories(chatInfo.stories);
-                }
+                storyView.updateStories();
             }
         } else if (id == NotificationCenter.userIsPremiumBlockedUpadted) {
             if (otherItem != null) {
@@ -8588,8 +8580,8 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
         if (avatarsViewPager != null && !isTopic) {
             avatarsViewPager.setChatInfo(chatInfo);
         }
-        if (storyView != null && chatInfo != null) {
-            storyView.setStories(chatInfo.stories);
+        if (storyView != null) {
+            storyView.updateStories();
         }
         if (giftsView != null) {
             giftsView.update();
@@ -8614,7 +8606,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
     ) {
         userInfo = value;
         if (storyView != null) {
-            storyView.setStories(userInfo.stories);
+            storyView.updateStories();
         }
         if (giftsView != null) {
             giftsView.update();
@@ -10073,7 +10065,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
         writeButtonSetBackground();
         updateEmojiStatusDrawableColor();
         if (storyView != null) {
-            storyView.update();
+            storyView.updateStories(true, true);
         }
         if (giftsView != null) {
             giftsView.update();
@@ -13508,9 +13500,6 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                     aright = AndroidUtilities.lerp(aright, left, child.getAlpha());
                 }
             }
-        }
-        if (storyView != null) {
-            storyView.setBounds(aleft, aright, atop + (actionBar.getHeight() - atop) / 2f, !animated);
         }
         if (giftsView != null) {
             giftsView.setBounds(aleft, aright, atop + (actionBar.getHeight() - atop) / 2f, !animated);

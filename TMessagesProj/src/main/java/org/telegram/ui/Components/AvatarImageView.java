@@ -135,7 +135,7 @@ public class AvatarImageView extends BackupImageView {
         ImageReceiver imageReceiver = animatedEmojiDrawable != null ? animatedEmojiDrawable.getImageReceiver() : this.imageReceiver;
         canvas.save();
         canvas.scale(bounceScale, bounceScale, getMeasuredWidth() / 2f, getMeasuredHeight() / 2f);
-        float inset = hasStories ? (int) AndroidUtilities.dpf2(3.5f) : 0;
+        float inset = hasStories ? (int) AndroidUtilities.dpf2(5.33f) : 0;
         inset *= (1f - progressToExpand);
         inset *= progressToInsets * (1f - foregroundAlpha);
         float alpha = 1.0f;

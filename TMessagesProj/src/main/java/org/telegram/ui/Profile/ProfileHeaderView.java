@@ -6,7 +6,6 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
-import android.util.Log;
 import android.view.*;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
@@ -26,6 +25,8 @@ import org.telegram.ui.PeerColorActivity;
 import org.telegram.ui.PhotoViewer;
 import org.telegram.ui.Stars.StarGiftPatterns;
 import org.telegram.ui.Stars.StarsController;
+import org.telegram.ui.Stories.ProfileStoriesView;
+import org.telegram.ui.Stories.StoryViewer;
 
 import java.util.*;
 import java.util.stream.IntStream;
@@ -92,7 +93,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private Gift pressedGift;
 
     private final AvatarDrawable avatarDrawable = new AvatarDrawable();
-    private final Avatar avatarImage;
+    private final Avatar avatarView;
     private ImageLocation avatarLoadedLocation;
 
     private final float attractorMinY = -ATTRACTOR_HIDDEN_Y;
@@ -106,6 +107,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             @NonNull Context context,
             int currentAccount,
             long dialogId,
+            boolean isTopic,
             SizeNotifierFrameLayout root,
             @NonNull ActionBar actionBar,
             Theme.ResourcesProvider resourcesProvider
@@ -116,20 +118,33 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         this.root = root;
         this.actionBar = actionBar;
         this.resourcesProvider = resourcesProvider;
-        this.avatarImage = new Avatar(context);
+        this.avatarView = new Avatar(context, currentAccount, dialogId, isTopic, resourcesProvider);
 
         avatarDrawable.setProfile(true);
-        avatarDrawable.setRoundRadius(avatarImage.getRoundRadius()[0]);
+        avatarDrawable.setRoundRadius(AVATAR_SIZE/2);
 
-        addView(avatarImage, new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
+        addView(avatarView, new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
         setWillNotDraw(false);
         setBackgroundColor(getThemedColor(Theme.key_avatar_backgroundActionBarBlue));
+        updateGifts();
     }
 
     // MISC
 
+    @Override
+    public void didReceivedNotification(int id, int account, Object... args) {
+        if (id == NotificationCenter.starUserGiftsLoaded) {
+            if ((long) args[0] == dialogId) {
+                updateGifts();
+            }
+        } else if (id == NotificationCenter.storiesUpdated || id == NotificationCenter.storiesReadUpdated) {
+            avatarView.updateStories();
+        }
+    }
+
     public void setActionModeProgress(float progress) {
         actionModeProgress = progress;
+        avatarView.stories.setActionBarActionMode(progress);
         invalidate();
     }
 
@@ -213,7 +228,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         float hidden = -getTranslationY();
         attractorProgress = Math.min(1F, (float) growth / snapGrowths[1]);
         attractorY = lerp(attractorMinY, attractorMaxY, attractorProgress);
-        avatarImage.update(hidden, attractorY, attractorProgress);
+        avatarView.updateLayout(hidden, attractorY, attractorProgress);
         invalidate();
     }
 
@@ -229,8 +244,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     public void getThemeDescriptions(ArrayList<ThemeDescription> arrayList) {
         arrayList.add(new ThemeDescription(this, ThemeDescription.FLAG_BACKGROUND, null, null, null, null, Theme.key_avatar_backgroundActionBarBlue));
-        arrayList.add(new ThemeDescription(avatarImage, 0, null, null, Theme.avatarDrawables, null, Theme.key_avatar_text));
-        arrayList.add(new ThemeDescription(avatarImage, 0, null, null, new Drawable[]{avatarDrawable}, null, Theme.key_avatar_backgroundInProfileBlue));
+        arrayList.add(new ThemeDescription(avatarView, 0, null, null, Theme.avatarDrawables, null, Theme.key_avatar_text));
+        arrayList.add(new ThemeDescription(avatarView, 0, null, null, new Drawable[]{avatarDrawable}, null, Theme.key_avatar_backgroundInProfileBlue));
     }
 
     private int getThemedColor(int key) {
@@ -299,12 +314,16 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         }
         emoji.attach();
         NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.starUserGiftsLoaded);
+        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.storiesUpdated);
+        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.storiesReadUpdated);
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.starUserGiftsLoaded);
+        NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.storiesUpdated);
+        NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.storiesReadUpdated);
         emoji.detach();
         for (Gift gift : gifts) {
             gift.attach(this, false);
@@ -312,16 +331,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     }
 
     // GIFTS
-
-
-    @Override
-    public void didReceivedNotification(int id, int account, Object... args) {
-        if (id == NotificationCenter.starUserGiftsLoaded) {
-            if ((long) args[0] == dialogId) {
-                updateGifts();
-            }
-        }
-    }
 
     private static class Gift extends Drawable implements StarGiftPatterns.RadialPatternElement {
         private boolean attached;
@@ -485,7 +494,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     // AVATAR
 
     public Avatar getAvatar() {
-        return avatarImage;
+        return avatarView;
     }
 
     public void setAvatarUser(@NonNull TLRPC.User user, TLRPC.UserFull userInfo, TLRPC.FileLocation uploadedAvatarSmall, TLRPC.FileLocation uploadedAvatarBig) {
@@ -508,12 +517,12 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         }
         if (uploadedAvatarBig == null) {
             if (vectorAvatar != null) {
-                avatarImage.setImageDrawable(vectorAvatarThumbDrawable);
+                avatarView.image.setImageDrawable(vectorAvatarThumbDrawable);
             } else if (videoThumbLocation != null && !user.photo.personal) {
-                avatarImage.getImageReceiver().setVideoThumbIsSame(true);
-                avatarImage.setImage(videoThumbLocation, "avatar", thumbLocation, "50_50", avatarDrawable, user);
+                avatarView.image.getImageReceiver().setVideoThumbIsSame(true);
+                avatarView.image.setImage(videoThumbLocation, "avatar", thumbLocation, "50_50", avatarDrawable, user);
             } else {
-                avatarImage.setImage(videoLocation, ImageLoader.AUTOPLAY_FILTER, thumbLocation, "50_50", avatarDrawable, user);
+                avatarView.image.setImage(videoLocation, ImageLoader.AUTOPLAY_FILTER, thumbLocation, "50_50", avatarDrawable, user);
             }
         }
         onAvatarChanged(user, imageLocation, user.photo != null ? user.photo.photo_big : null);
@@ -533,19 +542,19 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             // WIP: videoLocation = avatarsViewPager.getCurrentVideoLocation(thumbLocation, imageLocation);
         } else {
             TLRPC.TL_forumTopic topic = MessagesController.getInstance(currentAccount).getTopicsController().findTopic(chat.id, topicId);
-            ForumUtilities.setTopicIcon(avatarImage, topic, true, true, resourcesProvider);
+            ForumUtilities.setTopicIcon(avatarView.image, topic, true, true, resourcesProvider);
         }
 
         // WIP: avatarsViewPager.initIfEmpty(null, imageLocation, thumbLocation, reload);
         if (uploadedAvatarBig == null) {
             String filter = videoLocation != null && videoLocation.imageType == FileLoader.IMAGE_TYPE_ANIMATION ? ImageLoader.AUTOPLAY_FILTER : null;
-            avatarImage.setImage(videoLocation, filter, thumbLocation, "50_50", avatarDrawable, chat);
+            avatarView.image.setImage(videoLocation, filter, thumbLocation, "50_50", avatarDrawable, chat);
         }
         onAvatarChanged(chat, imageLocation, chat.photo != null && topicId == 0 ? chat.photo.photo_big : null);
     }
 
     public void unsetAvatar() {
-        avatarImage.setImageDrawable(null);
+        avatarView.image.setImageDrawable(null);
         // WIP: avatarsViewPager.onDestroy();
     }
 
@@ -554,13 +563,13 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             avatarLoadedLocation = imageLocation;
             FileLoader.getInstance(currentAccount).loadFile(imageLocation, parentObject, null, FileLoader.PRIORITY_LOW, 1);
         }
-        avatarImage.getImageReceiver().setVisible(
+        avatarView.image.getImageReceiver().setVisible(
                 !PhotoViewer.isShowingImage(photoBig), // WIP: && (getLastStoryViewer() == null || getLastStoryViewer().transitionViewHolder.view != avatarImage),
                 true // WIP: storyView != null
         );
     }
 
-    public static class Avatar extends AvatarImageView {
+    public static class Avatar extends FrameLayout {
         private final static float MIN_RADIUS = ATTRACTOR_HIDDEN_Y;
         private final static float MAX_INSET = AVATAR_SIZE/2F - MIN_RADIUS;
 
@@ -572,23 +581,77 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         private float clipPathOverrideOffsetX = 0;
         private float clipPathOverrideOffsetY = 0;
 
-        private Avatar(Context context) {
+        private final AvatarImageView image;
+        private final ProfileStoriesView stories;
+        public Callback callback;
+
+        public interface Callback {
+            void onAvatarClick(@Nullable StoryViewer.PlaceProvider provider);
+            boolean onAvatarLongClick();
+        }
+
+        private Avatar(Context context, int currentAccount, long dialogId, boolean isTopic, Theme.ResourcesProvider resourcesProvider) {
             super(context);
-            getImageReceiver().setAllowDecodeSingleFrame(true);
-            setRoundRadius(AVATAR_SIZE / 2);
-            updateClipPath();
+            image = new AvatarImageView(context) {
+                @Override
+                protected void dispatchDraw(Canvas canvas) {
+                    super.dispatchDraw(canvas);
+                    if (animatedEmojiDrawable != null && animatedEmojiDrawable.getImageReceiver() != null) {
+                        animatedEmojiDrawable.getImageReceiver().startAnimation();
+                    }
+                }
+
+                @Override
+                public void onNewImageSet() {
+                    super.onNewImageSet();
+                    Bitmap bitmap = imageReceiver.getBitmap();
+                    if (bitmap != null && !bitmap.isRecycled()) {
+                        Bitmap blurred = Utilities.stackBlurBitmapMax(bitmap, true);
+                        setForegroundImageDrawable(new ImageReceiver.BitmapHolder(blurred));
+                    }
+                }
+
+                @Override
+                public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+                    super.onInitializeAccessibilityNodeInfo(info);
+                    if (image.getImageReceiver().hasNotThumb()) {
+                        info.setText(LocaleController.getString(R.string.AccDescrProfilePicture));
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, LocaleController.getString(R.string.Open)));
+                            info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_LONG_CLICK, LocaleController.getString(R.string.AccDescrOpenInPhotoViewer)));
+                        }
+                    } else {
+                        info.setVisibleToUser(false);
+                    }
+                }
+            };
+            image.setRoundRadius(AVATAR_SIZE/2);
+            image.getImageReceiver().setAllowDecodeSingleFrame(true);
+            image.drawForeground(true);
+            image.setOnClickListener(v -> { if (callback != null) callback.onAvatarClick(null); });
+            image.setOnLongClickListener(v -> callback != null && callback.onAvatarLongClick());
+
+            stories = new ProfileStoriesView(context, currentAccount, dialogId, isTopic, image, resourcesProvider) {
+                @Override
+                protected void onTap(StoryViewer.PlaceProvider provider) {
+                    if (callback != null) callback.onAvatarClick(provider);
+                }
+
+                @Override
+                protected void onLongPress() {
+                    if (callback != null) callback.onAvatarLongClick();
+                }
+            };
+
+            addView(image, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+            addView(stories, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
             dimPaint.setColor(Color.BLACK);
-            drawForeground(true);
+            updateClipPath();
+            updateStories();
         }
 
-        @Override
-        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            setMeasuredDimension(AVATAR_SIZE, AVATAR_SIZE);
-        }
-
-        private void updateClipPath() {
-            clipPath.rewind();
-            clipPath.addCircle(AVATAR_SIZE/2F, AVATAR_SIZE/2F, AVATAR_SIZE/2F - clipInset, Path.Direction.CW);
+        public ImageReceiver getImageReceiver() {
+            return image.getImageReceiver();
         }
 
         public float getScale() {
@@ -597,29 +660,13 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         }
 
         @Override
-        public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
-            super.onInitializeAccessibilityNodeInfo(info);
-            if (getImageReceiver().hasNotThumb()) {
-                info.setText(LocaleController.getString(R.string.AccDescrProfilePicture));
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, LocaleController.getString(R.string.Open)));
-                    info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_LONG_CLICK, LocaleController.getString(R.string.AccDescrOpenInPhotoViewer)));
-                }
-            } else {
-                info.setVisibleToUser(false);
-            }
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            int spec = MeasureSpec.makeMeasureSpec(AVATAR_SIZE, MeasureSpec.EXACTLY);
+            super.onMeasure(spec, spec);
         }
 
         @Override
-        protected void dispatchDraw(Canvas canvas) {
-            super.dispatchDraw(canvas);
-            if (animatedEmojiDrawable != null && animatedEmojiDrawable.getImageReceiver() != null) {
-                animatedEmojiDrawable.getImageReceiver().startAnimation();
-            }
-        }
-
-        @Override
-        public void draw(@NonNull Canvas canvas) {
+        protected void dispatchDraw(@NonNull Canvas canvas) {
             canvas.save();
             if (clipPathOverride != null) {
                 canvas.translate(-clipPathOverrideOffsetX, -clipPathOverrideOffsetY);
@@ -628,31 +675,32 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             } else {
                 canvas.clipPath(clipPath);
             }
-            super.draw(canvas);
+            super.dispatchDraw(canvas);
             canvas.drawRect(0, 0, getWidth(), getHeight(), dimPaint);
             canvas.restore();
         }
 
-        @Override
-        public void onNewImageSet() {
-            super.onNewImageSet();
-            Bitmap bitmap = imageReceiver.getBitmap();
-            if (bitmap != null && !bitmap.isRecycled()) {
-                Bitmap blurred = Utilities.stackBlurBitmapMax(bitmap, true);
-                setForegroundImageDrawable(new ImageReceiver.BitmapHolder(blurred));
-            }
+        private void updateClipPath() {
+            clipPath.rewind();
+            clipPath.addCircle(AVATAR_SIZE/2F, AVATAR_SIZE/2F, AVATAR_SIZE/2F - clipInset, Path.Direction.CW);
+            invalidate();
         }
 
-        private void update(float hidden, float attractorY, float attractorProgress) {
+        public void updateStories() {
+            boolean has = stories.updateStories();
+            image.setHasStories(has);
+        }
+
+        private void updateLayout(float hidden, float attractorY, float attractorProgress) {
             setTranslationY(hidden + attractorY - getMeasuredWidth() / 2F);
 
             float progress = Math.min(1F, Math.max(0F, (attractorProgress - .1F) / .8F));
             if (progress >= .5F) {
                 dimPaint.setAlpha(0);
-                setForegroundAlpha(2F * (1F - progress));
+                image.setForegroundAlpha(2F * (1F - progress));
             } else {
                 dimPaint.setAlpha((int) (0xFF * (1F - progress * 2F)));
-                setForegroundAlpha(1F);
+                image.setForegroundAlpha(1F);
             }
 
             float inset = lerp(MAX_INSET, 0F, CubicBezierInterpolator.EASE_IN.getInterpolation(attractorProgress));
@@ -715,12 +763,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 drawDetachedTopPath(canvas);
                 drawDetachedBottomPath(canvas);
             }
-
-            paint.setColor(Color.CYAN);
-            paint.setAlpha(50);
-            canvas.drawCircle(avatarRect.centerX(), avatarRect.centerY(), avatarRadius, paint);
-            paint.setColor(Color.BLACK);
-            paint.setAlpha(255);
 
             canvas.restore();
         }
@@ -834,8 +876,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             }
 
             // Absorb animation
-            if (absorbAnimation.shouldDraw(avatarImage, attractorY, attractorMinY, attractorProgress)) {
-                absorbAnimation.draw(canvas, avatarImage);
+            if (absorbAnimation.shouldDraw(avatarView, attractorY, attractorMinY, attractorProgress)) {
+                absorbAnimation.draw(canvas, avatarView);
             }
         }
 
