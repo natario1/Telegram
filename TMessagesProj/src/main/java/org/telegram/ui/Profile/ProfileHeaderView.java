@@ -33,6 +33,7 @@ import java.util.stream.IntStream;
 
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static org.telegram.messenger.AndroidUtilities.*;
+import static org.telegram.ui.Components.LayoutHelper.MATCH_PARENT;
 import static org.telegram.ui.Stars.StarsController.findAttribute;
 
 public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implements NotificationCenter.NotificationCenterDelegate {
@@ -493,11 +494,29 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     // AVATAR
 
+    public void setUploadProgress(float progress, ImageLocation uploadingLocation) {
+        avatarView.progress.setProgress(progress);
+        // WIP: avatarsViewPager.setUploadProgress(uploadingLocation, progress);
+    }
+
+    public void setUploadStarted(ImageLocation big, ImageLocation small) {
+        avatarView.image.setImage(small, "50_50", avatarDrawable, null);
+        // WIP: avatarsViewPager.addUploadingImage(big, small);
+        avatarView.updateProgress(true, true);
+    }
+
+    public void setUploadCompleted(ImageLocation big) {
+        // WIP: avatarsViewPager.scrolledByUser = true;
+        // WIP: avatarsViewPager.removeUploadingImage(uploadingImageLocationBig);
+        // WIP: avatarsViewPager.setCreateThumbFromParent(false);
+        avatarView.updateProgress(false, true);
+    }
+
     public Avatar getAvatar() {
         return avatarView;
     }
 
-    public void setAvatarUser(@NonNull TLRPC.User user, TLRPC.UserFull userInfo, TLRPC.FileLocation uploadedAvatarSmall, TLRPC.FileLocation uploadedAvatarBig) {
+    public void setAvatarUser(@NonNull TLRPC.User user, TLRPC.UserFull userInfo, TLRPC.FileLocation uploadingSmall, TLRPC.FileLocation uploadingBig) {
         avatarDrawable.setInfo(currentAccount, user);
 
         final ImageLocation imageLocation = ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_BIG);
@@ -512,10 +531,10 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             }
         }
         final ImageLocation videoLocation = null; // WIP: avatarsViewPager.getCurrentVideoLocation(thumbLocation, imageLocation);
-        if (uploadedAvatarSmall == null) {
+        if (uploadingSmall == null) {
             // WIP: avatarsViewPager.initIfEmpty(vectorAvatarThumbDrawable, imageLocation, thumbLocation, reload);
         }
-        if (uploadedAvatarBig == null) {
+        if (uploadingBig == null) {
             if (vectorAvatar != null) {
                 avatarView.image.setImageDrawable(vectorAvatarThumbDrawable);
             } else if (videoThumbLocation != null && !user.photo.personal) {
@@ -528,7 +547,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         onAvatarChanged(user, imageLocation, user.photo != null ? user.photo.photo_big : null);
     }
 
-    public void setAvatarChat(@NonNull TLRPC.Chat chat, long topicId, TLRPC.FileLocation uploadedAvatarBig) {
+    public void setAvatarChat(@NonNull TLRPC.Chat chat, long topicId, TLRPC.FileLocation uploadingBig) {
         MessagesController controller = MessagesController.getInstance(currentAccount);
         chat = ChatObject.isMonoForum(chat) ? controller.getMonoForumLinkedChat(chat.id) : chat;
 
@@ -546,7 +565,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         }
 
         // WIP: avatarsViewPager.initIfEmpty(null, imageLocation, thumbLocation, reload);
-        if (uploadedAvatarBig == null) {
+        if (uploadingBig == null) {
             String filter = videoLocation != null && videoLocation.imageType == FileLoader.IMAGE_TYPE_ANIMATION ? ImageLoader.AUTOPLAY_FILTER : null;
             avatarView.image.setImage(videoLocation, filter, thumbLocation, "50_50", avatarDrawable, chat);
         }
@@ -583,6 +602,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         private final AvatarImageView image;
         private final ProfileStoriesView stories;
+        private final RadialProgressView progress;
+
         public Callback callback;
 
         public interface Callback {
@@ -643,11 +664,31 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 }
             };
 
-            addView(image, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-            addView(stories, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+            progress = new RadialProgressView(context) {
+                private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG); {
+                    paint.setColor(0x55000000);
+                }
+
+                @Override
+                protected void onDraw(Canvas canvas) {
+                    if (getImageReceiver().hasNotThumb()) {
+                        paint.setAlpha((int) (0x55 * getImageReceiver().getCurrentAlpha()));
+                        canvas.drawCircle(getWidth() / 2F, getHeight() / 2F, getWidth() / 2F, paint);
+                    }
+                    super.onDraw(canvas);
+                }
+            };
+            progress.setSize(AndroidUtilities.dp(26));
+            progress.setProgressColor(0xffffffff);
+            progress.setNoProgress(false);
+
+            addView(image, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT));
+            addView(stories, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT));
+            addView(progress, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT));
             dimPaint.setColor(Color.BLACK);
             updateClipPath();
             updateStories();
+            updateProgress(false, false);
         }
 
         public ImageReceiver getImageReceiver() {
@@ -708,6 +749,10 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 clipInset = inset;
                 updateClipPath();
             }
+        }
+
+        private void updateProgress(boolean show, boolean animated) {
+            AndroidUtilities.updateViewVisibilityAnimated(progress, show, 1F, animated);
         }
     }
 

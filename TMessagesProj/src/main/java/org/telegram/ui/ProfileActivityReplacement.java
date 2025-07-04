@@ -66,6 +66,7 @@ import org.telegram.ui.Stories.StoryViewer;
 import org.telegram.ui.Stories.recorder.DualCameraView;
 import org.telegram.ui.bots.*;
 
+import java.io.File;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -79,7 +80,6 @@ import static org.telegram.ui.Profile.ProfileContentView.*;
 public class ProfileActivityReplacement extends BaseFragment implements
         SharedMediaLayout.SharedMediaPreloaderDelegate,
         SharedMediaLayout.Delegate,
-        ImageUpdater.ImageUpdaterDelegate,
         NotificationCenter.NotificationCenterDelegate,
         DialogsActivity.DialogsActivityDelegate {
     
@@ -129,8 +129,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private AnimatorSet mediaHeaderAnimator;
 
     private ImageUpdater uploader;
-    private TLRPC.FileLocation uploadedAvatarSmall;
-    private TLRPC.FileLocation uploadedAvatarBig;
+    private TLRPC.FileLocation uploadingFileLocationSmall;
+    private TLRPC.FileLocation uploadingFileLocationBig;
+    private ImageLocation uploadingImageLocationBig;
+    private int uploadRequest;
 
     private ProfileBirthdayEffect.BirthdayEffectFetcher birthdayEffectFetcher;
     private ProfileBirthdayEffect birthdayEffect;
@@ -344,7 +346,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             peerColorFallbackId = UserObject.getProfileColorId(user);
             profileEmojiId = UserObject.getProfileEmojiId(user);
             if (headerView != null) {
-                headerView.setAvatarUser(user, userInfo, uploadedAvatarSmall, uploadedAvatarBig);
+                headerView.setAvatarUser(user, userInfo, uploadingFileLocationSmall, uploadingFileLocationBig);
             }
             if (menuHandler != null) {
                 menuHandler.updateUsernameRelatedItems(UserObject.getPublicUsername(user) != null);
@@ -356,7 +358,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             peerColorEmojiStatus = chat.emoji_status;
             peerColorFallbackId = ChatObject.getProfileColorId(chat);
             profileEmojiId = ChatObject.getProfileEmojiId(chat);
-            headerView.setAvatarChat(chat, topicId, uploadedAvatarBig);
+            headerView.setAvatarChat(chat, topicId, uploadingFileLocationBig);
 
         }
         if (flagSecure != null) {
@@ -1072,7 +1074,22 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 uploader = new ImageUpdater(true, ImageUpdater.FOR_TYPE_USER, true);
                 uploader.setOpenWithFrontfaceCamera(true);
                 uploader.parentFragment = this;
-                uploader.setDelegate(this);
+                uploader.setDelegate(new ImageUpdater.ImageUpdaterDelegate() {
+                    @Override
+                    public void didStartUpload(boolean fromAvatarConstructor, boolean isVideo) {
+                        onUploadProgressChanged(0F);
+                    }
+
+                    @Override
+                    public void onUploadProgressChanged(float progress) {
+                        if (headerView != null) headerView.setUploadProgress(progress, uploadingImageLocationBig);
+                    }
+
+                    @Override
+                    public void didUploadPhoto(TLRPC.InputFile photo, TLRPC.InputFile video, double videoStartTimestamp, String videoPath, TLRPC.PhotoSize bigSize, TLRPC.PhotoSize smallSize, boolean isVideo, TLRPC.VideoSize emojiMarkup) {
+                        AndroidUtilities.runOnUIThread(() -> handleUploadStart(photo, video, videoStartTimestamp, videoPath, bigSize, smallSize, emojiMarkup));
+                    }
+                });
                 getMediaDataController().checkFeaturedStickers();
                 getMessagesController().loadSuggestedFilters();
                 getMessagesController().loadUserInfo(getUserConfig().getCurrentUser(), true, classGuid);
@@ -1626,7 +1643,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
             @Override
             public boolean onAvatarLongClick() {
-                return !isTopic() && uploadedAvatarBig == null && handleOpenAvatar();
+                return !isTopic() && uploadingFileLocationBig == null && handleOpenAvatar();
             }
         };
 
@@ -1747,23 +1764,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
             listView.getThemeDescriptions(arrayList, themeDelegate);
         }
         return arrayList;
-    }
-
-    // AVATAR UPLOAD
-
-    @Override
-    public void didStartUpload(boolean fromAvatarConstructor, boolean isVideo) {
-        onUploadProgressChanged(0);
-    }
-
-    @Override
-    public void onUploadProgressChanged(float progress) {
-        // WIP Avatar
-    }
-
-    @Override
-    public void didUploadPhoto(TLRPC.InputFile photo, TLRPC.InputFile video, double videoStartTimestamp, String videoPath, TLRPC.PhotoSize bigSize, TLRPC.PhotoSize smallSize, boolean isVideo, TLRPC.VideoSize emojiMarkup) {
-        // WIP Avatar
     }
 
     // NOTIFICATIONS
@@ -2037,37 +2037,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
     }
 
-    private void handleImageUpload() {
-        if (uploader == null) return;
-        TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
-        if (user == null) user = UserConfig.getInstance(currentAccount).getCurrentUser();
-        if (user == null) return;
-        // TextCell setAvatarCell = null;
-        // RLottieImageView setAvatarImage = setAvatarCell != null ? setAvatarCell.getImageView() : null;
-        uploader.openMenu(user.photo != null && user.photo.photo_big != null && !(user.photo instanceof TLRPC.TL_userProfilePhotoEmpty), () -> {
-            MessagesController.getInstance(currentAccount).deleteUserPhoto(null);
-            // if (setAvatarImage != null) {
-            //     setAvatarImage.getAnimatedDrawable().setCurrentFrame(0);
-            // }
-        }, dialog -> {
-            if (!uploader.isUploadingImage()) {
-                // if (setAvatarImage != null) {
-                //     setAvatarImage.getAnimatedDrawable().setCustomEndFrame(86);
-                //     setAvatarImage.playAnimation();
-                // }
-            } else {
-                // if (setAvatarImage != null) {
-                //     setAvatarImage.getAnimatedDrawable().setCurrentFrame(0, false);
-                // }
-            }
-        }, 0);
-        // if (setAvatarImage != null) {
-        //     setAvatarImage.getAnimatedDrawable().setCurrentFrame(0);
-        //     setAvatarImage.getAnimatedDrawable().setCustomEndFrame(43);
-        //     setAvatarImage.playAnimation();
-        // }
-    }
-
     private void handleAddContact() {
         TLRPC.User user = getMessagesController().getUser(userId);
         Bundle args = new Bundle();
@@ -2191,7 +2160,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         } else if (id == AB_EDIT_INFO_ID) {
             presentFragment(new UserInfoActivity());
         } else if (id == AB_ADD_PHOTO_ID) {
-            handleImageUpload();
+            handleUploadRequest();
         } else if (id == AB_EDIT_ID) {
             handleEditProfileClick();
         } else if (id == AB_QR_ID) {
@@ -3989,7 +3958,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (headerView != null && headerView.setExpanded(true, true)) {
             return;
         }
-        if (uploadedAvatarBig == null) {
+        if (uploadingFileLocationBig == null) {
             handleOpenAvatar();
         }
     }
@@ -4094,6 +4063,136 @@ public class ProfileActivityReplacement extends BaseFragment implements
             return object;
         }
         return null;
+    }
+
+
+    private void handleUploadRequest() {
+        if (uploader == null) return;
+        TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
+        if (user == null) user = UserConfig.getInstance(currentAccount).getCurrentUser();
+        if (user == null) return;
+        // TextCell setAvatarCell = null;
+        // RLottieImageView setAvatarImage = setAvatarCell != null ? setAvatarCell.getImageView() : null;
+        uploader.openMenu(user.photo != null && user.photo.photo_big != null && !(user.photo instanceof TLRPC.TL_userProfilePhotoEmpty), () -> {
+            MessagesController.getInstance(currentAccount).deleteUserPhoto(null);
+            // if (setAvatarImage != null) {
+            //     setAvatarImage.getAnimatedDrawable().setCurrentFrame(0);
+            // }
+        }, dialog -> {
+            if (!uploader.isUploadingImage()) {
+                // if (setAvatarImage != null) {
+                //     setAvatarImage.getAnimatedDrawable().setCustomEndFrame(86);
+                //     setAvatarImage.playAnimation();
+                // }
+            } else {
+                // if (setAvatarImage != null) {
+                //     setAvatarImage.getAnimatedDrawable().setCurrentFrame(0, false);
+                // }
+            }
+        }, 0);
+        // if (setAvatarImage != null) {
+        //     setAvatarImage.getAnimatedDrawable().setCurrentFrame(0);
+        //     setAvatarImage.getAnimatedDrawable().setCustomEndFrame(43);
+        //     setAvatarImage.playAnimation();
+        // }
+    }
+
+    private void handleUploadStart(TLRPC.InputFile photo, TLRPC.InputFile video, double videoStartTimestamp, String videoPath, TLRPC.PhotoSize bigSize, TLRPC.PhotoSize smallSize, TLRPC.VideoSize emojiMarkup) {
+        if (photo != null || video != null || emojiMarkup != null) {
+            if (uploadingFileLocationSmall == null) {
+                return;
+            }
+            TLRPC.TL_photos_uploadProfilePhoto req = new TLRPC.TL_photos_uploadProfilePhoto();
+            if (photo != null) {
+                req.file = photo;
+                req.flags |= 1;
+            }
+            if (video != null) {
+                req.video = video;
+                req.flags |= 2;
+                req.video_start_ts = videoStartTimestamp;
+                req.flags |= 4;
+            }
+            if (emojiMarkup != null) {
+                req.video_emoji_markup = emojiMarkup;
+                req.flags |= 16;
+            }
+            uploadRequest = getConnectionsManager().sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
+                handleUploadEnd(response, error, videoPath);
+            }));
+        } else {
+            uploadingFileLocationSmall = smallSize.location;
+            uploadingFileLocationBig = bigSize.location;
+            uploadingImageLocationBig = ImageLocation.getForLocal(uploadingFileLocationBig);
+            ImageLocation uploadingImageLocationSmall = ImageLocation.getForLocal(uploadingFileLocationSmall);
+            if (headerView != null) headerView.setUploadStarted(uploadingImageLocationBig, uploadingImageLocationSmall);
+        }
+        updateMenuData(true);
+    }
+
+    /** @noinspection ResultOfMethodCallIgnored*/
+    private void handleUploadEnd(TLObject response, TLRPC.TL_error error, String videoPath) {
+        if (error == null) {
+            TLRPC.User user = getMessagesController().getUser(getUserConfig().getClientUserId());
+            if (user == null) {
+                user = getUserConfig().getCurrentUser();
+                if (user == null) return;
+                getMessagesController().putUser(user, false);
+            } else {
+                getUserConfig().setCurrentUser(user);
+            }
+
+            TLRPC.TL_photos_photo photos_photo = (TLRPC.TL_photos_photo) response;
+            ArrayList<TLRPC.PhotoSize> sizes = photos_photo.photo.sizes;
+            TLRPC.PhotoSize small = FileLoader.getClosestPhotoSizeWithSize(sizes, 150);
+            TLRPC.PhotoSize big = FileLoader.getClosestPhotoSizeWithSize(sizes, 800);
+            TLRPC.VideoSize videoSize = photos_photo.photo.video_sizes.isEmpty() ? null : FileLoader.getClosestVideoSizeWithSize(photos_photo.photo.video_sizes, 1000);
+            user.photo = new TLRPC.TL_userProfilePhoto();
+            user.photo.photo_id = photos_photo.photo.id;
+            if (small != null) {
+                user.photo.photo_small = small.location;
+            }
+            if (big != null) {
+                user.photo.photo_big = big.location;
+            }
+
+            if (small != null && uploadingFileLocationSmall != null) {
+                File destFile = FileLoader.getInstance(currentAccount).getPathToAttach(small, true);
+                File src = FileLoader.getInstance(currentAccount).getPathToAttach(uploadingFileLocationSmall, true);
+                src.renameTo(destFile);
+                String oldKey = uploadingFileLocationSmall.volume_id + "_" + uploadingFileLocationSmall.local_id + "@50_50";
+                String newKey = small.location.volume_id + "_" + small.location.local_id + "@50_50";
+                ImageLoader.getInstance().replaceImageInCache(oldKey, newKey, ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_SMALL), false);
+            }
+
+            if (videoSize != null && videoPath != null) {
+                File destFile = FileLoader.getInstance(currentAccount).getPathToAttach(videoSize, "mp4", true);
+                File src = new File(videoPath);
+                src.renameTo(destFile);
+            } else if (big != null && uploadingFileLocationBig != null) {
+                File destFile = FileLoader.getInstance(currentAccount).getPathToAttach(big, true);
+                File src = FileLoader.getInstance(currentAccount).getPathToAttach(uploadingFileLocationBig, true);
+                src.renameTo(destFile);
+            }
+            getMessagesController().getDialogPhotos(user.id).addPhotoAtStart(((TLRPC.TL_photos_photo) response).photo);
+            ArrayList<TLRPC.User> users = new ArrayList<>();
+            users.add(user);
+            getMessagesStorage().putUsersAndChats(users, null, false, true);
+            TLRPC.UserFull userFull = getMessagesController().getUserFull(userId);
+            if (userFull != null) {
+                userFull.profile_photo = photos_photo.photo;
+                getMessagesStorage().updateUserInfo(userFull, false);
+            }
+        }
+
+        if (headerView != null) headerView.setUploadCompleted(uploadingImageLocationBig);
+        uploadingFileLocationSmall = null;
+        uploadingFileLocationBig = null;
+        uploadingImageLocationBig = null;
+        updateProfileData(true);
+        getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_ALL);
+        getNotificationCenter().postNotificationName(NotificationCenter.mainUserInfoChanged);
+        getUserConfig().saveConfig(true);
     }
 
     private static class RoundRectPopup extends ActionBarPopupWindow.ActionBarPopupWindowLayout {
