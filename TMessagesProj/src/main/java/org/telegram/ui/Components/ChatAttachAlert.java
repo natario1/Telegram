@@ -5154,6 +5154,9 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             actionBarShadow.setVisibility(actionBar.getVisibility());
 
             setCaptionAbove(captionAbove, false);
+        } else {
+            currentAttachLayout.onShow(null);
+            currentAttachLayout.onShown();
         }
         if (currentAttachLayout != photoLayout) {
             photoLayout.setCheckCameraWhenShown(true);
