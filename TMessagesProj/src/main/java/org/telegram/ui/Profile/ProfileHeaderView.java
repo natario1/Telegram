@@ -95,9 +95,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private final Avatar avatarImage;
     private ImageLocation avatarLoadedLocation;
 
-    private TLRPC.FileLocation uploadedAvatarSmall;
-    private TLRPC.FileLocation uploadedAvatarBig;
-
     private final float attractorMinY = -ATTRACTOR_HIDDEN_Y;
     private float attractorY;
     private float attractorMaxY;
@@ -171,6 +168,20 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         attractorMaxY = baseHeight + mid - AVATAR_BOTTOM_PADDING - AVATAR_SIZE /2F;
         // Animate to mid value
         changeGrowth(mid, true);
+    }
+
+    public boolean setExpanded(boolean max, boolean animated) {
+        int index = max ? 2 : 1;
+        if (index >= snapGrowths.length) return false;
+        changeGrowth(snapGrowths[index], animated);
+        return true;
+    }
+
+    public boolean setCollapsed(boolean min, boolean animated) {
+        int index = min ? 0 : 1;
+        if (index >= snapGrowths.length) return false;
+        changeGrowth(snapGrowths[index], animated);
+        return true;
     }
 
     // GROWTH
@@ -473,7 +484,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     // AVATAR
 
-    public void setAvatarUser(@NonNull TLRPC.User user, TLRPC.UserFull userInfo) {
+    public Avatar getAvatar() {
+        return avatarImage;
+    }
+
+    public void setAvatarUser(@NonNull TLRPC.User user, TLRPC.UserFull userInfo, TLRPC.FileLocation uploadedAvatarSmall, TLRPC.FileLocation uploadedAvatarBig) {
         avatarDrawable.setInfo(currentAccount, user);
 
         final ImageLocation imageLocation = ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_BIG);
@@ -504,7 +519,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         onAvatarChanged(user, imageLocation, user.photo != null ? user.photo.photo_big : null);
     }
 
-    public void setAvatarChat(@NonNull TLRPC.Chat chat, long topicId) {
+    public void setAvatarChat(@NonNull TLRPC.Chat chat, long topicId, TLRPC.FileLocation uploadedAvatarBig) {
         MessagesController controller = MessagesController.getInstance(currentAccount);
         chat = ChatObject.isMonoForum(chat) ? controller.getMonoForumLinkedChat(chat.id) : chat;
 
@@ -545,7 +560,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         );
     }
 
-    private static class Avatar extends AvatarImageView {
+    public static class Avatar extends AvatarImageView {
         private final static float MIN_RADIUS = ATTRACTOR_HIDDEN_Y;
         private final static float MAX_INSET = AVATAR_SIZE/2F - MIN_RADIUS;
 
@@ -553,11 +568,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         private float clipInset = 0;
         private final Paint dimPaint = new Paint();
 
-        Path clipPathOverride = null;
-        float clipPathOverrideOffsetX = 0;
-        float clipPathOverrideOffsetY = 0;
+        private Path clipPathOverride = null;
+        private float clipPathOverrideOffsetX = 0;
+        private float clipPathOverrideOffsetY = 0;
 
-        public Avatar(Context context) {
+        private Avatar(Context context) {
             super(context);
             getImageReceiver().setAllowDecodeSingleFrame(true);
             setRoundRadius(AVATAR_SIZE / 2);
@@ -574,6 +589,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         private void updateClipPath() {
             clipPath.rewind();
             clipPath.addCircle(AVATAR_SIZE/2F, AVATAR_SIZE/2F, AVATAR_SIZE/2F - clipInset, Path.Direction.CW);
+        }
+
+        public float getScale() {
+            float radius = AVATAR_SIZE/2F - clipInset;
+            return radius/(AVATAR_SIZE/2F);
         }
 
         @Override
