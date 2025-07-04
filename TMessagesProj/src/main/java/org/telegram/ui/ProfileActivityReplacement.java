@@ -3242,7 +3242,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 popupLayout.addView(fragmentInfoView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
             }
 
-            popupWindowRef.set(popupLayout.show(this, view, x, y));
+            popupWindowRef.set(popupLayout.show(this, rootLayout, view, x, y));
             return true;
         } else if (kind == Rows.InfoChatAbout || kind == Rows.InfoUserAbout || kind == Rows.InfoLocation || kind == Rows.MyBio) {
             if (kind == Rows.MyBio && (userInfo == null || TextUtils.isEmpty(userInfo.about))) {
@@ -3307,7 +3307,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     });
                 }
 
-                popupWindowRef.set(popupLayout.show(this, view, x, y));
+                popupWindowRef.set(popupLayout.show(this, rootLayout, view, x, y));
             };
             if (withTranslate[0]) {
                 if (LanguageDetector.hasSupport()) {
@@ -3359,7 +3359,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 }
             });
 
-            popupWindowRef.set(popupLayout.show(this, view, x, y));
+            popupWindowRef.set(popupLayout.show(this, rootLayout, view, x, y));
             return true;
         }
         return false;
@@ -3884,7 +3884,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             return draw;
         }
 
-        private ActionBarPopupWindow show(BaseFragment fragment, View anchor, float x, float y) {
+        private ActionBarPopupWindow show(BaseFragment fragment, View container, View anchor, float x, float y) {
             ActionBarPopupWindow popupWindow = new ActionBarPopupWindow(this, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT);
             popupWindow.setPauseNotifications(true);
             popupWindow.setDismissAnimationDuration(220);
@@ -3898,7 +3898,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
             float px = x, py = y;
             View v = anchor;
-            while (v != fragment.getFragmentView() && v != null) {
+            while (v != container && v != null) {
                 px += v.getX();
                 py += v.getY();
                 v = (View) v.getParent();
@@ -3911,7 +3911,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 }
             }
             px -= getMeasuredWidth() / 2f;
-            popupWindow.showAtLocation(fragment.getFragmentView(), 0, (int) px, (int) py);
+            popupWindow.showAtLocation(container, 0, (int) px, (int) py);
             popupWindow.dimBehind();
             return popupWindow;
         }
