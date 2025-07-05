@@ -4753,7 +4753,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
             avatarsViewPager.onDestroy();
         }
         overlaysView = new OverlaysView(context);
-        avatarsViewPager = new ProfileGalleryView(context, userId != 0 ? userId : -chatId, actionBar, listView, avatarImage, getClassGuid(), overlaysView) {
+        avatarsViewPager = new ProfileGalleryView(context, userId != 0 ? userId : -chatId, actionBar, avatarImage, overlaysView) {
             @Override
             protected void setCustomAvatarProgress(float progress) {
                 customAvatarProgress = progress;

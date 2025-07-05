@@ -45,11 +45,10 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
     private final PointF downPoint = new PointF();
     private final int touchSlop;
     private final ActionBar parentActionBar;
-    private boolean isScrollingListView = true;
+    private boolean isScrollingListView;
     private boolean isSwipingViewPager = true;
-    private final RecyclerListView parentListView;
+    private RecyclerListView parentListView;
     private ViewPagerAdapter adapter;
-    private final int parentClassGuid;
     private long dialogId;
     private TLRPC.ChatFull chatInfo;
     private final Callback callback;
@@ -142,9 +141,9 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         super(context);
         setOffscreenPageLimit(2);
 
+        this.isScrollingListView = parentListView != null;
         this.isProfileFragment = false;
         this.parentListView = parentListView;
-        this.parentClassGuid = ConnectionsManager.generateClassGuid();
         this.parentActionBar = parentActionBar;
         this.touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
         this.callback = callback;
@@ -264,16 +263,15 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         imagesLayerNum = value;
     }
 
-    public ProfileGalleryView(Context context, long dialogId, ActionBar parentActionBar, RecyclerListView parentListView, org.telegram.ui.Components.AvatarImageView parentAvatarImageView, int parentClassGuid, Callback callback) {
+    public ProfileGalleryView(Context context, long dialogId, ActionBar parentActionBar, org.telegram.ui.Components.AvatarImageView parentAvatarImageView, Callback callback) {
         super(context);
         setVisibility(View.GONE);
         setOverScrollMode(View.OVER_SCROLL_NEVER);
         setOffscreenPageLimit(2);
 
+        this.isScrollingListView = false;
         this.isProfileFragment = true;
         this.dialogId = dialogId;
-        this.parentListView = parentListView;
-        this.parentClassGuid = parentClassGuid;
         this.parentActionBar = parentActionBar;
         setAdapter(adapter = new ViewPagerAdapter(getContext(), parentAvatarImageView, parentActionBar));
         this.touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
@@ -411,7 +409,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         if (adapter == null) {
             return false;
         }
-        if (parentListView.getScrollState() != RecyclerView.SCROLL_STATE_IDLE && !isScrollingListView && isSwipingViewPager) {
+        if (parentListView != null && parentListView.getScrollState() != RecyclerView.SCROLL_STATE_IDLE && !isScrollingListView && isSwipingViewPager) {
             isSwipingViewPager = false;
             final MotionEvent cancelEvent = MotionEvent.obtain(ev);
             cancelEvent.setAction(MotionEvent.ACTION_CANCEL);
@@ -435,7 +433,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
 
         if (action == MotionEvent.ACTION_DOWN) {
-            isScrollingListView = true;
+            isScrollingListView = parentListView != null;
             isSwipingViewPager = true;
             scrolledByUser = true;
             downPoint.set(ev.getX(), ev.getY());
@@ -821,10 +819,10 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent e) {
-        if (parentListView.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) {
+        if (parentListView != null && parentListView.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) {
             return false;
         }
-        if (getParent() != null && getParent().getParent() != null) {
+        if (parentListView != null && getParent() != null && getParent().getParent() != null) {
             getParent().getParent().requestDisallowInterceptTouchEvent(canScrollHorizontally(-1));
         }
         return super.onInterceptTouchEvent(e);

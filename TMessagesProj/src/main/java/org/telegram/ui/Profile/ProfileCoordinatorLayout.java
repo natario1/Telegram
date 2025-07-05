@@ -1,9 +1,11 @@
 package org.telegram.ui.Profile;
 
 import android.content.Context;
+import android.graphics.Rect;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.core.view.NestedScrollingParent3;
@@ -83,8 +85,15 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             header.applyGrowth(contentOffset);
         }
     };
+
     private VelocityTracker velocityTracker;
     private float lastVelocity;
+
+    private float interceptInitialX;
+    private float interceptInitialY;
+    private int interceptState = 0;
+    private final Rect interceptRect = new Rect();
+    private int interceptSlop = -1;
 
     public ProfileCoordinatorLayout(@NonNull Context context) {
         super(context);
@@ -208,8 +217,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
         return true;
     }
 
-    @Override
-    public boolean onInterceptTouchEvent(MotionEvent ev) {
+    private void computeVelocity(MotionEvent ev) {
         final int action = ev.getAction();
         if (action == MotionEvent.ACTION_DOWN) {
             if (velocityTracker == null) {
@@ -232,6 +240,63 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
                 lastVelocity = 0F;
             }
         }
-        return super.onInterceptTouchEvent(ev);
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        computeVelocity(ev);
+        if (ev.getAction() == MotionEvent.ACTION_DOWN) {
+            header.getHitRect(interceptRect);
+            if (interceptRect.contains((int) ev.getX(), (int) ev.getY())) {
+                interceptInitialX = ev.getX();
+                interceptInitialY = ev.getY();
+            } else {
+                interceptInitialX = Float.NaN;
+                interceptInitialY = Float.NaN;
+            }
+            interceptState = 0;
+        } else if (ev.getAction() == MotionEvent.ACTION_MOVE) {
+            if (interceptState == 0 && !Float.isNaN(interceptInitialX)) {
+                float dx = Math.abs(ev.getX() - interceptInitialX);
+                float dy = Math.abs(ev.getY() - interceptInitialY);
+                if (interceptSlop == -1) {
+                    interceptSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+                }
+                if (dy > interceptSlop && dy > dx) {
+                    interceptState = 1;
+                }
+            }
+        }
+
+        return interceptState > 0;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent ev) {
+        if (interceptState == 0) return super.onTouchEvent(ev);
+
+        computeVelocity(ev);
+        float offsetX = -content.getLeft();
+        float offsetY = -content.getTop();
+
+        if (interceptState == 1) {
+            MotionEvent down = MotionEvent.obtain(ev.getDownTime(), ev.getEventTime(), MotionEvent.ACTION_DOWN, interceptInitialX, interceptInitialY, ev.getMetaState());
+            down.offsetLocation(offsetX, offsetY);
+            boolean res = content.dispatchTouchEvent(down);
+            down.recycle();
+            interceptState = res ? 2 : 0;
+        }
+
+        if (interceptState > 0) {
+            ev.offsetLocation(offsetX, offsetY);
+            boolean res = content.dispatchTouchEvent(ev);
+            ev.offsetLocation(-offsetX, -offsetY);
+            interceptState = res ? interceptState : 0;
+        }
+
+        if (ev.getAction() == MotionEvent.ACTION_UP || ev.getAction() == MotionEvent.ACTION_CANCEL) {
+            interceptState = 0;
+        }
+        return interceptState > 0;
     }
 }
