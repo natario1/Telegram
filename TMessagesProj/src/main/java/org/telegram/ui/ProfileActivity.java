@@ -94,7 +94,6 @@ import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.collection.LongSparseArray;
 import androidx.core.content.ContextCompat;
-import androidx.core.content.FileProvider;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.math.MathUtils;
 import androidx.core.view.NestedScrollingParent3;
@@ -224,11 +223,7 @@ import org.telegram.ui.bots.BotWebViewAttachedSheet;
 import org.telegram.ui.bots.ChannelAffiliateProgramsFragment;
 import org.telegram.ui.bots.SetupEmojiStatusSheet;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
@@ -246,8 +241,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffect.Delegate, NotificationCenter.NotificationCenterDelegate, DialogsActivity.DialogsActivityDelegate, SharedMediaLayout.SharedMediaPreloaderDelegate, ImageUpdater.ImageUpdaterDelegate, SharedMediaLayout.Delegate {
     private final static int PHONE_OPTION_CALL = 0,
@@ -4775,7 +4768,6 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
         }
         avatarContainer2.addView(avatarsViewPager);
         avatarContainer2.addView(overlaysView);
-        avatarImage.setAvatarsViewPager(avatarsViewPager);
 
         avatarsViewPagerIndicatorView = new PagerIndicatorView(context);
         avatarContainer2.addView(avatarsViewPagerIndicatorView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
@@ -7168,7 +7160,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                                     avatarImage.drawForeground(false);
                                 } else {
                                     avatarImage.drawForeground(true);
-                                    avatarImage.setForegroundImageDrawable(imageView.getImageReceiver().getDrawableSafe());
+                                    avatarImage.setForegroundImage(imageView.getImageReceiver().getDrawableSafe());
                                 }
                             }
                         }
@@ -9495,7 +9487,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
             if (copyFromChatActivity) {
                 ChatActivity chatActivity = (ChatActivity) prevFragment;
                 BackupImageView fromAvatarImage = chatActivity.avatarContainer.getAvatarImageView();
-                avatarImage.setAnimateFromImageReceiver(fromAvatarImage.getImageReceiver());
+                avatarImage.setCrossfadeImage(fromAvatarImage.getImageReceiver());
             }
             for (int a = 0; a < 2; a++) {
                 if (nameTextView[a] == null) {
@@ -9805,7 +9797,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                     statusString = ((AnimatedTextView) chatActivity.avatarContainer.getSubtitleTextView()).getText();
                 }
                 BackupImageView fromAvatarImage = chatActivity.avatarContainer.getAvatarImageView();
-                avatarImage.setAnimateFromImageReceiver(fromAvatarImage.getImageReceiver());
+                avatarImage.setCrossfadeImage(fromAvatarImage.getImageReceiver());
             }
 
             boolean changed = false;

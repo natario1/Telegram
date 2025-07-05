@@ -1,49 +1,49 @@
 package org.telegram.ui.Components;
 
 import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.RectF;
+import android.graphics.*;
 import android.graphics.drawable.Drawable;
 import android.util.Property;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
+import org.telegram.messenger.Utilities;
 
 public class AvatarImageView extends BackupImageView {
 
-    private final RectF rect = new RectF();
-    private final Paint placeholderPaint;
     public boolean drawAvatar = true;
     public float bounceScale = 1f;
 
-    private float crossfadeProgress;
-    private ImageReceiver animateFromImageReceiver;
+    private final RectF rect = new RectF();
+    private final Paint dimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    private ImageReceiver foregroundImageReceiver;
+    private float crossfadeProgress;
+    private ImageReceiver crossfadeImageReceiver;
+
+    private final ImageReceiver foregroundImageReceiver;
     private float foregroundAlpha;
-    private ImageReceiver.BitmapHolder drawableHolder;
-    boolean drawForeground = true;
+    private ImageReceiver.BitmapHolder foregroundHolder;
+    private boolean drawForeground = true;
+
+    private final ImageReceiver blurImageReceiver;
+    private float blurAlpha;
+    private ImageReceiver.BitmapHolder blurHolder;
+
     float progressToExpand;
 
-    ProfileGalleryView avatarsViewPager;
     private boolean hasStories;
     private float progressToInsets = 1f;
 
-    public void setAvatarsViewPager(ProfileGalleryView avatarsViewPager) {
-        this.avatarsViewPager = avatarsViewPager;
-    }
 
     public AvatarImageView(Context context) {
         super(context);
         foregroundImageReceiver = new ImageReceiver(this);
-        placeholderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        placeholderPaint.setColor(Color.BLACK);
+        blurImageReceiver = new ImageReceiver(this);
+        dimPaint.setColor(Color.BLACK);
     }
 
-    public void setAnimateFromImageReceiver(ImageReceiver imageReceiver) {
-        this.animateFromImageReceiver = imageReceiver;
+    public void setCrossfadeImage(ImageReceiver imageReceiver) {
+        this.crossfadeImageReceiver = imageReceiver;
     }
 
     public void setCrossfadeProgress(float crossfadeProgress) {
@@ -65,13 +65,13 @@ public class AvatarImageView extends BackupImageView {
 
     public void setForegroundImage(ImageLocation imageLocation, String imageFilter, Drawable thumb) {
         foregroundImageReceiver.setImage(imageLocation, imageFilter, thumb, 0, null, null, 0);
-        if (drawableHolder != null) {
-            drawableHolder.release();
-            drawableHolder = null;
+        if (foregroundHolder != null) {
+            foregroundHolder.release();
+            foregroundHolder = null;
         }
     }
 
-    public void setForegroundImageDrawable(ImageReceiver.BitmapHolder holder) {
+    public void setForegroundImage(ImageReceiver.BitmapHolder holder) {
         if (holder != null) {
             if (holder.drawable != null) {
                 foregroundImageReceiver.setImageBitmap(holder.drawable);
@@ -79,15 +79,8 @@ public class AvatarImageView extends BackupImageView {
                 foregroundImageReceiver.setImageBitmap(holder.bitmap);
             }
         }
-        if (drawableHolder != null) {
-            drawableHolder.release();
-            drawableHolder = null;
-        }
-        drawableHolder = holder;
-    }
-
-    public float getForegroundAlpha() {
-        return foregroundAlpha;
+        if (foregroundHolder != null) foregroundHolder.release();
+        foregroundHolder = holder;
     }
 
     public void setForegroundAlpha(float value) {
@@ -101,33 +94,69 @@ public class AvatarImageView extends BackupImageView {
             drawable.removeSecondParentView(this);
         }
         foregroundImageReceiver.clearImage();
-        if (drawableHolder != null) {
-            drawableHolder.release();
-            drawableHolder = null;
+        if (foregroundHolder != null) {
+            foregroundHolder.release();
+            foregroundHolder = null;
         }
         foregroundAlpha = 0f;
+        invalidate();
+    }
+
+    @Override
+    public void onNewImageSet() {
+        super.onNewImageSet();
+        if (blurHolder != null) {
+            blurHolder.release();
+            blurHolder = null;
+        }
+        Bitmap bitmap = imageReceiver.getBitmap();
+        if (bitmap != null && !bitmap.isRecycled()) {
+            Bitmap blur = Utilities.stackBlurBitmapMax(bitmap, true);
+            blurImageReceiver.setImageBitmap(blur);
+            blurHolder = new ImageReceiver.BitmapHolder(blur);
+        }
+    }
+
+    public void setBlurAlpha(float value) {
+        blurAlpha = value;
+        invalidate();
+    }
+
+    public void setDimAlpha(float value) {
+        dimPaint.setAlpha((int) (value * 0xFF));
         invalidate();
     }
 
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         foregroundImageReceiver.onDetachedFromWindow();
-        if (drawableHolder != null) {
-            drawableHolder.release();
-            drawableHolder = null;
-        }
+        blurImageReceiver.onDetachedFromWindow();
+        if (foregroundHolder != null) foregroundHolder.release();
+        if (blurHolder != null) blurHolder.release();
+        blurHolder = null;
+        foregroundHolder = null;
     }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         foregroundImageReceiver.onAttachedToWindow();
+        blurImageReceiver.onAttachedToWindow();
     }
 
     @Override
     public void setRoundRadius(int value) {
         super.setRoundRadius(value);
         foregroundImageReceiver.setRoundRadius(value);
+        blurImageReceiver.setRoundRadius(value);
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+        super.dispatchDraw(canvas);
+        if (animatedEmojiDrawable != null && animatedEmojiDrawable.getImageReceiver() != null) {
+            animatedEmojiDrawable.getImageReceiver().startAnimation();
+        }
     }
 
     @Override
@@ -138,53 +167,50 @@ public class AvatarImageView extends BackupImageView {
         float inset = hasStories ? (int) AndroidUtilities.dpf2(5.33f) : 0;
         inset *= (1f - progressToExpand);
         inset *= progressToInsets * (1f - foregroundAlpha);
+        rect.set(0F, 0F, getWidth(), getHeight());
+        rect.inset(inset, inset);
         float alpha = 1.0f;
-        if (animateFromImageReceiver != null) {
+        if (crossfadeImageReceiver != null) {
             alpha *= 1.0f - crossfadeProgress;
             if (crossfadeProgress > 0.0f) {
                 final float fromAlpha = crossfadeProgress;
-                final float wasImageX = animateFromImageReceiver.getImageX();
-                final float wasImageY = animateFromImageReceiver.getImageY();
-                final float wasImageW = animateFromImageReceiver.getImageWidth();
-                final float wasImageH = animateFromImageReceiver.getImageHeight();
-                final float wasAlpha = animateFromImageReceiver.getAlpha();
-                animateFromImageReceiver.setImageCoords(inset, inset, getMeasuredWidth() - inset * 2f, getMeasuredHeight() - inset * 2f);
-                animateFromImageReceiver.setAlpha(fromAlpha);
-                animateFromImageReceiver.draw(canvas);
-                animateFromImageReceiver.setImageCoords(wasImageX, wasImageY, wasImageW, wasImageH);
-                animateFromImageReceiver.setAlpha(wasAlpha);
+                final float wasImageX = crossfadeImageReceiver.getImageX();
+                final float wasImageY = crossfadeImageReceiver.getImageY();
+                final float wasImageW = crossfadeImageReceiver.getImageWidth();
+                final float wasImageH = crossfadeImageReceiver.getImageHeight();
+                final float wasAlpha = crossfadeImageReceiver.getAlpha();
+                crossfadeImageReceiver.setImageCoords(rect);
+                crossfadeImageReceiver.setAlpha(fromAlpha);
+                crossfadeImageReceiver.draw(canvas);
+                crossfadeImageReceiver.setImageCoords(wasImageX, wasImageY, wasImageW, wasImageH);
+                crossfadeImageReceiver.setAlpha(wasAlpha);
             }
         }
-        if (imageReceiver != null && alpha > 0 && (foregroundAlpha < 1f || !drawForeground)) {
-            imageReceiver.setImageCoords(inset, inset, getMeasuredWidth() - inset * 2f, getMeasuredHeight() - inset * 2f);
+        float foregroundAlpha = drawForeground && foregroundImageReceiver.getDrawable() != null ? this.foregroundAlpha*alpha : 0F;
+        float blurAlpha = blurImageReceiver.getDrawable() != null ? this.blurAlpha : 0F;
+        if (imageReceiver != null && alpha > 0 && drawAvatar && foregroundAlpha < 1F && blurAlpha < 1F && dimPaint.getAlpha() < 0xFF) {
+            imageReceiver.setImageCoords(rect);
             final float wasAlpha = imageReceiver.getAlpha();
             imageReceiver.setAlpha(wasAlpha * alpha);
-            if (drawAvatar) {
-                imageReceiver.draw(canvas);
-            }
+            imageReceiver.draw(canvas);
             imageReceiver.setAlpha(wasAlpha);
         }
-        if (foregroundAlpha > 0f && drawForeground && alpha > 0) {
-            if (foregroundImageReceiver.getDrawable() != null) {
-                foregroundImageReceiver.setImageCoords(inset, inset, getMeasuredWidth() - inset * 2f, getMeasuredHeight() - inset * 2f);
-                foregroundImageReceiver.setAlpha(alpha * foregroundAlpha);
-                foregroundImageReceiver.draw(canvas);
-            } else {
-                rect.set(0f, 0f, getMeasuredWidth(), getMeasuredHeight());
-                placeholderPaint.setAlpha((int) (alpha * foregroundAlpha * 255f));
-                final int radius = foregroundImageReceiver.getRoundRadius()[0];
-                canvas.drawRoundRect(rect, radius, radius, placeholderPaint);
-            }
+        if (foregroundAlpha > 0F && blurAlpha < 1F && dimPaint.getAlpha() < 0xFF) {
+            foregroundImageReceiver.setImageCoords(rect);
+            foregroundImageReceiver.setAlpha(foregroundAlpha);
+            foregroundImageReceiver.draw(canvas);
+        }
+        if (blurAlpha > 0F && dimPaint.getAlpha() < 0xFF) {
+            blurImageReceiver.setImageCoords(rect);
+            blurImageReceiver.setAlpha(blurAlpha);
+            blurImageReceiver.draw(canvas);
+        }
+        if (dimPaint.getAlpha() > 0) {
+            final int radius = foregroundImageReceiver.getRoundRadius()[0];
+            canvas.drawRoundRect(rect, radius, radius, dimPaint);
+
         }
         canvas.restore();
-    }
-
-    @Override
-    public void invalidate() {
-        super.invalidate();
-        if (avatarsViewPager != null) {
-            avatarsViewPager.invalidate();
-        }
     }
 
     public void setProgressToStoriesInsets(float progressToInsets) {
@@ -199,10 +225,6 @@ public class AvatarImageView extends BackupImageView {
 
     public void drawForeground(boolean drawForeground) {
         this.drawForeground = drawForeground;
-    }
-
-    public ChatActivityInterface getPrevFragment() {
-        return null;
     }
 
     public void setHasStories(boolean hasStories) {

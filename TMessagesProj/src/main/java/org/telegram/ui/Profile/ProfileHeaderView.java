@@ -615,27 +615,9 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             super(context);
             image = new AvatarImageView(context) {
                 @Override
-                protected void dispatchDraw(Canvas canvas) {
-                    super.dispatchDraw(canvas);
-                    if (animatedEmojiDrawable != null && animatedEmojiDrawable.getImageReceiver() != null) {
-                        animatedEmojiDrawable.getImageReceiver().startAnimation();
-                    }
-                }
-
-                @Override
-                public void onNewImageSet() {
-                    super.onNewImageSet();
-                    Bitmap bitmap = imageReceiver.getBitmap();
-                    if (bitmap != null && !bitmap.isRecycled()) {
-                        Bitmap blurred = Utilities.stackBlurBitmapMax(bitmap, true);
-                        setForegroundImageDrawable(new ImageReceiver.BitmapHolder(blurred));
-                    }
-                }
-
-                @Override
                 public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
                     super.onInitializeAccessibilityNodeInfo(info);
-                    if (image.getImageReceiver().hasNotThumb()) {
+                    if (getImageReceiver().hasNotThumb()) {
                         info.setText(LocaleController.getString(R.string.AccDescrProfilePicture));
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                             info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_CLICK, LocaleController.getString(R.string.Open)));
@@ -717,7 +699,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 canvas.clipPath(clipPath);
             }
             super.dispatchDraw(canvas);
-            canvas.drawRect(0, 0, getWidth(), getHeight(), dimPaint);
             canvas.restore();
         }
 
@@ -737,11 +718,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
             float progress = Math.min(1F, Math.max(0F, (attractorProgress - .1F) / .8F));
             if (progress >= .5F) {
-                dimPaint.setAlpha(0);
-                image.setForegroundAlpha(2F * (1F - progress));
+                image.setDimAlpha(0);
+                image.setBlurAlpha(2F * (1F - progress));
             } else {
-                dimPaint.setAlpha((int) (0xFF * (1F - progress * 2F)));
-                image.setForegroundAlpha(1F);
+                image.setDimAlpha((1F - progress * 2F));
+                image.setBlurAlpha(1);
             }
 
             float inset = lerp(MAX_INSET, 0F, CubicBezierInterpolator.EASE_IN.getInterpolation(attractorProgress));
