@@ -60,10 +60,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     private final static int ATTRACTOR_HIDDEN_Y = dp(16);
     private final static float FULLSCREEN_EXPAND_TRIGGER = .25F;
-    private final static float FULLSCREEN_COLLAPSE_TRIGGER = .75F;
+    private final static float FULLSCREEN_COLLAPSE_TRIGGER = .85F;
 
     private final static int HEIGHT_MID = dp(270);
     private final static int HEIGHT_MAX = dp(422);
+    private final static int HEIGHT_OVERSCROLL_DP = 48;
 
     public interface Callback {
         void onFullscreenAnimationStarted(boolean fullscreen);
@@ -120,6 +121,9 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private boolean discardGalleryImageOnFullscreenCollapse = false; // 'doNotSetForeground'
 
     private final AbsorbAnimation absorbAnimation = new AbsorbAnimation();
+
+    private final ProfileGalleryView galleryView;
+
     private Point displaySize;
     public Callback callback;
 
@@ -130,6 +134,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             boolean isTopic,
             SizeNotifierFrameLayout root,
             @NonNull ActionBar actionBar,
+            @NonNull ProfileGalleryView gallery,
             Theme.ResourcesProvider resourcesProvider
     ) {
         super(context);
@@ -139,14 +144,17 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         this.actionBar = actionBar;
         this.resourcesProvider = resourcesProvider;
         this.avatarView = new Avatar(context, currentAccount, dialogId, isTopic, resourcesProvider, this::updateRanges);
+        this.galleryView = gallery;
 
         avatarDrawable.setProfile(true);
+        galleryView.setParentAvatarImage(avatarView.image);
 
         fullscreenAnimator.setInterpolator(CubicBezierInterpolator.EASE_BOTH);
         fullscreenAnimator.addUpdateListener(anim -> {
             setFullscreenProgress((float) anim.getAnimatedValue(), true);
         });
-        addView(avatarView, new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
+        addView(avatarView, LayoutHelper.createFrame(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
+        addView(galleryView, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT, Gravity.TOP | Gravity.LEFT, 0, HEIGHT_OVERSCROLL_DP, 0, 0));
         setWillNotDraw(false);
         setBackgroundColor(getThemedColor(Theme.key_avatar_backgroundActionBarBlue));
         updateGifts();
@@ -191,10 +199,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         return true;
     }
 
-    public boolean isFullscreen() {
-        return snapGrowths.length >= 3 && growth == snapGrowths[2];
-    }
-
     // GROWTH
 
     private void updateRanges() {
@@ -211,8 +215,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             DisplayCutout cutout = getRootWindowInsets().getDisplayCutout();
             cutoutTop = cutout == null ? 0 : cutout.getSafeInsetTop();
         }
-        int overscrollHeight = dp(48);
         int availableHeight = displaySize.y - baseHeight;
+        int overscrollHeight = dp(HEIGHT_OVERSCROLL_DP);
 
         // Configure growth
         boolean landscape = displaySize.x > displaySize.y;
@@ -277,6 +281,10 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     // FULLSCREEN ANIMATION
 
+    public boolean isFullscreen() {
+        return fullscreenProgress >= 1F;
+    }
+
     private void setFullscreenProgress(float progress, boolean withinAnimation) {
         if (withinAnimation) {
             fullscreenProgressDrivenByTouch = false;
@@ -286,6 +294,18 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             fullscreenProgress = fullscreenProgressDrivenByTouch ? progress : fullscreenProgress;
         }
         avatarView.updateFullscreen(fullscreenProgress, baseHeight + snapGrowths[snapGrowths.length - 1]);
+        if (galleryView.getMeasuredWidth() != 0) {
+            float scale = avatarView.getScaleX() / ((float) galleryView.getMeasuredWidth() / AVATAR_SIZE);
+            galleryView.setScaleX(scale);
+            galleryView.setScaleY(scale);
+            if (scale >= 1F) {
+                galleryView.setPivotY(galleryView.getMeasuredHeight());
+                galleryView.setTranslationY(0F);
+            } else {
+                galleryView.setTranslationY((-getTranslationY() - galleryView.getTop())/2F);
+                galleryView.setPivotY(galleryView.getMeasuredHeight()/2F);
+            }
+        }
     }
 
     private void checkFullscreenAnimation(float touch, int change, float velocity) {
@@ -313,14 +333,14 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         // WIP: avatarsViewPagerIndicatorView.refreshVisibility(accelerator);
 
         if (expand) {
-            // WIP: avatarsViewPager.setCreateThumbFromParent(true);
-            // WIP: avatarsViewPager.getAdapter().notifyDataSetChanged();
+            galleryView.setCreateThumbFromParent(true);
+            galleryView.getAdapter().notifyDataSetChanged();
         } else {
             avatarView.getImageReceiver().startAnimation();
             updateFullscreenImageFromGallery(true, false);
             avatarView.image.setForegroundAlpha(1F);
             avatarView.setVisibility(View.VISIBLE);
-            // WIP: avatarsViewPager.setVisibility(View.GONE);
+            galleryView.setVisibility(View.GONE);
         }
 
         fullscreenAnimator.addListener(new AnimatorListenerAdapter() {
@@ -331,8 +351,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 }
                 if (expand) {
                     updateFullscreenImageFromGallery(false, false);
-                    // WIP: avatarsViewPager.setAnimatedFileMaybe(avatarImage.getImageReceiver().getAnimation());
-                    // WIP: avatarsViewPager.resetCurrentItem();
+                    galleryView.setAnimatedFileMaybe(avatarView.getImageReceiver().getAnimation());
+                    galleryView.resetCurrentItem();
                 }
             }
             @Override
@@ -348,7 +368,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 }
                 if (expand) {
                     avatarView.setVisibility(View.GONE);
-                    // WIP: avatarsViewPager.setVisibility(View.VISIBLE);
+                    galleryView.setVisibility(View.VISIBLE);
                     avatarView.image.clearForeground();
                 }
                 discardGalleryImageOnFullscreenCollapse = false;
@@ -363,7 +383,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private void updateFullscreenImageFromGallery(boolean isCollapse, boolean addSecondParent) {
         if (isCollapse) {
             if (discardGalleryImageOnFullscreenCollapse) return;
-            BackupImageView imageView = null; // WIP: avatarsViewPager.getCurrentItemView();
+            BackupImageView imageView = galleryView.getCurrentItemView();
             if (imageView != null) {
                 if (imageView.getImageReceiver().getDrawable() instanceof VectorAvatarThumbDrawable) {
                     avatarView.image.drawForeground(false);
@@ -383,7 +403,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                     ((AnimatedFileDrawable) drawable).addSecondParentView(avatarView.image);
                 }
             } else {
-                ImageLocation location = null; // WIP: avatarsViewPager.getImageLocation(0);
+                ImageLocation location = galleryView.getImageLocation(0);
                 String filter = location != null && location.imageType == FileLoader.IMAGE_TYPE_ANIMATION ? "avatar" : null;
                 avatarView.image.setForegroundImage(location, filter, drawable);
             }
@@ -572,8 +592,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        float x = event.getX() + getTranslationX();
-        float y = event.getY() + getTranslationY();
+        float x = event.getX();
+        float y = event.getY() + getTranslationY(); // used to draw the gifts
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 for (Gift gift : gifts) {
@@ -649,23 +669,29 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         if (!unchanged) invalidate();
     }
 
+    // GALLERY
+
+    public ProfileGalleryView getGallery() {
+        return galleryView;
+    }
+
     // AVATAR
 
     public void setUploadProgress(float progress, ImageLocation uploadingLocation) {
         avatarView.progressBar.setProgress(progress);
-        // WIP: avatarsViewPager.setUploadProgress(uploadingLocation, progress);
+        galleryView.setUploadProgress(uploadingLocation, progress);
     }
 
     public void setUploadStarted(ImageLocation big, ImageLocation small) {
         avatarView.image.setImage(small, "50_50", avatarDrawable, null);
-        // WIP: avatarsViewPager.addUploadingImage(big, small);
+        galleryView.addUploadingImage(big, small);
         avatarView.updateProgressBar(true, true);
     }
 
     public void setUploadCompleted(ImageLocation big) {
-        // WIP: avatarsViewPager.scrolledByUser = true;
-        // WIP: avatarsViewPager.removeUploadingImage(uploadingImageLocationBig);
-        // WIP: avatarsViewPager.setCreateThumbFromParent(false);
+        galleryView.scrolledByUser = true;
+        galleryView.removeUploadingImage(big);
+        galleryView.setCreateThumbFromParent(false);
         avatarView.updateProgressBar(false, true);
     }
 
@@ -687,9 +713,9 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 vectorAvatarThumbDrawable = new VectorAvatarThumbDrawable(vectorAvatar, user.premium, VectorAvatarThumbDrawable.TYPE_PROFILE);
             }
         }
-        final ImageLocation videoLocation = null; // WIP: avatarsViewPager.getCurrentVideoLocation(thumbLocation, imageLocation);
+        final ImageLocation videoLocation = galleryView.getCurrentVideoLocation(thumbLocation, imageLocation);
         if (uploadingSmall == null) {
-            // WIP: avatarsViewPager.initIfEmpty(vectorAvatarThumbDrawable, imageLocation, thumbLocation, reload);
+            galleryView.initIfEmpty(vectorAvatarThumbDrawable, imageLocation, thumbLocation, true);
         }
         if (uploadingBig == null) {
             if (vectorAvatar != null) {
@@ -715,13 +741,13 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             avatarDrawable.setInfo(currentAccount, chat);
             imageLocation = ImageLocation.getForUserOrChat(chat, ImageLocation.TYPE_BIG);
             thumbLocation = ImageLocation.getForUserOrChat(chat, ImageLocation.TYPE_SMALL);
-            // WIP: videoLocation = avatarsViewPager.getCurrentVideoLocation(thumbLocation, imageLocation);
+            videoLocation = galleryView.getCurrentVideoLocation(thumbLocation, imageLocation);
         } else {
             TLRPC.TL_forumTopic topic = MessagesController.getInstance(currentAccount).getTopicsController().findTopic(chat.id, topicId);
             ForumUtilities.setTopicIcon(avatarView.image, topic, true, true, resourcesProvider);
         }
 
-        // WIP: avatarsViewPager.initIfEmpty(null, imageLocation, thumbLocation, reload);
+        galleryView.initIfEmpty(null, imageLocation, thumbLocation, true);
         if (uploadingBig == null) {
             String filter = videoLocation != null && videoLocation.imageType == FileLoader.IMAGE_TYPE_ANIMATION ? ImageLoader.AUTOPLAY_FILTER : null;
             avatarView.image.setImage(videoLocation, filter, thumbLocation, "50_50", avatarDrawable, chat);
@@ -731,7 +757,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     public void unsetAvatar() {
         avatarView.image.setImageDrawable(null);
-        // WIP: avatarsViewPager.onDestroy();
+        galleryView.onDestroy();
     }
 
     private void onAvatarChanged(Object parentObject, ImageLocation imageLocation, TLRPC.FileLocation photoBig) {
@@ -741,7 +767,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         }
         avatarView.image.getImageReceiver().setVisible(
                 !PhotoViewer.isShowingImage(photoBig), // WIP: && (getLastStoryViewer() == null || getLastStoryViewer().transitionViewHolder.view != avatarImage),
-                true // WIP: storyView != null
+                true
         );
     }
 
@@ -895,7 +921,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             }
         }
 
-        // TODO: disallow fullscreen when hasNotThumb()
         private void updateFullscreen(float fullscreenProgress, float fullscreenHeight) {
             float clamped = Math.min(1F, fullscreenProgress);
             image.setForegroundAlpha(clamped);

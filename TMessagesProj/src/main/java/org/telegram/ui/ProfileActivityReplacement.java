@@ -280,6 +280,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         updateListData("setChatInfo");
         if (headerView != null) {
             headerView.getAvatar().updateStories();
+            if (!isTopic()) headerView.getGallery().setChatInfo(chatInfo);
         }
         if (menuHandler != null) {
             boolean canPurchase = !BuildVars.IS_BILLING_UNAVAILABLE && !getMessagesController().premiumPurchaseBlocked();
@@ -1331,6 +1332,40 @@ public class ProfileActivityReplacement extends BaseFragment implements
         updateLandscapeData();
     }
 
+    private boolean isSwipeBackEventWithin(MotionEvent event, View view) {
+        if (event == null) return false;
+        int[] screenLocation = new int[2];
+        view.getLocationOnScreen(screenLocation);
+        return event.getRawX() >= screenLocation[0]
+                && event.getRawX() <= screenLocation[0] + view.getWidth()
+                && event.getRawY() >= screenLocation[1]
+                && event.getRawY() <= screenLocation[1] + view.getHeight();
+    }
+
+
+    @Override
+    public boolean isSwipeBackEnabled(MotionEvent event) {
+        if (headerView != null) {
+            ProfileGalleryView gallery = headerView.getGallery();
+            if (gallery.getVisibility() == View.VISIBLE && gallery.getRealCount() > 1 && isSwipeBackEventWithin(event, gallery)) {
+                return false;
+            }
+        }
+        if (sharedMediaLayout == null || !sharedMediaLayout.isAttachedToWindow()) {
+            return true;
+        }
+        if (!sharedMediaLayout.isSwipeBackEnabled()) {
+            return false;
+        }
+        return !isSwipeBackEventWithin(event, sharedMediaLayout) || sharedMediaLayout.isCurrentTabFirst();
+    }
+
+
+    public boolean onBackPressed() {
+        if (!super.onBackPressed() || !actionBar.isEnabled()) return false;
+        return (sharedMediaLayout == null || !sharedMediaLayout.isAttachedToWindow() || !sharedMediaLayout.closeActionMode());
+    }
+
     // TRANSITIONS
 
     private void checkMediaHeaderVisible() {
@@ -1539,6 +1574,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         versionClickCount = 0;
         if (sharedMediaLayout != null) sharedMediaLayout.onDestroy();
         if (menuHandler != null) menuHandler.deinitialize();
+        if (headerView != null) headerView.getGallery().onDestroy();
 
         // Menu
         menuHandler = new ProfileActivityMenus(context, resourceProvider, actionBar);
@@ -1632,7 +1668,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout.addView(coordinator);
 
         // Header
-        headerView = new ProfileHeaderView(context, currentAccount, getDialogId(), isTopic(), rootLayout, actionBar, getResourceProvider());
+        ProfileGalleryView gallery = new ProfileGalleryView(context, userId != 0 ? userId : -chatId, actionBar, null, new ProfileGalleryView.Callback() {
+            @Override public void onDown(boolean left) {}
+            @Override public void onRelease() {}
+            @Override public void onPhotosLoaded() {}
+            @Override public void onVideoSet() {}
+        });
+        headerView = new ProfileHeaderView(context, currentAccount, getDialogId(), isTopic(), rootLayout, actionBar, gallery, getResourceProvider());
         headerView.callback = new ProfileHeaderView.Callback() {
             @Override
             public void onFullscreenAnimationStarted(boolean fullscreen) {
