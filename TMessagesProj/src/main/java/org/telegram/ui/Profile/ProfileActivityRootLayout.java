@@ -145,9 +145,9 @@ public class ProfileActivityRootLayout extends SizeNotifierFrameLayout {
         return Theme.getColor(key, resourceProvider);
     }
 
-    public void updateColors(MessagesController.PeerColor peerColor, float actionModeProgress) {
-        int rawBackground = peerColor != null ? Theme.ACTION_BAR_WHITE_SELECTOR_COLOR : getColor(Theme.key_avatar_actionBarSelectorBlue);
-        int rawForeground = peerColor != null ? Color.WHITE : getColor(Theme.key_actionBarDefaultIcon);
+    public void updateColors(MessagesController.PeerColor peerColor, float actionModeProgress, boolean fullscreen) {
+        int rawBackground = peerColor != null || fullscreen ? Theme.ACTION_BAR_WHITE_SELECTOR_COLOR : getColor(Theme.key_avatar_actionBarSelectorBlue);
+        int rawForeground = peerColor != null || fullscreen ? Color.WHITE : getColor(Theme.key_actionBarDefaultIcon);
         int foreground = ColorUtils.blendARGB(rawForeground, getColor(Theme.key_actionBarActionModeDefaultIcon), actionModeProgress);
         actionBar.setItemsBackgroundColor(ColorUtils.blendARGB(rawBackground, getColor(Theme.key_actionBarActionModeDefaultSelector), actionModeProgress), false);
         actionBar.setItemsColor(foreground, false);

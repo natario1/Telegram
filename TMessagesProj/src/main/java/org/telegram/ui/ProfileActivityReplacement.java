@@ -385,7 +385,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
     private void updateColors(boolean animated) {
         if (rootLayout != null) {
-            rootLayout.updateColors(peerColor, mediaHeaderAnimationProgress);
+            rootLayout.updateColors(peerColor, mediaHeaderAnimationProgress, headerView != null && headerView.isFullscreen());
         }
         if (menuHandler != null) {
             menuHandler.updateColors(peerColor, mediaHeaderAnimationProgress);
@@ -1471,13 +1471,13 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
     @Override
     public boolean isActionBarCrossfadeEnabled() {
-        return actionBar != null && (headerView == null || !headerView.canGrow());
+        return actionBar != null && (headerView == null || headerView.isFullscreen());
     }
 
     @Override
     public boolean isLightStatusBar() {
         int color;
-        if (headerView != null && !headerView.canGrow()) {
+        if (headerView != null && headerView.isFullscreen()) {
             return false;
         }
         if (actionBar.isActionModeShowed()) {
@@ -1633,7 +1633,50 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
         // Header
         headerView = new ProfileHeaderView(context, currentAccount, getDialogId(), isTopic(), rootLayout, actionBar, getResourceProvider());
+        headerView.callback = new ProfileHeaderView.Callback() {
+            @Override
+            public void onFullscreenAnimationStarted(boolean fullscreen) {
+                if (fullscreen) {
+                    /* WIP: if (otherItem != null) {
+                        if (!getMessagesController().isChatNoForwards(currentChat)) {
+                            otherItem.showSubItem(gallery_menu_save);
+                        } else {
+                            otherItem.hideSubItem(gallery_menu_save);
+                        }
+                        if (imageUpdater != null) {
+                            otherItem.showSubItem(add_photo);
+                            otherItem.showSubItem(delete_avatar);
+                            otherItem.hideSubItem(set_as_main);
+                            otherItem.hideSubItem(logout);
+                        }
+                    }
+                    if (searchItem != null) {
+                        searchItem.setEnabled(false);
+                    } */
+                } else {
+                    /* WIP: if (otherItem != null) {
+                        otherItem.hideSubItem(gallery_menu_save);
+                        if (imageUpdater != null) {
+                            otherItem.hideSubItem(set_as_main);
+                            otherItem.hideSubItem(delete_avatar);
+                            otherItem.showSubItem(add_photo);
+                            otherItem.showSubItem(logout);
+                        }
+                    }
+                    if (searchItem != null) {
+                        searchItem.setEnabled(!scrolling);
+                    } */
+                }
+            }
+
+            @Override
+            public void onFullscreenAnimationEnded(boolean fullscreen) {
+                updateColors(false); // for action bar etc.
+            }
+        };
         coordinator.addHeader(headerView);
+
+        // Avatar
         ProfileHeaderView.Avatar avatar = headerView.getAvatar();
         avatar.callback = new ProfileHeaderView.Avatar.Callback() {
             @Override
@@ -4058,7 +4101,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             object.thumb = object.imageReceiver.getBitmapSafe();
             object.size = -1;
             object.radius = avatar.getImageReceiver().getRoundRadius(true);
-            object.scale = avatar.getScale();
+            object.scale = avatar.getImageScale();
             object.canEdit = userId == getUserConfig().clientUserId;
             return object;
         }

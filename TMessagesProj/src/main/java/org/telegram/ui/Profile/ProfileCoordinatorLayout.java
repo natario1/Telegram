@@ -1,6 +1,8 @@
 package org.telegram.ui.Profile;
 
 import android.content.Context;
+import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
 import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
@@ -24,10 +26,6 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             super(context);
         }
 
-        public final boolean canGrow() {
-            return growth < maxGrowth;
-        }
-
         public final int getGrowth() {
             return growth;
         }
@@ -44,9 +42,11 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
         }
 
         private void applyGrowth(int growth) {
+            int last = this.growth;
             this.growth = Math.max(Math.min(growth, maxGrowth), 0);
             setTranslationY(this.growth - maxGrowth);
-            onGrowthChanged(this.growth);
+            ProfileCoordinatorLayout parent = (ProfileCoordinatorLayout) getParent();
+            onGrowthChanged(this.growth, this.growth - last, parent != null ? parent.lastVelocity : 0F);
         }
 
         public final void changeGrowth(int targetGrowth, boolean animated) {
@@ -58,7 +58,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             }
         }
 
-        protected void onGrowthChanged(int growth) {
+        protected void onGrowthChanged(int growth, int change, float velocity) {
             // No-op
         }
 
@@ -83,6 +83,8 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             header.applyGrowth(contentOffset);
         }
     };
+    private VelocityTracker velocityTracker;
+    private float lastVelocity;
 
     public ProfileCoordinatorLayout(@NonNull Context context) {
         super(context);
@@ -204,5 +206,32 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             content.scrollBy(0, distance);
         }
         return true;
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        final int action = ev.getAction();
+        if (action == MotionEvent.ACTION_DOWN) {
+            if (velocityTracker == null) {
+                velocityTracker = VelocityTracker.obtain();
+            } else {
+                velocityTracker.clear();
+            }
+            velocityTracker.addMovement(ev);
+            lastVelocity = 0F;
+        } else if (action == MotionEvent.ACTION_MOVE) {
+            if (velocityTracker != null) {
+                velocityTracker.addMovement(ev);
+                velocityTracker.computeCurrentVelocity(1000);
+                lastVelocity = velocityTracker.getYVelocity(ev.getPointerId(ev.getActionIndex()));
+            }
+        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            if (velocityTracker != null) {
+                velocityTracker.recycle();
+                velocityTracker = null;
+                lastVelocity = 0F;
+            }
+        }
+        return super.onInterceptTouchEvent(ev);
     }
 }
