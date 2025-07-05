@@ -230,32 +230,32 @@ public class StarGiftPatterns {
     };
     private static final int radialPoints = radialData.length / 4;
 
-    public static void drawRadialPattern(Canvas canvas, Drawable pattern, float cx, float cy, float ty, float alpha, float progress) {
+    public static void drawRadialPattern(Canvas canvas, Drawable pattern, float cx, float cy, float ty, float alpha, float progress, float overscroll) {
         for (int p = 0; p < radialPoints; p++) {
             boolean flip = p >= 2;
-            drawRadialPatternElement(canvas, pattern, radialData[p*4], radialData[p*4+1], radialData[p*4+2], radialData[p*4+3], cx, cy, ty, alpha, progress, flip ? p : -1);
+            drawRadialPatternElement(canvas, pattern, radialData[p*4], radialData[p*4+1], radialData[p*4+2], radialData[p*4+3], cx, cy, ty, alpha, progress, overscroll, flip ? p : -1);
         }
     }
 
-    public static void drawRadialPattern(Canvas canvas, List<? extends RadialPatternElement> elements, float cx, float cy, float ty, float alpha, float progress) {
+    public static void drawRadialPattern(Canvas canvas, List<? extends RadialPatternElement> elements, float cx, float cy, float ty, float alpha, float progress, float overscroll) {
         for (int p = 0; p < elements.size(); p ++) {
             float[] info = elements.get(p).getRadialInfo();
-            drawRadialPatternElement(canvas, elements.get(p).getRadialDrawable(), info[0], info[1], info[2], info[3], cx, cy, ty, alpha, progress, -1);
+            drawRadialPatternElement(canvas, elements.get(p).getRadialDrawable(), info[0], info[1], info[2], info[3], cx, cy, ty, alpha, progress, overscroll, -1);
         }
     }
 
-    private static void drawRadialPatternElement(Canvas canvas, Drawable drawable, float length, float angle, float size, float friction, float cx, float ay, float ty, float alpha, float progress, int flipIndex) {
+    private static void drawRadialPatternElement(Canvas canvas, Drawable drawable, float length, float angle, float size, float friction, float cx, float ay, float ty, float alpha, float progress, float overscroll, int flipIndex) {
         if (flipIndex >= 0) {
             // Add a tiny friction delta to the flipped element for a more natural animation
-            drawRadialPatternElement(canvas, drawable, length, angle, size, friction, cx, ay, ty, alpha, progress, -1);
-            drawRadialPatternElement(canvas, drawable, length, (float) Math.PI - angle, size, friction + (flipIndex % 2 == 0 ? 0.05F : -0.05F), cx, ay, ty, alpha, progress, -1);
+            drawRadialPatternElement(canvas, drawable, length, angle, size, friction, cx, ay, ty, alpha, progress, overscroll, -1);
+            drawRadialPatternElement(canvas, drawable, length, (float) Math.PI - angle, size, friction + (flipIndex % 2 == 0 ? 0.05F : -0.05F), cx, ay, ty, alpha, progress, overscroll,-1);
             return;
         }
         // Regular layout
         float halfSize = dpf2(size) / 2F;
         float x = dpf2(length) * (float) Math.cos(angle);
         float y = dpf2(length) * (float) Math.sin(angle);
-        alpha *= lerp(1F, .6F, (length - 60F) / 80F);
+        alpha *= lerp(1F, .4F, (length - 60F) / 80F);
 
         // Progress animation
         float clip0 = .3F * (1F - friction);
@@ -264,6 +264,10 @@ public class StarGiftPatterns {
         float shrink = (float) Math.pow(progress, lerp(3F, 0.33F, friction)); // ease in or out depending on friction
         x *= shrink;
         y *= shrink;
+        if (progress == 1F && overscroll > 0F) {
+            x *= (1F + .3F * overscroll);
+            y *= (1F + .3F * overscroll);
+        }
         alpha *= lerp(.6F, 1F, shrink);
         halfSize *= lerp(.6F, 1F, shrink);
         float cy = lerp(ay, ty, CubicBezierInterpolator.EASE_OUT.getInterpolation(progress));

@@ -255,14 +255,14 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         attractorProgress = Math.min(1F, (float) growth / snapGrowths[1]);
         float fullscreenTouchProgress = snapGrowths.length >= 3 ? Math.max(0, (float) (growth - snapGrowths[1]) / (snapGrowths[2] - snapGrowths[1])) : 0F;
+        attractorY = lerp(attractorMinY, attractorMaxY, attractorProgress);
 
         if (fullscreenTouchProgress > 0F) {
-            attractorY = attractorMaxY;
             avatarView.updateY(hidden, lerp(attractorMaxY, (baseHeight + snapGrowths[2]) / 2F, fullscreenTouchProgress));
         } else {
-            attractorY = lerp(attractorMinY, attractorMaxY, attractorProgress);
             avatarView.updateY(hidden, attractorY);
         }
+
         avatarView.updateAttractor(attractorProgress);
         checkFullscreenAnimation(fullscreenTouchProgress, change, velocity);
         invalidate();
@@ -1074,7 +1074,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             if (hasEmoji && isEmojiLoaded() && attractorProgress > 0F) {
                 float alpha = lerp(.2F, .5F, attractorProgress);
                 float progress = emojiFadeIn.set(isEmojiLoaded) * attractorProgress;
-                StarGiftPatterns.drawRadialPattern(canvas, emoji, width / 2F, attractorY, attractorMaxY, alpha, progress);
+                float overscroll = clamp(fullscreenProgress / FULLSCREEN_EXPAND_TRIGGER, 1, 0);
+                StarGiftPatterns.drawRadialPattern(canvas, emoji, width / 2F, attractorY, attractorMaxY, alpha, progress, overscroll);
             } else {
                 emojiFadeIn.set(isEmojiLoaded);
             }
@@ -1082,7 +1083,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             // Gift pattern
             if (!gifts.isEmpty() && attractorProgress > 0F) {
                 float progress = hasGiftsAnimated.set(true) * attractorProgress;
-                StarGiftPatterns.drawRadialPattern(canvas, gifts, width / 2F, attractorY, attractorMaxY, -1F, progress);
+                float overscroll = clamp(fullscreenProgress / FULLSCREEN_EXPAND_TRIGGER, 1, 0);
+                StarGiftPatterns.drawRadialPattern(canvas, gifts, width / 2F, attractorY, attractorMaxY, -1F, progress, overscroll);
             } else {
                 hasGiftsAnimated.set(false);
             }
