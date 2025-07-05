@@ -120,6 +120,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private boolean discardGalleryImageOnFullscreenCollapse = false; // 'doNotSetForeground'
 
     private final AbsorbAnimation absorbAnimation = new AbsorbAnimation();
+    private Point displaySize;
     public Callback callback;
 
     public ProfileHeaderView(
@@ -137,7 +138,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         this.root = root;
         this.actionBar = actionBar;
         this.resourcesProvider = resourcesProvider;
-        this.avatarView = new Avatar(context, currentAccount, dialogId, isTopic, resourcesProvider);
+        this.avatarView = new Avatar(context, currentAccount, dialogId, isTopic, resourcesProvider, this::updateRanges);
 
         avatarDrawable.setProfile(true);
 
@@ -171,40 +172,9 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     }
 
     public void setDisplaySize(Point size) {
-        int cutoutTop = 0;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && isAttachedToWindow()) {
-            DisplayCutout cutout = getRootWindowInsets().getDisplayCutout();
-            cutoutTop = cutout == null ? 0 : cutout.getSafeInsetTop();
-        }
-        int baseHeight = ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? statusBarHeight : 0);
-        int overscrollHeight = dp(48);
-        int availableHeight = size.y - baseHeight;
-
-        // Configure base height
-        configureHeights(baseHeight);
-
-        // Configure growth
-        // WIP: also avatarImage.getImageReceiver().hasNotThumb()
-        boolean landscape = size.x > size.y;
-        boolean expandable = !landscape && !AndroidUtilities.isAccessibilityScreenReaderEnabled();
-        if ((expandable && snapGrowths.length == 3) || (!expandable && snapGrowths.length == 2)) return;
-
-        int mid = HEIGHT_MID - ActionBar.getCurrentActionBarHeight() - statusBarHeight;
-        if (actionBar.getOccupyStatusBar() && cutoutTop > 0) {
-            // Not much room for the avatar. Ensure it's not clipped by cutouts.
-            int leftover = (baseHeight + mid) - (AVATAR_BOTTOM_PADDING + AVATAR_SIZE);
-            if (leftover < cutoutTop) mid += cutoutTop - leftover;
-        }
-        mid = (int) Math.min(.75F * availableHeight, mid);
-        if (expandable) {
-            int max = Math.min(availableHeight - overscrollHeight, HEIGHT_MAX - ActionBar.getCurrentActionBarHeight() - statusBarHeight);
-            configureGrowth(max + overscrollHeight, new int[]{0, mid, max});
-        } else {
-            configureGrowth(mid + overscrollHeight, new int[]{0, mid});
-        }
-        attractorMaxY = baseHeight + mid - AVATAR_BOTTOM_PADDING - AVATAR_SIZE /2F;
-        // Animate to mid value
-        changeGrowth(mid, true);
+        this.displaySize = size;
+        updateRanges();
+        changeGrowth(snapGrowths[1], true);
     }
 
     public boolean setExpanded(boolean fullscreen, boolean animated) {
@@ -226,6 +196,43 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     }
 
     // GROWTH
+
+    private void updateRanges() {
+        if (displaySize == null) return;
+
+        // Configure base height
+        int baseHeight = ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? statusBarHeight : 0);
+        if (baseHeight != this.baseHeight) {
+            configureHeights(baseHeight);
+        }
+
+        int cutoutTop = 0;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && isAttachedToWindow()) {
+            DisplayCutout cutout = getRootWindowInsets().getDisplayCutout();
+            cutoutTop = cutout == null ? 0 : cutout.getSafeInsetTop();
+        }
+        int overscrollHeight = dp(48);
+        int availableHeight = displaySize.y - baseHeight;
+
+        // Configure growth
+        boolean landscape = displaySize.x > displaySize.y;
+        boolean expandable = !landscape && avatarView.getImageReceiver().hasNotThumb() && !AndroidUtilities.isAccessibilityScreenReaderEnabled();
+
+        int mid = HEIGHT_MID - ActionBar.getCurrentActionBarHeight() - statusBarHeight;
+        if (actionBar.getOccupyStatusBar() && cutoutTop > 0) {
+            // Not much room for the avatar. Ensure it's not clipped by cutouts.
+            int leftover = (baseHeight + mid) - (AVATAR_BOTTOM_PADDING + AVATAR_SIZE);
+            if (leftover < cutoutTop) mid += cutoutTop - leftover;
+        }
+        mid = (int) Math.min(.75F * availableHeight, mid);
+        if (expandable) {
+            int max = Math.min(availableHeight - overscrollHeight, HEIGHT_MAX - ActionBar.getCurrentActionBarHeight() - statusBarHeight);
+            configureGrowth(max + overscrollHeight, new int[]{0, mid, max});
+        } else {
+            configureGrowth(mid + overscrollHeight, new int[]{0, mid});
+        }
+        attractorMaxY = baseHeight + mid - AVATAR_BOTTOM_PADDING - AVATAR_SIZE /2F;
+    }
 
     @Override
     protected int onContentScroll(int dy, boolean touch) {
@@ -763,9 +770,15 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             boolean onAvatarLongClick();
         }
 
-        private Avatar(Context context, int currentAccount, long dialogId, boolean isTopic, Theme.ResourcesProvider resourcesProvider) {
+        private Avatar(Context context, int currentAccount, long dialogId, boolean isTopic, Theme.ResourcesProvider resourcesProvider, Runnable updateRanges) {
             super(context);
             image = new AvatarImageView(context) {
+                @Override
+                public void onNewImageSet() {
+                    super.onNewImageSet();
+                    updateRanges.run();
+                }
+
                 @Override
                 public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
                     super.onInitializeAccessibilityNodeInfo(info);
