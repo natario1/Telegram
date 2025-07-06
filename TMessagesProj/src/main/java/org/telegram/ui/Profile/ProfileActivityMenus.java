@@ -313,6 +313,17 @@ public class ProfileActivityMenus {
         }
     }
 
+    public void updateGalleryRelatedItems(ProfileGalleryView galleryView) {
+        if (mainMenuItem == null) return;
+        if (mainMenuItem.isSubMenuShowing()) {
+            AndroidUtilities.runOnUIThread(() -> updateGalleryRelatedItems(galleryView), 500);
+            return;
+        }
+        boolean first = galleryView.getRealPosition() == 0;
+        mainMenuItem.setSubItemShown(AB_ADD_PHOTO_ID, first);
+        // WIP: mainMenuItem.setSubItemShown(AB_SET_AS_MAIN_ID, !first);
+    }
+
     public void updateBotViewPrivacyItem(boolean hasPrivacyPolicy) {
         if (mainMenuItem == null) return;
         mainMenuItem.setSubItemShown(AB_BOT_VIEW_PRIVACY_ID, hasPrivacyPolicy);

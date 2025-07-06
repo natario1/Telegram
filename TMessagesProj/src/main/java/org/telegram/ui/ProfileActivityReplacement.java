@@ -8,6 +8,7 @@ import android.content.*;
 import android.content.pm.ConfigurationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.database.DataSetObserver;
 import android.graphics.*;
 import android.graphics.Point;
 import android.graphics.Rect;
@@ -36,6 +37,7 @@ import androidx.collection.LongSparseArray;
 import androidx.core.graphics.ColorUtils;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager.widget.ViewPager;
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.*;
 import org.telegram.messenger.browser.Browser;
@@ -1667,13 +1669,30 @@ public class ProfileActivityReplacement extends BaseFragment implements
         ProfileCoordinatorLayout coordinator = new ProfileCoordinatorLayout(context);
         rootLayout.addView(coordinator);
 
-        // Header
+        // Gallery
         ProfileGalleryView gallery = new ProfileGalleryView(context, userId != 0 ? userId : -chatId, actionBar, null, new ProfileGalleryView.Callback() {
             @Override public void onDown(boolean left) {}
             @Override public void onRelease() {}
             @Override public void onPhotosLoaded() {}
             @Override public void onVideoSet() {}
         });
+        gallery.getAdapter().registerDataSetObserver(new DataSetObserver() {
+            @Override public void onChanged() {
+                if (menuHandler == null) return;
+                menuHandler.updateGalleryRelatedItems(gallery);
+            }
+        });
+        gallery.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override public void onPageScrollStateChanged(int state) {}
+            @Override public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {}
+            @Override public void onPageSelected(int position) {
+                if (menuHandler == null) return;
+                menuHandler.updateGalleryRelatedItems(gallery);
+            }
+
+        });
+
+        // Header
         headerView = new ProfileHeaderView(context, currentAccount, getDialogId(), isTopic(), rootLayout, actionBar, gallery, getResourceProvider());
         headerView.callback = new ProfileHeaderView.Callback() {
             @Override

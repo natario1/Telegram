@@ -4,17 +4,20 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.database.DataSetObserver;
 import android.graphics.*;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.text.TextPaint;
 import android.view.*;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
+import androidx.viewpager.widget.ViewPager;
 import org.telegram.messenger.*;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.TLRPC;
@@ -123,6 +126,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private final AbsorbAnimation absorbAnimation = new AbsorbAnimation();
 
     private final ProfileGalleryView galleryView;
+    private final Indicator indicatorView;
 
     private Point displaySize;
     public Callback callback;
@@ -145,6 +149,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         this.resourcesProvider = resourcesProvider;
         this.avatarView = new Avatar(context, currentAccount, dialogId, isTopic, resourcesProvider, this::updateRanges);
         this.galleryView = gallery;
+        this.indicatorView = new Indicator(context, gallery);
 
         avatarDrawable.setProfile(true);
         galleryView.setParentAvatarImage(avatarView.image);
@@ -156,6 +161,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         });
         addView(avatarView, LayoutHelper.createFrame(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
         addView(galleryView, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT, Gravity.TOP | Gravity.LEFT, 0, HEIGHT_OVERSCROLL_DP, 0, 0));
+        addView(indicatorView, LayoutHelper.createFrame(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
         setWillNotDraw(false);
         setBackgroundColor(getThemedColor(Theme.key_avatar_backgroundActionBarBlue));
         updateGifts();
@@ -279,6 +285,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         }
         avatarView.setTranslationY((hidden + cy) - (avatarView.getTop() + AVATAR_SIZE/2F));
         galleryView.setTranslationY((hidden + cy) - (galleryView.getTop() + galleryView.getHeight()/2F));
+        indicatorView.setTranslationY(hidden + (actionBar.getOccupyStatusBar() ? statusBarHeight : 0) + dp(16));
 
         avatarView.updateAttractor(attractorProgress);
         checkFullscreenAnimation(fullscreenTouchProgress, change, velocity);
@@ -353,6 +360,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             updateFullscreenImageFromGallery(true, false);
             avatarView.image.setForegroundAlpha(1F);
             galleryView.setVisibility(View.INVISIBLE);
+            indicatorView.refresh(true);
         }
 
         fullscreenAnimator.addListener(new AnimatorListenerAdapter() {
@@ -380,6 +388,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 }
                 if (expand) {
                     galleryView.setVisibility(View.VISIBLE);
+                    indicatorView.refresh(true);
                     avatarView.image.clearForeground();
                 }
                 discardGalleryImageOnFullscreenCollapse = false;
@@ -1156,5 +1165,71 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         } */
 
         canvas.restore();
+    }
+
+    // INDICATORS
+
+
+    private static class Indicator extends View {
+
+        private String text = "";
+        private final RectF rect = new RectF();
+        private final TextPaint textPaint;
+        private final Paint backgroundPaint;
+        private final ProfileGalleryView gallery;
+
+        public Indicator(Context context, ProfileGalleryView gallery) {
+            super(context);
+            setVisibility(GONE);
+            this.gallery = gallery;
+            textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            textPaint.setColor(Color.WHITE);
+            textPaint.setTypeface(Typeface.SANS_SERIF);
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            textPaint.setTextSize(AndroidUtilities.dpf2(15f));
+            backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            backgroundPaint.setColor(0x26000000);
+            gallery.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+                @Override public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {}
+                @Override public void onPageScrollStateChanged(int state) {}
+                @Override public void onPageSelected(int position) { refresh(true); }
+            });
+            gallery.getAdapter().registerDataSetObserver(new DataSetObserver() {
+                @Override public void onChanged() { refresh(true); }
+            });
+            refresh(false);
+        }
+
+        private void refresh(boolean animated) {
+            boolean visible = gallery.getVisibility() == View.VISIBLE && gallery.getRealCount() >= 20;
+            AndroidUtilities.updateViewVisibilityAnimated(this, visible, 0F, true, animated);
+            invalidate();
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), dp(26));
+        }
+
+        @Override
+        protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+            invalidate();
+        }
+
+        @Override
+        public void invalidate() {
+            super.invalidate();
+            text = gallery.getAdapter().getPageTitle(gallery.getCurrentItem()).toString();
+            rect.set(0, 0, textPaint.measureText(text) + dpf2(16), getMeasuredHeight());
+            rect.offset(getMeasuredWidth()/2F - rect.centerX(), 0F);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            if (text.isEmpty()) return;
+            final float radius = dpf2(12);
+            canvas.drawRoundRect(rect, radius, radius, backgroundPaint);
+            canvas.drawText(text, rect.centerX(), rect.top + AndroidUtilities.dpf2(18.5f), textPaint);
+        }
     }
 }
