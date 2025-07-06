@@ -1670,14 +1670,16 @@ public class ProfileActivityReplacement extends BaseFragment implements
         rootLayout.addView(coordinator);
 
         // Gallery
-        ProfileGalleryView gallery = new ProfileGalleryView(context, userId != 0 ? userId : -chatId, actionBar, null, new ProfileGalleryView.Callback() {
-            @Override public void onDown(boolean left) {}
-            @Override public void onRelease() {}
-            @Override public void onPhotosLoaded() {}
-            @Override public void onVideoSet() {}
+        ProfileGalleryView gallery = new ProfileGalleryView(context, userId != 0 ? userId : -chatId, actionBar, null);
+        gallery.addCallback(new ProfileGalleryView.Callback() {
+            @Override
+            public void onPhotosLoaded() {
+                updateProfileData(false);
+            }
         });
         gallery.getAdapter().registerDataSetObserver(new DataSetObserver() {
-            @Override public void onChanged() {
+            @Override
+            public void onChanged() {
                 if (menuHandler == null) return;
                 menuHandler.updateGalleryRelatedItems(gallery);
             }

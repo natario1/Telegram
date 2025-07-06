@@ -4753,13 +4753,14 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
             avatarsViewPager.onDestroy();
         }
         overlaysView = new OverlaysView(context);
-        avatarsViewPager = new ProfileGalleryView(context, userId != 0 ? userId : -chatId, actionBar, avatarImage, overlaysView) {
+        avatarsViewPager = new ProfileGalleryView(context, userId != 0 ? userId : -chatId, actionBar, avatarImage) {
             @Override
             protected void setCustomAvatarProgress(float progress) {
                 customAvatarProgress = progress;
                 checkPhotoDescriptionAlpha();
             }
         };
+        avatarsViewPager.addCallback(overlaysView);
         if (userId != getUserConfig().clientUserId && userInfo != null) {
             customAvatarProgress = userInfo.profile_photo == null ? 0 : 1;
         }

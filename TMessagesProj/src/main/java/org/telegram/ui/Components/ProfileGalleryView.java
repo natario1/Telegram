@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -39,6 +40,7 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.PinchToZoomHelper;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class ProfileGalleryView extends CircularViewPager implements NotificationCenter.NotificationCenterDelegate {
 
@@ -51,7 +53,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
     private ViewPagerAdapter adapter;
     private long dialogId;
     private TLRPC.ChatFull chatInfo;
-    private final Callback callback;
+    private final List<Callback> callbacks = new ArrayList<>();
 
     public boolean scrolledByUser;
     private boolean isDownReleased;
@@ -123,13 +125,10 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
     }
 
     public interface Callback {
-        void onDown(boolean left);
-
-        void onRelease();
-
-        void onPhotosLoaded();
-
-        void onVideoSet();
+        default void onDown(boolean left) {}
+        default void onRelease() {}
+        default void onPhotosLoaded() {}
+        default void onVideoSet() {}
     }
 
     private int roundTopRadius;
@@ -146,7 +145,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         this.parentListView = parentListView;
         this.parentActionBar = parentActionBar;
         this.touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
-        this.callback = callback;
+        if (callback != null) addCallback(callback);
 
         addOnPageChangeListener(new OnPageChangeListener() {
             @Override
@@ -263,7 +262,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         imagesLayerNum = value;
     }
 
-    public ProfileGalleryView(Context context, long dialogId, ActionBar parentActionBar, org.telegram.ui.Components.AvatarImageView parentAvatarImageView, Callback callback) {
+    public ProfileGalleryView(Context context, long dialogId, ActionBar parentActionBar, org.telegram.ui.Components.AvatarImageView parentAvatarImageView) {
         super(context);
         setOverScrollMode(View.OVER_SCROLL_NEVER);
         setOffscreenPageLimit(2);
@@ -274,7 +273,6 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         this.parentActionBar = parentActionBar;
         setAdapter(adapter = new ViewPagerAdapter(getContext(), parentAvatarImageView, parentActionBar));
         this.touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
-        this.callback = callback;
 
         addOnPageChangeListener(new OnPageChangeListener() {
             @Override
@@ -351,6 +349,8 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
     }
 
     public void onDestroy() {
+        this.callbacks.clear();
+
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.dialogPhotosLoaded);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileLoaded);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileLoadProgressChanged);
@@ -372,6 +372,14 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
                 }
             }
         }
+    }
+
+    public void addCallback(@NonNull Callback callback) {
+        this.callbacks.add(callback);
+    }
+
+    public void removeCallback(@NonNull Callback callback) {
+        this.callbacks.remove(callback);
     }
 
     public void setAnimatedFileMaybe(AnimatedFileDrawable drawable) {
@@ -424,7 +432,9 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
             } else if (pinchToZoomHelper.checkPinchToZoom(ev, this, getCurrentItemView().getImageReceiver(), null, null,null)) {
                 if (!isDownReleased) {
                     isDownReleased = true;
-                    callback.onRelease();
+                    for (int c = 0; c < callbacks.size(); c++) {
+                        callbacks.get(c).onRelease();
+                    }
                 }
                 return true;
             }
@@ -437,7 +447,9 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
             scrolledByUser = true;
             downPoint.set(ev.getX(), ev.getY());
             if (adapter.getCount() > 1) {
-                callback.onDown(ev.getX() < getWidth() / 3f);
+                for (int c = 0; c < callbacks.size(); c++) {
+                    callbacks.get(c).onDown(ev.getX() < getWidth() / 3f);
+                }
             }
             isDownReleased = false;
         } else if (action == MotionEvent.ACTION_UP) {
@@ -456,7 +468,9 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
                             currentItem = itemsCount + extraCount - 1;
                         }
                     }
-                    callback.onRelease();
+                    for (int c = 0; c < callbacks.size(); c++) {
+                        callbacks.get(c).onRelease();
+                    }
                     setCurrentItem(currentItem, false);
                 }
             }
@@ -466,7 +480,9 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
             boolean move = Math.abs(dy) >= touchSlop || Math.abs(dx) >= touchSlop;
             if (move) {
                 isDownReleased = true;
-                callback.onRelease();
+                for (int c = 0; c < callbacks.size(); c++) {
+                    callbacks.get(c).onRelease();
+                }
             }
             if (isSwipingViewPager && isScrollingListView) {
                 if (move) {
@@ -519,7 +535,9 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
                 final TLRPC.VideoSize videoSize = FileLoader.getClosestVideoSizeWithSize(chatInfo.chat_photo.video_sizes, 1000);
                 videoLocations.set(0, ImageLocation.getForPhoto(videoSize, chatInfo.chat_photo));
                 videoFileNames.set(0, FileLoader.getAttachFileName(videoSize));
-                callback.onPhotosLoaded();
+                for (int c = 0; c < callbacks.size(); c++) {
+                    callbacks.get(c).onPhotosLoaded();
+                }
             } else {
                 videoLocations.set(0, null);
                 videoFileNames.add(0, null);
@@ -1025,8 +1043,8 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
                 forceResetPosition = false;
 
-                if (callback != null) {
-                    callback.onPhotosLoaded();
+                for (int c = 0; c < callbacks.size(); c++) {
+                    callbacks.get(c).onPhotosLoaded();
                 }
                 if (currentUploadingImageLocation != null) {
                     addUploadingImage(currentUploadingImageLocation, curreantUploadingThumbLocation);
@@ -1211,7 +1229,9 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
                 @Override
                 public void onAnimationReady(ImageReceiver imageReceiver) {
-                    callback.onVideoSet();
+                    for (int c = 0; c < callbacks.size(); c++) {
+                        callbacks.get(c).onVideoSet();
+                    }
                 }
             });
             item.imageView.getImageReceiver().setCrossfadeAlpha((byte) 2);
