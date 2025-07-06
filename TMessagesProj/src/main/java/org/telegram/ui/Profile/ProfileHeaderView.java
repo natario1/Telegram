@@ -148,6 +148,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         avatarDrawable.setProfile(true);
         galleryView.setParentAvatarImage(avatarView.image);
+        galleryView.setVisibility(View.INVISIBLE);
 
         fullscreenAnimator.setInterpolator(CubicBezierInterpolator.EASE_BOTH);
         fullscreenAnimator.addUpdateListener(anim -> {
@@ -265,17 +266,23 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         float hidden = -getTranslationY();
 
         attractorProgress = Math.min(1F, (float) growth / snapGrowths[1]);
-        float fullscreenTouchProgress = snapGrowths.length >= 3 ? Math.max(0, (float) (growth - snapGrowths[1]) / (snapGrowths[2] - snapGrowths[1])) : 0F;
         attractorY = lerp(attractorMinY, attractorMaxY, attractorProgress);
+        float fullscreenTouchProgress = snapGrowths.length >= 3 ? Math.max(0, (float) (growth - snapGrowths[1]) / (snapGrowths[2] - snapGrowths[1])) : 0F;
 
-        if (fullscreenTouchProgress > 0F) {
-            avatarView.updateY(hidden, lerp(attractorMaxY, (baseHeight + snapGrowths[2]) / 2F, fullscreenTouchProgress));
+        float cy;
+        if (fullscreenTouchProgress > 1F) {
+            cy = (baseHeight + growth) / 2F;
+        } else if (fullscreenTouchProgress > 0F) {
+            cy = lerp(attractorMaxY, (baseHeight + snapGrowths[2]) / 2F, fullscreenTouchProgress);
         } else {
-            avatarView.updateY(hidden, attractorY);
+            cy = attractorY;
         }
+        avatarView.setTranslationY((hidden + cy) - (avatarView.getTop() + AVATAR_SIZE/2F));
+        galleryView.setTranslationY((hidden + cy) - (galleryView.getTop() + galleryView.getHeight()/2F));
 
         avatarView.updateAttractor(attractorProgress);
         checkFullscreenAnimation(fullscreenTouchProgress, change, velocity);
+
         invalidate();
     }
 
@@ -286,29 +293,34 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     }
 
     private void setFullscreenProgress(float progress, boolean withinAnimation) {
-        if (withinAnimation) {
+        if (attractorProgress < 1F) {
+            fullscreenProgressDrivenByTouch = true;
+            fullscreenProgress = 0F;
+        } else if (withinAnimation) {
             fullscreenProgressDrivenByTouch = false;
             fullscreenProgress = progress;
         } else {
             if (progress >= 1F || progress <= FULLSCREEN_EXPAND_TRIGGER) fullscreenProgressDrivenByTouch = true;
             fullscreenProgress = fullscreenProgressDrivenByTouch ? progress : fullscreenProgress;
         }
+
+        // Update views
         avatarView.updateFullscreen(fullscreenProgress, baseHeight + snapGrowths[snapGrowths.length - 1]);
         if (galleryView.getMeasuredWidth() != 0) {
-            float scale = avatarView.getScaleX() / ((float) galleryView.getMeasuredWidth() / AVATAR_SIZE);
+            float target = avatarView.getScaleX() * AVATAR_SIZE;
+            float scale = target / galleryView.getMeasuredWidth();
             galleryView.setScaleX(scale);
             galleryView.setScaleY(scale);
-            if (scale >= 1F) {
-                galleryView.setPivotY(galleryView.getMeasuredHeight());
-                galleryView.setTranslationY(0F);
-            } else {
-                galleryView.setTranslationY((-getTranslationY() - galleryView.getTop())/2F);
-                galleryView.setPivotY(galleryView.getMeasuredHeight()/2F);
-            }
+            galleryView.invalidate();
         }
     }
 
     private void checkFullscreenAnimation(float touch, int change, float velocity) {
+        if (attractorProgress < 1F) {
+            if (fullscreenAnimator.isRunning()) fullscreenAnimator.cancel();
+            setFullscreenProgress(0F, false);
+            return;
+        }
         float max = Math.max(fullscreenProgress, touch);
         float min = Math.min(fullscreenProgress, touch);
         if (max > FULLSCREEN_EXPAND_TRIGGER && fullscreenProgress < 1F && change > 0) {
@@ -336,11 +348,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             galleryView.setCreateThumbFromParent(true);
             galleryView.getAdapter().notifyDataSetChanged();
         } else {
+            avatarView.getImageReceiver().setAllowStartAnimation(true);
             avatarView.getImageReceiver().startAnimation();
             updateFullscreenImageFromGallery(true, false);
             avatarView.image.setForegroundAlpha(1F);
-            avatarView.setVisibility(View.VISIBLE);
-            galleryView.setVisibility(View.GONE);
+            galleryView.setVisibility(View.INVISIBLE);
         }
 
         fullscreenAnimator.addListener(new AnimatorListenerAdapter() {
@@ -357,21 +369,24 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             }
             @Override
             public void onAnimationCancel(Animator animation) {
-                fullscreenAnimator.removeListener(this);
+                cleanup();
             }
 
             @Override
             public void onAnimationEnd(Animator animation) {
-                fullscreenAnimator.removeListener(this);
+                cleanup();
                 if (callback != null) {
                     callback.onFullscreenAnimationEnded(expand);
                 }
                 if (expand) {
-                    avatarView.setVisibility(View.GONE);
                     galleryView.setVisibility(View.VISIBLE);
                     avatarView.image.clearForeground();
                 }
                 discardGalleryImageOnFullscreenCollapse = false;
+            }
+
+            private void cleanup() {
+                fullscreenAnimator.removeListener(this);
                 float touchProgress = snapGrowths.length >= 3 ? Math.max(0, (float) (growth - snapGrowths[1]) / (snapGrowths[2] - snapGrowths[1])) : 0F;
                 setFullscreenProgress(touchProgress, false);
             }
@@ -897,10 +912,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             }
             super.dispatchDraw(canvas);
             canvas.restore();
-        }
-
-        private void updateY(float hidden, float center) {
-            setTranslationY(hidden + center - AVATAR_SIZE/2F);
         }
 
         private void updateAttractor(float attractorProgress) {

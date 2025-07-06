@@ -265,7 +265,6 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
     public ProfileGalleryView(Context context, long dialogId, ActionBar parentActionBar, org.telegram.ui.Components.AvatarImageView parentAvatarImageView, Callback callback) {
         super(context);
-        setVisibility(View.GONE);
         setOverScrollMode(View.OVER_SCROLL_NEVER);
         setOffscreenPageLimit(2);
 
