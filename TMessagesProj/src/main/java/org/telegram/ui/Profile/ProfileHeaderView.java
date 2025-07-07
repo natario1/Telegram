@@ -38,6 +38,7 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static org.telegram.messenger.AndroidUtilities.*;
 import static org.telegram.messenger.Utilities.clamp;
 import static org.telegram.ui.Components.LayoutHelper.MATCH_PARENT;
+import static org.telegram.ui.Components.LayoutHelper.createFrame;
 import static org.telegram.ui.Stars.StarsController.findAttribute;
 
 public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implements NotificationCenter.NotificationCenterDelegate {
@@ -63,8 +64,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private final static float FULLSCREEN_COLLAPSE_TRIGGER = .85F;
 
     private final static int HEIGHT_MID = dp(270);
-    private final static int HEIGHT_MAX = dp(422);
-    private final static int HEIGHT_OVERSCROLL_DP = 48;
+    private final static int EXTRA_HEIGHT_OVERSCROLL = dp(48F);
+    public final static int EXTRA_HEIGHT_ACTIONS = dp(62F);
 
     public interface Callback {
         void onFullscreenAnimationStarted(boolean fullscreen);
@@ -107,6 +108,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     private final AvatarDrawable avatarDrawable = new AvatarDrawable();
     private final Avatar avatarView;
+    private final ViewWithBlurredFooter avatarWrapper;
     private ImageLocation avatarLoadedLocation;
 
     private final float attractorMinY = -ATTRACTOR_HIDDEN_Y;
@@ -123,6 +125,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private final AbsorbAnimation absorbAnimation = new AbsorbAnimation();
 
     private final ProfileGalleryView galleryView;
+    private final ViewWithBlurredFooter galleryWrapper;
     private final ProfileHeaderOverlaysView overlaysView;
 
     private Point displaySize;
@@ -144,21 +147,26 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         this.root = root;
         this.actionBar = actionBar;
         this.resourcesProvider = resourcesProvider;
+
         this.avatarView = new Avatar(context, currentAccount, dialogId, isTopic, resourcesProvider, this::updateRanges);
+        this.avatarWrapper = new ViewWithBlurredFooter(avatarView, gallery, resourcesProvider);
+
         this.galleryView = gallery;
-        this.overlaysView = new ProfileHeaderOverlaysView(context, gallery);
+        this.galleryWrapper = new ViewWithBlurredFooter(galleryView, gallery, resourcesProvider);
+        this.overlaysView = new ProfileHeaderOverlaysView(context, gallery, galleryWrapper.clipper);
 
         avatarDrawable.setProfile(true);
         galleryView.setParentAvatarImage(avatarView.image);
-        galleryView.setVisibility(View.INVISIBLE);
+        galleryWrapper.setVisibility(View.INVISIBLE);
 
         fullscreenAnimator.setInterpolator(CubicBezierInterpolator.EASE_BOTH);
         fullscreenAnimator.addUpdateListener(anim -> {
             setFullscreenProgress((float) anim.getAnimatedValue(), true);
         });
-        addView(avatarView, LayoutHelper.createFrame(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
-        addView(galleryView, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT, Gravity.TOP | Gravity.LEFT, 0, HEIGHT_OVERSCROLL_DP, 0, 0));
-        addView(overlaysView, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT));
+
+        addView(avatarWrapper, createFrame(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
+        addView(galleryWrapper, createFrame(MATCH_PARENT, WRAP_CONTENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
+        addView(overlaysView, createFrame(MATCH_PARENT, WRAP_CONTENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
         setWillNotDraw(false);
         setBackgroundColor(getThemedColor(Theme.key_avatar_backgroundActionBarBlue));
         updateGifts();
@@ -173,7 +181,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 updateGifts();
             }
         } else if (id == NotificationCenter.storiesUpdated || id == NotificationCenter.storiesReadUpdated) {
-            avatarView.updateStories();
+            avatarView.updateStoriesData();
         }
     }
 
@@ -205,8 +213,16 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     // GROWTH
 
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        if (w != oldw) updateRanges();
+    }
+
     private void updateRanges() {
         if (displaySize == null) return;
+        boolean landscape = displaySize.x > displaySize.y;
 
         // Configure base height
         int baseHeight = ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? statusBarHeight : 0);
@@ -220,24 +236,20 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             cutoutTop = cutout == null ? 0 : cutout.getSafeInsetTop();
         }
         int availableHeight = displaySize.y - baseHeight;
-        int overscrollHeight = dp(HEIGHT_OVERSCROLL_DP);
 
         // Configure growth
-        boolean landscape = displaySize.x > displaySize.y;
-        boolean expandable = !landscape && avatarView.getImageReceiver().hasNotThumb() && !AndroidUtilities.isAccessibilityScreenReaderEnabled();
-
         int mid = HEIGHT_MID - ActionBar.getCurrentActionBarHeight() - statusBarHeight;
+        int max = (getMeasuredWidth() == 0 ? displaySize.x : getMeasuredWidth()) - baseHeight + EXTRA_HEIGHT_ACTIONS;
         if (actionBar.getOccupyStatusBar() && cutoutTop > 0) {
             // Not much room for the avatar. Ensure it's not clipped by cutouts.
             int leftover = (baseHeight + mid) - (AVATAR_BOTTOM_PADDING + AVATAR_SIZE);
             if (leftover < cutoutTop) mid += cutoutTop - leftover;
         }
-        mid = (int) Math.min(.75F * availableHeight, mid);
-        if (expandable) {
-            int max = Math.min(availableHeight - overscrollHeight, HEIGHT_MAX - ActionBar.getCurrentActionBarHeight() - statusBarHeight);
-            configureGrowth(max + overscrollHeight, new int[]{0, mid, max});
+        mid = Math.min((int) (.75F * (availableHeight - EXTRA_HEIGHT_OVERSCROLL)), mid);
+        if (!landscape && !isTablet() && avatarView.getImageReceiver().hasNotThumb() && !AndroidUtilities.isAccessibilityScreenReaderEnabled()) {
+            configureGrowth(max + EXTRA_HEIGHT_OVERSCROLL, new int[]{0, mid, max});
         } else {
-            configureGrowth(mid + overscrollHeight, new int[]{0, mid});
+            configureGrowth(mid + EXTRA_HEIGHT_OVERSCROLL, new int[]{0, mid});
         }
         attractorMaxY = baseHeight + mid - AVATAR_BOTTOM_PADDING - AVATAR_SIZE /2F;
     }
@@ -274,18 +286,19 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         float cy;
         if (fullscreenTouchProgress > 1F) {
-            cy = (baseHeight + growth) / 2F;
+            cy = (baseHeight + growth - EXTRA_HEIGHT_ACTIONS) / 2F;
         } else if (fullscreenTouchProgress > 0F) {
-            cy = lerp(attractorMaxY, (baseHeight + snapGrowths[2]) / 2F, fullscreenTouchProgress);
+            cy = lerp(attractorMaxY, (baseHeight + snapGrowths[2] - EXTRA_HEIGHT_ACTIONS) / 2F, fullscreenTouchProgress);
         } else {
             cy = attractorY;
         }
-        avatarView.setTranslationY((hidden + cy) - (avatarView.getTop() + AVATAR_SIZE/2F));
-        galleryView.setTranslationY((hidden + cy) - (galleryView.getTop() + galleryView.getHeight()/2F));
-        overlaysView.setTranslationY(hidden);
-        overlaysView.setInsets(actionBar.getOccupyStatusBar() ? statusBarHeight : 0, ActionBar.getCurrentActionBarHeight());
+        avatarWrapper.translateContentCenter(hidden + cy);
+        float gt = galleryWrapper.translateContentCenter(hidden + cy);
+        overlaysView.setTranslationY(gt);
+        overlaysView.setTopInsets(actionBar.getOccupyStatusBar() ? statusBarHeight : 0, ActionBar.getCurrentActionBarHeight());
 
-        avatarView.updateAttractor(attractorProgress);
+        float shrinkInset = avatarView.updateAttractor(attractorProgress);
+        avatarWrapper.clipper.setInset(shrinkInset);
         checkFullscreenAnimation(fullscreenTouchProgress, change, velocity);
 
         invalidate();
@@ -309,16 +322,37 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             fullscreenProgress = fullscreenProgressDrivenByTouch ? progress : fullscreenProgress;
         }
 
-        // Update views
-        avatarView.updateFullscreen(fullscreenProgress, baseHeight + snapGrowths[snapGrowths.length - 1]);
-        overlaysView.setGalleryVisibility(fullscreenProgress);
-        if (galleryView.getMeasuredWidth() != 0) {
-            float target = avatarView.getScaleX() * AVATAR_SIZE;
-            float scale = target / galleryView.getMeasuredWidth();
-            galleryView.setScaleX(scale);
-            galleryView.setScaleY(scale);
-            galleryView.invalidate();
-        }
+        // Use first part for the stories ring to disappear
+        float initial = Math.min(1F, fullscreenProgress / FULLSCREEN_EXPAND_TRIGGER);
+        avatarView.updateStoriesInsets(initial);
+
+        // Use the rest for blurred footer appearance
+        float remaining = Math.max(0F, (fullscreenProgress - FULLSCREEN_EXPAND_TRIGGER) / (1F - FULLSCREEN_EXPAND_TRIGGER));
+        galleryWrapper.setFooterVisibility(Math.min(1F, remaining));
+        avatarWrapper.setFooterVisibility(Math.min(1F, remaining));
+        overlaysView.setGalleryVisibility(remaining);
+
+        // Update size
+        int fullscreenSize = baseHeight + snapGrowths[snapGrowths.length - 1] - EXTRA_HEIGHT_ACTIONS;
+        float targetWidth = remaining == 0F
+                ? lerp(AVATAR_SIZE, 1.25F*AVATAR_SIZE, initial)
+                : lerp(1.25F*AVATAR_SIZE, fullscreenSize, (float) Math.pow(remaining, .75));
+        avatarWrapper.setScaleX(targetWidth / AVATAR_SIZE);
+        avatarWrapper.setScaleY(targetWidth / AVATAR_SIZE);
+        avatarWrapper.clipper.invalidate();
+        galleryWrapper.setScaleX(targetWidth / fullscreenSize);
+        galleryWrapper.setScaleY(targetWidth / fullscreenSize);
+        galleryWrapper.clipper.invalidate();
+        overlaysView.setScaleX(targetWidth / fullscreenSize);
+        overlaysView.setScaleY(targetWidth / fullscreenSize);
+
+        // Update radius
+        float targetRadius = remaining == 0F ? targetWidth/2F : lerp(1.25F*AVATAR_SIZE/2F, 0, CubicBezierInterpolator.EASE_BOTH.getInterpolation(remaining));
+        avatarWrapper.clipper.setRoundRadius(targetRadius);
+        galleryWrapper.clipper.setRoundRadius(targetRadius);
+
+        // Misc
+        avatarView.image.setForegroundAlpha(Math.min(1F, fullscreenProgress));
     }
 
     private void checkFullscreenAnimation(float touch, int change, float velocity) {
@@ -348,31 +382,25 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         float accelerator = clamp(Math.abs(velocity), dpf2(2000F), dpf2(1100F)) / dpf2(1100f);
         fullscreenAnimator.setDuration((long) (200F / accelerator));
-        // WIP: avatarsViewPagerIndicatorView.refreshVisibility(accelerator);
 
         if (expand) {
             galleryView.setCreateThumbFromParent(true);
             galleryView.getAdapter().notifyDataSetChanged();
+            galleryView.setAnimatedFileMaybe(avatarView.getImageReceiver().getAnimation());
+            updateFullscreenImageFromGallery(false, false);
         } else {
             avatarView.getImageReceiver().setAllowStartAnimation(true);
             avatarView.getImageReceiver().startAnimation();
             updateFullscreenImageFromGallery(true, false);
             avatarView.image.setForegroundAlpha(1F);
-            galleryView.setVisibility(View.INVISIBLE);
+            galleryWrapper.setVisibility(View.INVISIBLE);
+            avatarWrapper.setVisibility(View.VISIBLE);
+        }
+        if (callback != null) {
+            callback.onFullscreenAnimationStarted(expand);
         }
 
         fullscreenAnimator.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationStart(Animator animation) {
-                if (callback != null) {
-                    callback.onFullscreenAnimationStarted(expand);
-                }
-                if (expand) {
-                    updateFullscreenImageFromGallery(false, false);
-                    galleryView.setAnimatedFileMaybe(avatarView.getImageReceiver().getAnimation());
-                    galleryView.resetCurrentItem();
-                }
-            }
             @Override
             public void onAnimationCancel(Animator animation) {
                 cleanup();
@@ -385,8 +413,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                     callback.onFullscreenAnimationEnded(expand);
                 }
                 if (expand) {
-                    galleryView.setVisibility(View.VISIBLE);
+                    galleryWrapper.setVisibility(View.VISIBLE);
+                    avatarWrapper.setVisibility(View.INVISIBLE);
                     avatarView.image.clearForeground();
+                } else {
+                    galleryView.resetCurrentItem();
                 }
                 discardGalleryImageOnFullscreenCollapse = false;
             }
@@ -796,16 +827,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         private final static float MIN_RADIUS = ATTRACTOR_HIDDEN_Y;
         private final static float MAX_INSET = AVATAR_SIZE/2F - MIN_RADIUS;
 
-        private final Path clipPath = new Path();
-        private boolean clipPathDirty = true;
-        private float clipInset = 0;
-        private float clipRadius = AVATAR_SIZE/2F;
-        private final RectF clipRect = new RectF(0, 0, AVATAR_SIZE, AVATAR_SIZE);
-
-        private Path clipPathOverride = null;
-        private float clipPathOverrideOffsetX = 0;
-        private float clipPathOverrideOffsetY = 0;
-
         private final AvatarImageView image;
         private final ProfileStoriesView stories;
         private final RadialProgressView progressBar;
@@ -840,7 +861,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                     }
                 }
             };
-            image.setRoundRadius(AVATAR_SIZE/2);
             image.getImageReceiver().setAllowDecodeSingleFrame(true);
             image.getImageReceiver().setAllowStartAnimation(true);
             image.getImageReceiver().startAnimation();
@@ -880,17 +900,14 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             addView(image, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT));
             addView(stories, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT));
             addView(progressBar, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT));
-            updateStories();
+            updateStoriesData();
+            updateStoriesInsets(0F);
             updateProgressBar(false, false);
+            updateAttractor(0F);
         }
 
         public ImageReceiver getImageReceiver() {
             return image.getImageReceiver();
-        }
-
-        public float getImageScale() {
-            float radius = AVATAR_SIZE/2F - clipInset;
-            return getScaleX() * radius/(AVATAR_SIZE/2F);
         }
 
         @Override
@@ -899,28 +916,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             super.onMeasure(spec, spec);
         }
 
-        @Override
-        protected void dispatchDraw(@NonNull Canvas canvas) {
-            canvas.save();
-            if (clipPathOverride != null) {
-                canvas.translate(-clipPathOverrideOffsetX, -clipPathOverrideOffsetY);
-                canvas.clipPath(clipPathOverride);
-                canvas.translate(clipPathOverrideOffsetX, clipPathOverrideOffsetY);
-            } else {
-                if (clipPathDirty) {
-                    clipPath.rewind();
-                    clipRect.set(0F, 0F, AVATAR_SIZE, AVATAR_SIZE);
-                    clipRect.inset(clipInset, clipInset);
-                    clipPath.addRoundRect(clipRect, clipRadius-clipInset, clipRadius-clipInset, Path.Direction.CW);
-                    clipPathDirty = false;
-                }
-                canvas.clipPath(clipPath);
-            }
-            super.dispatchDraw(canvas);
-            canvas.restore();
-        }
-
-        private void updateAttractor(float attractorProgress) {
+        private float updateAttractor(float attractorProgress) {
             float progress = clamp((attractorProgress - .1F) / .8F, 1F, 0F); // trim 10% on both sides
             if (progress >= .5F) {
                 image.setDimAlpha(0);
@@ -929,46 +925,16 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 image.setDimAlpha((1F - progress * 2F));
                 image.setBlurAlpha(1);
             }
-
-            float inset = lerp(MAX_INSET, 0F, CubicBezierInterpolator.EASE_IN.getInterpolation(attractorProgress));
-            if (inset != clipInset) {
-                clipInset = inset;
-                clipPathDirty = true;
-                invalidate();
-            }
+            return lerp(MAX_INSET, 0F, CubicBezierInterpolator.EASE_IN.getInterpolation(attractorProgress));
         }
 
-        private void updateFullscreen(float fullscreenProgress, float fullscreenHeight) {
-            float clamped = Math.min(1F, fullscreenProgress);
-            image.setForegroundAlpha(clamped);
-            image.setProgressToExpand(clamped);
-            stories.setAlpha(1F - clamped);
-
-            float radius;
-            float scale;
-            if (fullscreenProgress >= FULLSCREEN_EXPAND_TRIGGER) {
-                float p = (fullscreenProgress - FULLSCREEN_EXPAND_TRIGGER) / (1F - FULLSCREEN_EXPAND_TRIGGER);
-                radius = Math.max(0, lerp(AVATAR_SIZE/2F, 0, p*1.5F));
-                float maxScaleX = (2F * getLeft() + AVATAR_SIZE) / AVATAR_SIZE;
-                float maxScaleY = fullscreenHeight / AVATAR_SIZE;
-                scale = lerp(1.2F, Math.max(maxScaleX, maxScaleY), p);
-            } else {
-                float p = fullscreenProgress / FULLSCREEN_EXPAND_TRIGGER;
-                radius = AVATAR_SIZE/2F;
-                scale = lerp(1F, 1.2F, p);
-            }
-            setScaleX(scale);
-            setScaleY(scale);
-
-            if (radius != clipRadius) {
-                clipRadius = radius;
-                clipPathDirty = true;
-                image.setRoundRadius(Math.round(radius));
-                invalidate();
-            }
+        private void updateStoriesInsets(float storiesDisappearProgress) {
+            image.setProgressToStoriesInsets(1F - storiesDisappearProgress);
+            image.setRoundRadius(storiesDisappearProgress == 1F ? 0 : AVATAR_SIZE/2);
+            stories.setAlpha(1F - storiesDisappearProgress);
         }
 
-        public void updateStories() {
+        public void updateStoriesData() {
             boolean has = stories.updateStories();
             image.setHasStories(has);
         }
@@ -989,49 +955,44 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         private final Path path = new Path();
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF avatarRect = new RectF();
+        private final RectF avatarBox = new RectF();
+        private final RectF avatarFullBox = new RectF();
         private boolean hasContact;
         private float progress;
-        private float avatarRadius;
 
         private AbsorbAnimation() {
             paint.setColor(Color.BLACK);
         }
 
-        private boolean shouldDraw(Avatar avatar, float attractorY, float attractorMinY, float attractorProgress) {
-            avatar.clipPathOverride = null;
-            if (attractorProgress == 0F || attractorProgress == 1F) {
+        private boolean shouldDraw(ViewClipper avatar, float avatarCenterY, float avatarMinCenterY, float avatarProgress) {
+            avatar.setCustom(null, 0, 0, false);
+            if (avatarProgress == 0F || avatarProgress == 1F) {
                 hasContact = false;
                 return false;
             }
-            avatarRadius = AVATAR_SIZE / 2F - avatar.clipInset;
-            avatarRect.set(-avatarRadius, attractorY - avatarRadius, avatarRadius, attractorY + avatarRadius);
-            hasContact = avatarRect.top <= AVATAR_TOP_CONTACT;
-            if (avatarRect.top > AVATAR_TOP_INITIAL) return false;
+            float avatarHalfSize = avatar.getBoundingBox().width() / 2F;
+            float avatarHalfSizeWithoutClip = avatar.getBoundingBox().centerX();
+            avatarBox.set(-avatarHalfSize, avatarCenterY - avatarHalfSize, avatarHalfSize, avatarCenterY + avatarHalfSize);
+            avatarFullBox.set(-avatarHalfSizeWithoutClip, avatarCenterY - avatarHalfSizeWithoutClip, avatarHalfSizeWithoutClip, avatarCenterY + avatarHalfSizeWithoutClip);
+            hasContact = avatarBox.top <= AVATAR_TOP_CONTACT;
+            if (avatarBox.top > AVATAR_TOP_INITIAL) return false;
             if (hasContact) {
-                float avatarTopFinal = attractorMinY - Avatar.MIN_RADIUS;
-                progress = (AVATAR_TOP_CONTACT - avatarRect.top) / (AVATAR_TOP_CONTACT - avatarTopFinal);
+                float avatarTopFinal = avatarMinCenterY - Avatar.MIN_RADIUS;
+                progress = (AVATAR_TOP_CONTACT - avatarBox.top) / (AVATAR_TOP_CONTACT - avatarTopFinal);
             } else {
-                progress = (AVATAR_TOP_INITIAL - avatarRect.top) / (AVATAR_TOP_INITIAL - AVATAR_TOP_CONTACT);
+                progress = (AVATAR_TOP_INITIAL - avatarBox.top) / (AVATAR_TOP_INITIAL - AVATAR_TOP_CONTACT);
             }
             return true;
         }
 
-        private void draw(Canvas canvas, Avatar avatar) {
-            canvas.save();
-            canvas.translate(avatar.getX() + avatar.getWidth() / 2F, 0);
-
+        private void draw(Canvas canvas, ViewClipper avatar) {
             if (hasContact) {
                 drawHourglass(canvas);
-                avatar.clipPathOverride = path;
-                avatar.clipPathOverrideOffsetX = -avatar.getWidth() / 2F;
-                avatar.clipPathOverrideOffsetY = avatarRect.centerY() - avatar.getHeight() / 2F;
+                avatar.setCustom(path, avatarFullBox.left, avatarFullBox.top, false);
             } else {
                 drawDetachedTopPath(canvas);
                 drawDetachedBottomPath(canvas);
             }
-
-            canvas.restore();
         }
 
         private void drawGaussian(Canvas canvas, float w, float h) {
@@ -1050,19 +1011,21 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         }
 
         private void drawDetachedBottomPath(Canvas canvas) {
+            float avatarHalfSize = avatarBox.right;
             float h = 0.25F * AVATAR_TOP_CONTACT * progress;
-            float e = avatarRadius * 0.076120F;
-            canvas.translate(0, avatarRect.top + e);
-            drawGaussian(canvas, avatarRadius * 0.765367F, -(h+e));
-            canvas.translate(0, -(avatarRect.top + e));
+            float e = avatarHalfSize * 0.076120F;
+            canvas.translate(0, avatarBox.top + e);
+            drawGaussian(canvas, avatarHalfSize * 0.765367F, -(h+e));
+            canvas.translate(0, -(avatarBox.top + e));
         }
 
         private void drawHourglass(Canvas canvas) {
+            float avatarHalfSize = avatarBox.right;
             double angle = Math.PI * lerp(1F/8, 7F/8, CubicBezierInterpolator.EASE_OUT.getInterpolation(progress));
             float degrees = (float) (angle * 180/Math.PI);
             float tx = lerp(TOP_W_CONTACT, TOP_W_MAX, progress) / 2;
-            float bx = avatarRadius * (float) Math.sin(angle);
-            float by = avatarRect.centerY() - avatarRadius * (float) Math.cos(angle);
+            float bx = avatarHalfSize * (float) Math.sin(angle);
+            float by = avatarBox.centerY() - avatarHalfSize * (float) Math.cos(angle);
 
             float tan = (float) Math.tan(Math.PI * lerp(.3, .1, progress));
             float cx = tx + 0.5F * ((bx-tx) - tan*by);
@@ -1070,7 +1033,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             path.rewind();
             path.moveTo(tx, 0);
             path.quadTo(cx, cy, bx, by);
-            path.arcTo(avatarRect, degrees - 90, 2 * (180 - degrees), false);
+            path.arcTo(avatarBox, degrees - 90, 2 * (180 - degrees), false);
             path.lineTo(-bx, by);
             path.quadTo(-cx, cy, -tx, 0);
             path.close();
@@ -1145,8 +1108,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             }
 
             // Absorb animation
-            if (absorbAnimation.shouldDraw(avatarView, attractorY, attractorMinY, attractorProgress)) {
-                absorbAnimation.draw(canvas, avatarView);
+            if (absorbAnimation.shouldDraw(avatarWrapper.clipper, attractorY, attractorMinY, attractorProgress)) {
+                canvas.save();
+                canvas.translate(avatarWrapper.getX() + avatarWrapper.getWidth() / 2F, 0);
+                absorbAnimation.draw(canvas, avatarWrapper.clipper);
+                canvas.restore();
             }
         }
 

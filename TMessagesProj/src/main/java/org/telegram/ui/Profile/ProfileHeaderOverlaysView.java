@@ -10,8 +10,9 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
+import androidx.core.graphics.ColorUtils;
 import androidx.viewpager.widget.ViewPager;
-import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.*;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.ProfileGalleryView;
 
@@ -32,10 +33,11 @@ public class ProfileHeaderOverlaysView extends FrameLayout {
     private final SimpleIndicator simpleIndicator;
     private final DetailedIndicator detailedIndicator;
     private final Shadows shadows;
+    private final ViewClipper clipper;
 
-    public ProfileHeaderOverlaysView(Context context, ProfileGalleryView gallery) {
+    public ProfileHeaderOverlaysView(Context context, ProfileGalleryView gallery, ViewClipper clipper) {
         super(context);
-
+        this.clipper = clipper;
         this.simpleIndicator = new SimpleIndicator(context, gallery);
         this.detailedIndicator = new DetailedIndicator(context, gallery);
         this.shadows = new Shadows(context, gallery);
@@ -45,6 +47,24 @@ public class ProfileHeaderOverlaysView extends FrameLayout {
         addView(this.detailedIndicator, createFrame(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 2, 0, 0));
 
         setGalleryVisibility(0F, false);
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int h = MeasureSpec.getSize(widthMeasureSpec) + ProfileHeaderView.EXTRA_HEIGHT_ACTIONS;
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
+    }
+
+    @Override
+    protected void dispatchDraw(@NonNull Canvas canvas) {
+        if (clipper.needsApply()) {
+            canvas.save();
+            clipper.apply(canvas);
+            super.dispatchDraw(canvas);
+            canvas.restore();
+        } else {
+            super.dispatchDraw(canvas);
+        }
     }
 
     public void setGalleryVisibility(float progress) {
@@ -57,7 +77,7 @@ public class ProfileHeaderOverlaysView extends FrameLayout {
         shadows.updateVisibility(progress);
     }
 
-    public void setInsets(int statusBar, int actionBar) {
+    public void setTopInsets(int statusBar, int actionBar) {
         simpleIndicator.setTranslationY(statusBar);
         detailedIndicator.setTranslationY(statusBar);
         shadows.setInsets(statusBar, actionBar);
@@ -65,23 +85,18 @@ public class ProfileHeaderOverlaysView extends FrameLayout {
 
     private static class Shadows extends View {
 
-        private int topInsets = 0;
-        private final Rect topRect = new Rect();
-        private final Rect bottomRect = new Rect();
-        private final GradientDrawable topGradient = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x42000000, 0});
-        private final GradientDrawable bottomGradient = new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[]{0x42000000, 0});
+        private final RadialGradient vignetteGradient = new RadialGradient(.5F, .5F, .5F, new int[]{ 0, ColorUtils.setAlphaComponent(Color.BLACK, 42) }, new float[]{ 0.7F, 1F }, Shader.TileMode.CLAMP);
+        private final Matrix vignetteMatrix = new Matrix();
+        private final Paint vignettePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private int vignetteTop = 0;
         private final GradientDrawable[] pressedGradients = new GradientDrawable[2];
         private final boolean[] pressedVisible = new boolean[2];
         private final float[] pressedAlpha = new float[2];
         private long lastDrawTime;
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
         public Shadows(Context context, ProfileGalleryView gallery) {
             super(context);
-            paint.setColor(Color.BLACK);
-            paint.setAlpha(66);
-            topGradient.setShape(GradientDrawable.RECTANGLE);
-            bottomGradient.setShape(GradientDrawable.RECTANGLE);
+            vignettePaint.setShader(vignetteGradient);
             for (int i = 0; i < 2; i++) {
                 final GradientDrawable.Orientation orientation = i == 0 ? GradientDrawable.Orientation.LEFT_RIGHT : GradientDrawable.Orientation.RIGHT_LEFT;
                 pressedGradients[i] = new GradientDrawable(orientation, new int[]{0x32000000, 0});
@@ -104,16 +119,14 @@ public class ProfileHeaderOverlaysView extends FrameLayout {
 
         private void updateVisibility(float progress) {
             int alpha = (int) (0xFF * progress);
-            topGradient.setAlpha(alpha);
-            bottomGradient.setAlpha(alpha);
-            paint.setAlpha((int) (66 * progress));
+            vignettePaint.setAlpha(alpha);
             pressedGradients[0].setAlpha(alpha);
             pressedGradients[1].setAlpha(alpha);
             setVisibility(progress > 0F ? View.VISIBLE : View.INVISIBLE);
         }
 
         private void setInsets(int statusBar, int actionBar) {
-            this.topInsets = statusBar + actionBar;
+            this.vignetteTop = statusBar / 2;
             refreshRects();
         }
 
@@ -123,16 +136,16 @@ public class ProfileHeaderOverlaysView extends FrameLayout {
         }
 
         private void refreshRects() {
-            final float k = 0.5f;
             int w = getWidth();
             int h = getHeight();
-            topRect.set(0, 0, w, (int) (k * topInsets));
-            bottomRect.set(0, (int) (h - dp(72f) * k), w, h);
-            topGradient.setBounds(0, topRect.bottom, w, topInsets + dp(16f));
-            bottomGradient.setBounds(0, h - dp(72f) - dp(24f), w, bottomRect.top);
             pressedGradients[0].setBounds(0, 0, w / 5, h);
             pressedGradients[1].setBounds(w - (w / 5), 0, w, h);
-            super.invalidate();
+
+            float vw = w*1.35F;
+            vignetteMatrix.setScale(vw, h- vignetteTop);
+            vignetteMatrix.postTranslate(-(vw-w)/2F, vignetteTop);
+            vignetteGradient.setLocalMatrix(vignetteMatrix);
+            invalidate();
         }
 
         @Override
@@ -149,10 +162,7 @@ public class ProfileHeaderOverlaysView extends FrameLayout {
                     pressedGradients[i].draw(canvas);
                 }
             }
-            topGradient.draw(canvas);
-            bottomGradient.draw(canvas);
-            canvas.drawRect(topRect, paint);
-            canvas.drawRect(bottomRect, paint);
+            canvas.drawRect(0, 0, getWidth(), getHeight(), vignettePaint);
 
             boolean invalidate = false;
             for (int i = 0; i < 2; i++) {

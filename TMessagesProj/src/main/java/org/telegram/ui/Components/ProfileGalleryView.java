@@ -1520,4 +1520,15 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         }
         setCurrentItem(p, true);
     }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        if (isProfileFragment) {
+            int w = MeasureSpec.getSize(widthMeasureSpec);
+            int spec = MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY);
+            super.onMeasure(spec, spec);
+        } else {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        }
+    }
 }

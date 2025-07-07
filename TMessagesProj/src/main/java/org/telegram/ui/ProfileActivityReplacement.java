@@ -246,7 +246,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
         }
         if (headerView != null) {
-            headerView.getAvatar().updateStories();
+            headerView.getAvatar().updateStoriesData();
         }
         updateTtlData();
         updatePremiumData();
@@ -281,7 +281,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         updateOnlineData(false);
         updateListData("setChatInfo");
         if (headerView != null) {
-            headerView.getAvatar().updateStories();
+            headerView.getAvatar().updateStoriesData();
             if (!isTopic()) headerView.getGallery().setChatInfo(chatInfo);
         }
         if (menuHandler != null) {
@@ -4164,7 +4164,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             object.thumb = object.imageReceiver.getBitmapSafe();
             object.size = -1;
             object.radius = avatar.getImageReceiver().getRoundRadius(true);
-            object.scale = avatar.getImageScale();
+            object.scale = 1F;
             object.canEdit = userId == getUserConfig().clientUserId;
             return object;
         }
