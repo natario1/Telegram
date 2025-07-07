@@ -28,14 +28,14 @@ import static org.telegram.ui.Components.LayoutHelper.createFrame;
  * Overlays for {@link ProfileGalleryView}.
  * Adds shadow and gallery indicator (top bars or current page, depending on count).
  */
-public class ProfileHeaderOverlaysView extends FrameLayout {
+class ProfileOverlaysView extends FrameLayout {
 
     private final SimpleIndicator simpleIndicator;
     private final DetailedIndicator detailedIndicator;
     private final Shadows shadows;
     private final ViewClipper clipper;
 
-    public ProfileHeaderOverlaysView(Context context, ProfileGalleryView gallery, ViewClipper clipper) {
+    ProfileOverlaysView(Context context, ProfileGalleryView gallery, ViewClipper clipper) {
         super(context);
         this.clipper = clipper;
         this.simpleIndicator = new SimpleIndicator(context, gallery);
@@ -51,7 +51,7 @@ public class ProfileHeaderOverlaysView extends FrameLayout {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int h = MeasureSpec.getSize(widthMeasureSpec) + ProfileHeaderView.EXTRA_HEIGHT_ACTIONS;
+        int h = MeasureSpec.getSize(widthMeasureSpec) + ProfileHeaderView.EXTRA_HEIGHT_FOOTER;
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
     }
 

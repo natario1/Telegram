@@ -65,7 +65,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     private final static int HEIGHT_MID = dp(270);
     private final static int EXTRA_HEIGHT_OVERSCROLL = dp(48F);
-    public final static int EXTRA_HEIGHT_ACTIONS = dp(62F);
+    public final static int EXTRA_HEIGHT_FOOTER = dp(62F);
 
     public interface Callback {
         void onFullscreenAnimationStarted(boolean fullscreen);
@@ -126,7 +126,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     private final ProfileGalleryView galleryView;
     private final ViewWithBlurredFooter galleryWrapper;
-    private final ProfileHeaderOverlaysView overlaysView;
+    private final ProfileOverlaysView overlaysView;
+    private final ProfileActionsView actionsView;
 
     private Point displaySize;
     public Callback callback;
@@ -153,7 +154,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         this.galleryView = gallery;
         this.galleryWrapper = new ViewWithBlurredFooter(galleryView, gallery, resourcesProvider);
-        this.overlaysView = new ProfileHeaderOverlaysView(context, gallery, galleryWrapper.clipper);
+        this.overlaysView = new ProfileOverlaysView(context, gallery, galleryWrapper.clipper);
+        this.actionsView = new ProfileActionsView(context);
 
         avatarDrawable.setProfile(true);
         galleryView.setParentAvatarImage(avatarView.image);
@@ -167,6 +169,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         addView(avatarWrapper, createFrame(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP));
         addView(galleryWrapper, createFrame(MATCH_PARENT, WRAP_CONTENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
         addView(overlaysView, createFrame(MATCH_PARENT, WRAP_CONTENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
+        addView(actionsView, createFrame(MATCH_PARENT, WRAP_CONTENT, Gravity.FILL_HORIZONTAL | Gravity.BOTTOM));
         setWillNotDraw(false);
         setBackgroundColor(getThemedColor(Theme.key_avatar_backgroundActionBarBlue));
         updateGifts();
@@ -239,7 +242,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         // Configure growth
         int mid = HEIGHT_MID - ActionBar.getCurrentActionBarHeight() - statusBarHeight;
-        int max = (getMeasuredWidth() == 0 ? displaySize.x : getMeasuredWidth()) - baseHeight + EXTRA_HEIGHT_ACTIONS;
+        int max = (getMeasuredWidth() == 0 ? displaySize.x : getMeasuredWidth()) - baseHeight + EXTRA_HEIGHT_FOOTER;
         if (actionBar.getOccupyStatusBar() && cutoutTop > 0) {
             // Not much room for the avatar. Ensure it's not clipped by cutouts.
             int leftover = (baseHeight + mid) - (AVATAR_BOTTOM_PADDING + AVATAR_SIZE);
@@ -286,9 +289,9 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         float cy;
         if (fullscreenTouchProgress > 1F) {
-            cy = (baseHeight + growth - EXTRA_HEIGHT_ACTIONS) / 2F;
+            cy = (baseHeight + growth - EXTRA_HEIGHT_FOOTER) / 2F;
         } else if (fullscreenTouchProgress > 0F) {
-            cy = lerp(attractorMaxY, (baseHeight + snapGrowths[2] - EXTRA_HEIGHT_ACTIONS) / 2F, fullscreenTouchProgress);
+            cy = lerp(attractorMaxY, (baseHeight + snapGrowths[2] - EXTRA_HEIGHT_FOOTER) / 2F, fullscreenTouchProgress);
         } else {
             cy = attractorY;
         }
@@ -300,6 +303,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         float shrinkInset = avatarView.updateAttractor(attractorProgress);
         avatarWrapper.clipper.setInset(shrinkInset);
         checkFullscreenAnimation(fullscreenTouchProgress, change, velocity);
+
+        actionsView.setVisibleRoom(growth);
 
         invalidate();
     }
@@ -333,7 +338,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         overlaysView.setGalleryVisibility(remaining);
 
         // Update size
-        int fullscreenSize = baseHeight + snapGrowths[snapGrowths.length - 1] - EXTRA_HEIGHT_ACTIONS;
+        int fullscreenSize = baseHeight + snapGrowths[snapGrowths.length - 1] - EXTRA_HEIGHT_FOOTER;
         float targetWidth = remaining == 0F
                 ? lerp(AVATAR_SIZE, 1.25F*AVATAR_SIZE, initial)
                 : lerp(1.25F*AVATAR_SIZE, fullscreenSize, (float) Math.pow(remaining, .75));

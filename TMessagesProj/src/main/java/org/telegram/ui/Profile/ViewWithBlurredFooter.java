@@ -30,7 +30,7 @@ class ViewWithBlurredFooter extends FrameLayout {
     private static final int FOOTER_GRADIENT_HEIGHT = dp(32);
     private static final int FOOTER_BLURRED_HEIGHT = dp(73.33F);
     private static final int FOOTER_HEIGHT = FOOTER_BLURRED_HEIGHT + FOOTER_GRADIENT_HEIGHT;
-    private static final int FOOTER_ROOM = ProfileHeaderView.EXTRA_HEIGHT_ACTIONS;
+    private static final int FOOTER_ROOM = ProfileHeaderView.EXTRA_HEIGHT_FOOTER;
 
     private final View content;
     final ViewClipper clipper;
@@ -234,15 +234,12 @@ class ViewWithBlurredFooter extends FrameLayout {
 
     @RequiresApi(Build.VERSION_CODES.S)
     private static class RenderNodeBlur extends Blur {
-        private final ProfileGalleryView gallery;
-        private final RenderNode node = new RenderNode(null);
-        private final int[] thisLocation = new int[2];
-        private final int[] otherLocation = new int[2];
+        private final BlurBehindDrawable drawable;
 
         private RenderNodeBlur(Context context, ProfileGalleryView gallery, Theme.ResourcesProvider resourcesProvider) {
             super(context, resourcesProvider);
-            this.gallery = gallery;
-            node.setRenderEffect(RenderEffect.createBlurEffect(60, 60, Shader.TileMode.CLAMP));
+            this.drawable = new BlurBehindDrawable(this);
+            this.drawable.behindViews.add(gallery);
             gallery.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
                 @Override public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) { invalidate(); }
                 @Override public void onPageSelected(int position) { invalidate(); }
@@ -254,22 +251,10 @@ class ViewWithBlurredFooter extends FrameLayout {
             });
         }
 
-        private void updateBlur(View view) {
-            if (getWidth() == 0 || getHeight() == 0) return;
-
-            this.getLocationInWindow(thisLocation);
-            view.getLocationInWindow(otherLocation);
-            float offsetX = otherLocation[0] - thisLocation[0];
-            float offsetY = otherLocation[1] - thisLocation[1];
-            offsetX -= view.getScrollX();
-            offsetY -= view.getScrollY();
-            node.setPosition(0, 0, getWidth(), getHeight());
-            offsetY += ProfileHeaderView.EXTRA_HEIGHT_ACTIONS;
-            RecordingCanvas canvas = node.beginRecording();
-            canvas.translate(offsetX, offsetY);
-            view.draw(canvas);
-            canvas.translate(-offsetX, -offsetY);
-            node.endRecording();
+        @Override
+        public void invalidate() {
+            super.invalidate();
+            drawable.refresh(0, FOOTER_ROOM);
         }
 
         @Override
@@ -279,8 +264,8 @@ class ViewWithBlurredFooter extends FrameLayout {
 
         @Override
         protected void drawContent(Canvas canvas) {
-            updateBlur(gallery);
-            canvas.drawRenderNode(node);
+            drawable.setBounds(0, 0, getWidth(), getHeight());
+            drawable.draw(canvas);
         }
     }
 }

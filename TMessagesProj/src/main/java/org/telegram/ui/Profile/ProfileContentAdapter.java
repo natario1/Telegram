@@ -96,7 +96,6 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
     private CharacterStyle loadingSpan;
     private final HashMap<TLRPC.TL_username, ClickableSpan> usernameSpans = new HashMap<>();
     private RecyclerView owner;
-    private RLottieDrawable cellCameraDrawable;
 
     public ProfileContentAdapter(ProfileActivityReplacement fragment) {
         this.fragment = fragment;
