@@ -21,7 +21,19 @@ import static org.telegram.messenger.Utilities.clamp;
 public class ProfileActionsView extends LinearLayout {
 
     public enum Action {
-        JOIN(R.string.VoipChatJoin, R.drawable.profile_actions_join);
+        GIFT(R.string.ActionStarGift, R.drawable.profile_actions_gift),
+        STORY(R.string.AddStory, R.drawable.profile_actions_story),
+        LIVESTREAM(R.string.StartVoipChannelTitle, R.drawable.profile_actions_livestream),
+        REPORT(R.string.ReportChat, R.drawable.profile_actions_report),
+        CALL(R.string.Call, R.drawable.profile_actions_call),
+        MESSAGE(R.string.Message, R.drawable.profile_actions_message), // "Discuss" in one of the mockups
+        VIDEO(R.string.GroupCallCreateVideo, R.drawable.profile_actions_video),
+        BLOCK(R.string.BizBotStop, R.drawable.profile_actions_block),
+        MUTE(R.string.ChatsMute, R.drawable.profile_actions_mute),
+        UNMUTE(R.string.ChatsUnmute, R.drawable.profile_actions_unmute),
+        SHARE(R.string.BotShare, R.drawable.profile_actions_share),
+        JOIN(R.string.VoipChatJoin, R.drawable.profile_actions_join),
+        LEAVE(R.string.VoipGroupLeave, R.drawable.profile_actions_leave);
 
         private final int textResId;
         private final int drawableResId;

@@ -1843,6 +1843,7 @@
     <string name="BlockAndDeleteReplies">BLOCK AND DELETE REPLIES</string>
     <string name="BlockContact">Block user</string>
     <string name="BlockUser">Block user</string>
+    <string name="BlockUserShort">Block</string>
     <string name="BlockUsers">Block users</string>
     <string name="BlockUserMessage">Do you want to block **%1$s** from messaging and calling you on Telegram?</string>
     <string name="BlockUsersMessage">Do you want to block **%1$s** from messaging and calling you on Telegram?</string>
