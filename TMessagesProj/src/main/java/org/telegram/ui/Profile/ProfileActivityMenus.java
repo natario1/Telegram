@@ -33,8 +33,8 @@ public class ProfileActivityMenus {
     public final static int AB_CONTACT_SHARE_ID = 3;
     public final static int AB_CONTACT_EDIT_ID = 4;
     public final static int AB_CONTACT_DELETE_ID = 5;
-    public final static int AB_GROUP_LEAVE_ID = 7; // TODO: move to header
-    public final static int AB_SHARE_ID = 10; // TODO: move to header
+    public final static int AB_GROUP_LEAVE_ID = 7;
+    public final static int AB_SHARE_ID = 10;
     public final static int AB_SHORTCUT_ID = 14;
     public final static int AB_SEARCH_MEMBERS_ID = 17;
     public final static int AB_STATISTICS_ID = 19;
@@ -324,19 +324,14 @@ public class ProfileActivityMenus {
         // WIP: mainMenuItem.setSubItemShown(AB_SET_AS_MAIN_ID, !first);
     }
 
-    public void updateBotViewPrivacyItem(boolean hasPrivacyPolicy) {
-        if (mainMenuItem == null) return;
-        mainMenuItem.setSubItemShown(AB_BOT_VIEW_PRIVACY_ID, hasPrivacyPolicy);
-    }
-
-    public void updateSendGiftsItem(boolean canSendGifts) {
-        if (mainMenuItem == null) return;
-        mainMenuItem.setSubItemShown(AB_SEND_GIFTS_ID, canSendGifts);
-    }
-
     public void clearMainMenu() {
         if (mainMenuItem == null) return;
         mainMenuItem.removeAllSubItems();
+    }
+
+    public void toggleMainMenuSubItem(int id, boolean visible) {
+        if (mainMenuItem == null) return;
+        mainMenuItem.setSubItemShown(id, visible);
     }
 
     public boolean hasMainMenuSubItem(int id) {

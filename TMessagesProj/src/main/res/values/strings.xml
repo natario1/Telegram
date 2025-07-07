@@ -490,6 +490,7 @@
     <string name="ChannelInviteLinkTitle">Invite Link</string>
     <string name="GroupAddMembers">Add Members</string>
     <string name="ChannelAddSubscribers">Add Subscribers</string>
+    <string name="LeaveChannelOrGroup">Leave</string>
     <string name="LeaveChannel">Leave Channel</string>
     <string name="LeaveChannelMenu">Leave channel</string>
     <string name="ChannelSettings">Settings</string>
@@ -743,6 +744,7 @@
     <string name="ChatHistoryHiddenInfo2">New members won\'t see more than 100 previous messages.</string>
     <string name="ProfileJoinChannel">Join Channel</string>
     <string name="ProfileJoinGroup">Join Group</string>
+    <string name="ProfileJoinShort">Join</string>
     <string name="GroupType">Group Type</string>
     <string name="ChannelType">Channel Type</string>
     <string name="GroupTypeHeader">Group type</string>

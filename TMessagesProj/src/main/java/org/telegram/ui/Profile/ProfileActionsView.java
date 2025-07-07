@@ -15,12 +15,24 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+
 import static org.telegram.messenger.AndroidUtilities.*;
 import static org.telegram.messenger.Utilities.clamp;
 
 public class ProfileActionsView extends LinearLayout {
 
+    public interface OnActionClickListener {
+        void onActionClick(Action action, View view);
+    }
+
     public enum Action {
+        JOIN(R.string.ProfileJoinShort, R.drawable.profile_actions_join),
+        LEAVE(R.string.LeaveChannelOrGroup, R.drawable.profile_actions_leave), // can be shown in action bar too
+        SHARE(R.string.BotShare, R.drawable.profile_actions_share), // can be shown in action bar too
+
         GIFT(R.string.ActionStarGift, R.drawable.profile_actions_gift),
         STORY(R.string.AddStory, R.drawable.profile_actions_story),
         LIVESTREAM(R.string.StartVoipChannelTitle, R.drawable.profile_actions_livestream),
@@ -30,10 +42,7 @@ public class ProfileActionsView extends LinearLayout {
         VIDEO(R.string.GroupCallCreateVideo, R.drawable.profile_actions_video),
         BLOCK(R.string.BizBotStop, R.drawable.profile_actions_block),
         MUTE(R.string.ChatsMute, R.drawable.profile_actions_mute),
-        UNMUTE(R.string.ChatsUnmute, R.drawable.profile_actions_unmute),
-        SHARE(R.string.BotShare, R.drawable.profile_actions_share),
-        JOIN(R.string.VoipChatJoin, R.drawable.profile_actions_join),
-        LEAVE(R.string.VoipGroupLeave, R.drawable.profile_actions_leave);
+        UNMUTE(R.string.ChatsUnmute, R.drawable.profile_actions_unmute);
 
         private final int textResId;
         private final int drawableResId;
@@ -55,6 +64,8 @@ public class ProfileActionsView extends LinearLayout {
     private final static float TEXT_SIZE = dpf2(10.9F);
 
     private final Button[] buttons = new Button[4];
+    private final List<Action> actions = new ArrayList<>();
+    public OnActionClickListener listener = null;
 
     public ProfileActionsView(Context context) {
         super(context);
@@ -62,13 +73,14 @@ public class ProfileActionsView extends LinearLayout {
         int px = (int) (HORIZONTAL_INSET - ITEM_PADDING_X);
         setPadding(px, PADDING_Y, px, PADDING_Y);
         for (int i = 0; i < buttons.length; i++) {
-            buttons[i] = new Button(context, null);
-            addView(buttons[i]);
+            Button button = new Button(context, null);
+            buttons[i] = button;
+            button.setOnClickListener(v -> {
+                if (listener == null || button.action == null) return;
+                listener.onActionClick(button.action, v);
+            });
+            addView(button);
         }
-        buttons[0].setAction(Action.JOIN);
-        buttons[1].setAction(Action.JOIN);
-        buttons[2].setAction(Action.JOIN);
-        buttons[3].setAction(Action.JOIN);
         setVisibleRoom(0F);
     }
 
@@ -77,7 +89,20 @@ public class ProfileActionsView extends LinearLayout {
         return new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 1F);
     }
 
-    public void setVisibleRoom(float room) {
+    public void editActions(Consumer<List<Action>> actions) {
+        List<Action> list = new ArrayList<>(this.actions);
+        actions.accept(list);
+        for (int i = 0; i < buttons.length; i++) {
+            Action action = i < list.size() ? list.get(i) : null;
+            buttons[i].setAction(action);
+        }
+    }
+
+    public boolean containsAction(Action action) {
+        return action != null && actions.contains(action);
+    }
+
+    void setVisibleRoom(float room) {
         float height = ITEM_HEIGHT + PADDING_Y * 2;
         float p0 = 0.1F * height;
         float p1 = 1.1F * height;
@@ -96,6 +121,7 @@ public class ProfileActionsView extends LinearLayout {
         private String text = "";
         private Drawable icon;
         private float iconScale = 1F;
+        private Action action;
 
         private Button(Context context, Action data) {
             super(context);
@@ -118,6 +144,7 @@ public class ProfileActionsView extends LinearLayout {
         }
 
         private void setAction(Action data) {
+            this.action = data;
             if (data != null) {
                 this.text = LocaleController.getString(data.textResId);
                 this.icon = ContextCompat.getDrawable(getContext(), data.drawableResId);

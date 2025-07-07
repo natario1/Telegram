@@ -334,7 +334,6 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         public final static int InfoFooter = newKind(VIEW_TYPE_SPACER);
         public final static int InfoShadow = newKind(VIEW_TYPE_SHADOW_TEXT);
 
-        // public final static int Join = newKind(VIEW_TYPE_TEXT); // Moved to header
         // public final static int SendMessage = newKind(VIEW_TYPE_TEXT); // Moved to header
         // public final static int Report = newKind(VIEW_TYPE_TEXT); // Moved to header
         // public final static int NotificationsSimple = newKind(VIEW_TYPE_NOTIFICATIONS_CHECK_SIMPLE); // Moved to header

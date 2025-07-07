@@ -83,7 +83,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
         SharedMediaLayout.SharedMediaPreloaderDelegate,
         SharedMediaLayout.Delegate,
         NotificationCenter.NotificationCenterDelegate,
-        DialogsActivity.DialogsActivityDelegate {
+        DialogsActivity.DialogsActivityDelegate,
+        ProfileActionsView.OnActionClickListener {
     
     private final static int PHONE_OPTION_CALL = 0,
             PHONE_OPTION_COPY = 1,
@@ -227,7 +228,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             isBotWithPrivacyPolicy = false;
         }
         if (menuHandler != null) {
-            menuHandler.updateBotViewPrivacyItem(isBotWithPrivacyPolicy);
+            menuHandler.toggleMainMenuSubItem(AB_BOT_VIEW_PRIVACY_ID, isBotWithPrivacyPolicy);
         }
         if (!isSettings()) {
             if (channelMessageFetcher == null) {
@@ -235,7 +236,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
             if (!channelMessageFetcherSubscribed && userInfo != null) {
                 channelMessageFetcherSubscribed = true;
-                channelMessageFetcher.subscribe(() -> updateListData("channelMessageFetcher"));
+                channelMessageFetcher.subscribe(() -> {
+                    updateListData("channelMessageFetcher");
+                    updateActionsData();
+                });
                 channelMessageFetcher.fetch(userInfo);
             }
             ProfileBirthdayEffect.BirthdayEffectFetcher old = birthdayEffectFetcher;
@@ -251,6 +255,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         updateTtlData();
         updatePremiumData();
         updateListData("setUserInfo");
+        updateActionsData();
     }
 
     public TLRPC.User getCurrentUser() {
@@ -280,6 +285,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         updateTtlData();
         updateOnlineData(false);
         updateListData("setChatInfo");
+        updateActionsData();
         if (headerView != null) {
             headerView.getAvatar().updateStoriesData();
             if (!isTopic()) headerView.getGallery().setChatInfo(chatInfo);
@@ -287,7 +293,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (menuHandler != null) {
             boolean canPurchase = !BuildVars.IS_BILLING_UNAVAILABLE && !getMessagesController().premiumPurchaseBlocked();
             boolean canSendGifts = chatInfo != null && chatInfo.stargifts_available;
-            menuHandler.updateSendGiftsItem(canPurchase && canSendGifts);
+            menuHandler.toggleMainMenuSubItem(AB_SEND_GIFTS_ID, canPurchase && canSendGifts);
         }
     }
 
@@ -444,7 +450,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                         }
                         if (user.bot) {
                             menuHandler.appendMainMenuSubItem(AB_BOT_VIEW_PRIVACY_ID);
-                            menuHandler.updateBotViewPrivacyItem(isBotWithPrivacyPolicy);
+                            menuHandler.toggleMainMenuSubItem(AB_BOT_VIEW_PRIVACY_ID, isBotWithPrivacyPolicy);
                             menuHandler.appendMainMenuSubItem(AB_REPORT_ID);
                         }
                         menuHandler.appendBlockUnblockItem(user.bot, isUserBlocked);
@@ -502,7 +508,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     if (!BuildVars.IS_BILLING_UNAVAILABLE && !getMessagesController().premiumPurchaseBlocked()) {
                         StarsController.getInstance(currentAccount).loadStarGifts();
                         menuHandler.appendSendGiftsItem(true);
-                        menuHandler.updateSendGiftsItem(chatInfo != null && chatInfo.stargifts_available);
+                        menuHandler.toggleMainMenuSubItem(AB_SEND_GIFTS_ID, chatInfo != null && chatInfo.stargifts_available);
                     }
                     if (chatInfo != null && chatInfo.linked_chat_id != 0) menuHandler.appendMainMenuSubItem(AB_VIEW_DISCUSSION_ID);
                     if (!chat.creator && !chat.left && !chat.kicked) menuHandler.appendLeaveGroupItem(false, true);
@@ -662,6 +668,30 @@ public class ProfileActivityReplacement extends BaseFragment implements
             updateListData("updateChatMembersData");
         }), delay));
         getConnectionsManager().bindRequestToGuid(reqId, classGuid);
+    }
+
+    private void updateActionsData() {
+        if (headerView == null) return;
+        ProfileActionsView actions = headerView.getActions();
+        actions.editActions(out -> {
+            out.clear();
+            if (chatId != 0 && ChatObject.isChannel(chat) && chat.left && !chat.kicked) {
+                long requestedTime = MessagesController.getNotificationsSettings(currentAccount).getLong("dialog_join_requested_time_" + dialogId, -1);
+                if (!(requestedTime > 0 && System.currentTimeMillis() - requestedTime < 1000 * 60 * 2)) {
+                    out.add(ProfileActionsView.Action.JOIN);
+                }
+            }
+            if (chatId != 0 && chat != null && ChatObject.isPublic(chat) || userId != 0 && getCurrentUser() != null && getCurrentUser().bot) {
+                out.add(ProfileActionsView.Action.SHARE);
+            }
+            if (chatId != 0 && chat != null && (!ChatObject.isChannel(chat) || (!chat.creator && !chat.left && !chat.kicked && topicId == 0))) {
+                out.add(ProfileActionsView.Action.LEAVE);
+            }
+        });
+        if (menuHandler != null) {
+            menuHandler.toggleMainMenuSubItem(AB_GROUP_LEAVE_ID, !actions.containsAction(ProfileActionsView.Action.LEAVE));
+            menuHandler.toggleMainMenuSubItem(AB_SHARE_ID, !actions.containsAction(ProfileActionsView.Action.SHARE));
+        }
     }
 
     private void updateListData(String reason) {
@@ -1811,6 +1841,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         // Updates
         updateColors(false);
         updateListData("createView");
+        updateActionsData();
         updateProfileData(true);
         updateMenuData(false);
         updateSelectedMediaTabText();
@@ -1965,6 +1996,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     if ((mask & MessagesController.UPDATE_MASK_CHAT) != 0) {
                         updateOnlineData(false);
                         updateListData("NotificationCenter.updateInterfaces");
+                        updateActionsData();
                     } else {
                         updateOnlineData(true);
                     }
@@ -2051,6 +2083,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
         } else if (id == NotificationCenter.reloadInterface) {
             updateListData("NotificationCenter.reloadInterface");
+            updateActionsData();
         } else if (id == NotificationCenter.starBalanceUpdated) {
             updateListData("NotificationCenter.starBalanceUpdated");
         } else if (id == NotificationCenter.botStarsUpdated) {
@@ -2062,6 +2095,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (info.user_id == userId) {
                 isBotInfoLoaded = true;
                 updateListData("NotificationCenter.botInfoDidLoad");
+                updateActionsData();
             }
         } else if (id == NotificationCenter.emojiLoaded) {
             if (listView == null) return;
@@ -2361,35 +2395,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
         } else if (id == AB_CONTACT_ADD_ID) {
             handleAddContact();
         } else if (id == AB_SHARE_ID) {
-            TLRPC.User user = userId != 0 ? getMessagesController().getUser(userId) : null;
-            TLRPC.Chat chat = chatId != 0 ? getMessagesController().getChat(chatId) : null;
-            if (user == null && chat == null) return;
-            try {
-                String text = "";
-                String username = user != null ? UserObject.getPublicUsername(user) : ChatObject.getPublicUsername(chat);
-                String about = user != null ? (isBotInfoLoaded && userInfo != null ? userInfo.about : null) : (chatInfo != null ? chatInfo.about : null);
-                if (TextUtils.isEmpty(about)) {
-                    text = String.format("https://" + getMessagesController().linkPrefix + "/%s", username);
-                } else {
-                    text = String.format("%s https://" + getMessagesController().linkPrefix + "/%s", about, username);
-                }
-                Intent intent = new Intent(Intent.ACTION_SEND);
-                intent.setType("text/plain");
-                intent.putExtra(Intent.EXTRA_TEXT, text);
-                startActivityForResult(Intent.createChooser(intent, getString(R.string.BotShare)), 500);
-            } catch (Exception e) {
-                FileLog.e(e);
-            }
+            handleShareProfile();
         } else if (id == AB_GROUP_LEAVE_ID) {
-            if (chat == null) return;
-            boolean isForum = ChatObject.isForum(chat);
-            AlertsCreator.createClearOrDeleteDialogAlert(this, false, chat, null, false, isForum, !isForum, (param) -> {
-                // WIP: playProfileAnimation = 0;
-                getNotificationCenter().removeObserver(this, NotificationCenter.closeChats);
-                getNotificationCenter().postNotificationName(NotificationCenter.closeChats);
-                finishFragment();
-                getNotificationCenter().postNotificationName(NotificationCenter.needDeleteDialog, -chat.id, null, chat, param);
-            }, getResourceProvider());
+            handleLeaveChat();
         } else if (id == AB_SHORTCUT_ID) {
             try {
                 long did;
@@ -2859,6 +2867,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     SharedPreferences sharedPreferences = ApplicationLoader.applicationContext.getSharedPreferences("systemConfig", Context.MODE_PRIVATE);
                     sharedPreferences.edit().putBoolean("logsEnabled", BuildVars.LOGS_ENABLED).commit();
                     updateListData("logs");
+                    updateActionsData();
                     if (BuildVars.LOGS_ENABLED) {
                         FileLog.d("app start time = " + ApplicationLoader.startTime);
                         try {
@@ -4299,6 +4308,73 @@ public class ProfileActivityReplacement extends BaseFragment implements
         getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_ALL);
         getNotificationCenter().postNotificationName(NotificationCenter.mainUserInfoChanged);
         getUserConfig().saveConfig(true);
+    }
+
+    @Override
+    public void onActionClick(ProfileActionsView.Action action, View view) {
+        switch (action) {
+            case LEAVE: {
+                handleLeaveChat();
+                break;
+            }
+            case SHARE: {
+                handleShareProfile();
+                break;
+            }
+            case JOIN: {
+                if (chat == null) return;
+                getMessagesController().addUserToChat(chat.id, getUserConfig().getCurrentUser(), 0, null, this, true, this::updateActionsData, err -> {
+                    if (err != null && "INVITE_REQUEST_SENT".equals(err.text)) {
+                        SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
+                        preferences.edit().putLong("dialog_join_requested_time_" + dialogId, System.currentTimeMillis()).commit();
+                        JoinGroupAlert.showBulletin(getContext(), this, ChatObject.isChannel(chat) && !chat.megagroup);
+                        updateActionsData();
+                        BaseFragment lastFragment = parentLayout != null ? parentLayout.getLastFragment() : null;
+                        if (lastFragment instanceof ChatActivity) {
+                            ((ChatActivity) lastFragment).showBottomOverlayProgress(false, true);
+                        }
+                        return false;
+                    }
+                    return true;
+                });
+                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.closeSearchByActiveAction);
+                break;
+            }
+        }
+    }
+
+    private void handleLeaveChat() {
+        if (chat == null) return;
+        boolean isForum = ChatObject.isForum(chat);
+        AlertsCreator.createClearOrDeleteDialogAlert(this, false, chat, null, false, isForum, !isForum, (param) -> {
+            // WIP: playProfileAnimation = 0;
+            getNotificationCenter().removeObserver(this, NotificationCenter.closeChats);
+            getNotificationCenter().postNotificationName(NotificationCenter.closeChats);
+            finishFragment();
+            getNotificationCenter().postNotificationName(NotificationCenter.needDeleteDialog, -chat.id, null, chat, param);
+        }, getResourceProvider());
+    }
+
+    private void handleShareProfile() {
+        TLRPC.User user = userId != 0 ? getMessagesController().getUser(userId) : null;
+        TLRPC.Chat chat = chatId != 0 ? getMessagesController().getChat(chatId) : null;
+        if (user == null && chat == null) return;
+        try {
+            String text = "";
+            String username = user != null ? UserObject.getPublicUsername(user) : ChatObject.getPublicUsername(chat);
+            String about = user != null ? (isBotInfoLoaded && userInfo != null ? userInfo.about : null) : (chatInfo != null ? chatInfo.about : null);
+            if (TextUtils.isEmpty(about)) {
+                text = String.format("https://" + getMessagesController().linkPrefix + "/%s", username);
+            } else {
+                text = String.format("%s https://" + getMessagesController().linkPrefix + "/%s", about, username);
+            }
+            Intent intent = new Intent(Intent.ACTION_SEND);
+            intent.setType("text/plain");
+            intent.putExtra(Intent.EXTRA_TEXT, text);
+            startActivityForResult(Intent.createChooser(intent, getString(R.string.BotShare)), 500);
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
     }
 
     private static class RoundRectPopup extends ActionBarPopupWindow.ActionBarPopupWindowLayout {

@@ -895,14 +895,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                     IdenticonDrawable identiconDrawable = new IdenticonDrawable();
                     identiconDrawable.setEncryptedChat(fragment.chatEncrypted);
                     textCell.setTextAndValueDrawable(LocaleController.getString(R.string.EncryptionKey), identiconDrawable, false);
-                } /* WIP: Moved to header else if (kind == Rows.Join) {
-                    textCell.setColors(-1, Theme.key_windowBackgroundWhiteBlueText2);
-                    if (fragment.getCurrentChat() != null && fragment.getCurrentChat().megagroup) {
-                        textCell.setText(LocaleController.getString(R.string.ProfileJoinGroup), false);
-                    } else {
-                        textCell.setText(LocaleController.getString(R.string.ProfileJoinChannel), false);
-                    }
-                } */ else if (kind == Rows.ChannelOptionsSubscribers) {
+                } else if (kind == Rows.ChannelOptionsSubscribers) {
                     String text = LocaleController.getString(R.string.ChannelSubscribers);
                     boolean divider = pos != rows.position(Rows.MembersShadow) - 1;
                     TLRPC.ChatFull chatInfo = fragment.getMessagesController().getChatFull(fragment.getChatId());

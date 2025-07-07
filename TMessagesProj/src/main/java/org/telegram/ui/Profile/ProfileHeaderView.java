@@ -1046,6 +1046,13 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         }
     }
 
+    // ACTIONS
+
+
+    public ProfileActionsView getActions() {
+        return actionsView;
+    }
+
     // DRAW
 
     @Override
