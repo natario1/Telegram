@@ -915,6 +915,10 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             return image.getImageReceiver();
         }
 
+        public AvatarImageView getImageView() {
+            return image;
+        }
+
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             int spec = MeasureSpec.makeMeasureSpec(AVATAR_SIZE, MeasureSpec.EXACTLY);

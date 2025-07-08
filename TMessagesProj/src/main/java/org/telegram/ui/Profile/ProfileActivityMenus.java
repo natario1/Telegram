@@ -39,7 +39,7 @@ public class ProfileActivityMenus {
     public final static int AB_SEARCH_MEMBERS_ID = 17;
     public final static int AB_STATISTICS_ID = 19;
     public final static int AB_START_SECRET_CHAT_ID = 20;
-    public final static int AB_VIEW_DISCUSSION_ID = 22; // TODO: move to header
+    public final static int AB_VIEW_DISCUSSION_ID = 22;
     public final static int AB_DELETE_TOPIC_ID = 23;
     public final static int AB_REPORT_ID = 24;
     public final static int AB_EDIT_INFO_ID = 30;

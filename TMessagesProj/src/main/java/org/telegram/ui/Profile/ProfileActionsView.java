@@ -38,11 +38,12 @@ public class ProfileActionsView extends LinearLayout {
         STOP(R.string.BizBotStop, R.drawable.profile_actions_block), // can be shown in action bar too, but this is specific for bots
         CALL(R.string.Call, R.drawable.profile_actions_call),
         VIDEO(R.string.GroupCallCreateVideo, R.drawable.profile_actions_video),
-
-        GIFT(R.string.ActionStarGift, R.drawable.profile_actions_gift),
+        GIFT(R.string.ActionStarGift, R.drawable.profile_actions_gift), // can be shown in action bar too
         STORY(R.string.AddStory, R.drawable.profile_actions_story),
-        LIVESTREAM(R.string.StartVoipChannelTitle, R.drawable.profile_actions_livestream), // Also 'Voice chat' from groups, see call_item
-        MESSAGE(R.string.Message, R.drawable.profile_actions_message), // "Discuss" in one of the mockups
+        DISCUSS(R.string.ProfileDiscuss, R.drawable.profile_actions_message), // can be shown in action bar too
+        MESSAGE(R.string.Message, R.drawable.profile_actions_message),
+        LIVESTREAM(R.string.StartVoipChannelTitle, R.drawable.profile_actions_livestream),
+        VOICECHAT(R.string.StartVoipChatTitle, R.drawable.profile_actions_livestream),
         ;
 
         private final int textResId;
@@ -93,9 +94,11 @@ public class ProfileActionsView extends LinearLayout {
     public void editActions(Consumer<List<Action>> actions) {
         List<Action> list = new ArrayList<>(this.actions);
         actions.accept(list);
+        this.actions.clear();
         for (int i = 0; i < buttons.length; i++) {
             Action action = i < list.size() ? list.get(i) : null;
             buttons[i].setAction(action);
+            if (action != null) this.actions.add(action);
         }
     }
 
