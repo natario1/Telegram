@@ -674,6 +674,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (headerView == null) return;
         ProfileActionsView actions = headerView.getActions();
         actions.editActions(out -> {
+            TLRPC.User user = userId == 0 ? null : getMessagesController().getUser(userId);
             out.clear();
             if (chatId != 0 && ChatObject.isChannel(chat) && chat.left && !chat.kicked) {
                 long requestedTime = MessagesController.getNotificationsSettings(currentAccount).getLong("dialog_join_requested_time_" + dialogId, -1);
@@ -681,16 +682,33 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     out.add(ProfileActionsView.Action.JOIN);
                 }
             }
-            if (chatId != 0 && chat != null && ChatObject.isPublic(chat) || userId != 0 && getCurrentUser() != null && getCurrentUser().bot) {
+            if (chatId != 0 || userId != 0 && !isSettings() && !UserObject.isUserSelf(user)) {
+                boolean enabled = MessagesController.getInstance(currentAccount).isDialogNotificationsSoundEnabled(getDialogId(), topicId);
+                out.add(enabled ? ProfileActionsView.Action.MUTE : ProfileActionsView.Action.UNMUTE);
+            }
+            if (user != null && !UserObject.isUserSelf(user)) {
+                out.add(ProfileActionsView.Action.CALL);
+                out.add(ProfileActionsView.Action.VIDEO);
+            }
+            if (chatId != 0 && chat != null && ChatObject.isPublic(chat) || user != null && user.bot && getDialogId() != UserObject.VERIFY) {
                 out.add(ProfileActionsView.Action.SHARE);
             }
             if (chatId != 0 && chat != null && (!ChatObject.isChannel(chat) || (!chat.creator && !chat.left && !chat.kicked && topicId == 0))) {
                 out.add(ProfileActionsView.Action.LEAVE);
             }
+            if (user != null && user.bot && getDialogId() != UserObject.VERIFY) {
+                out.add(ProfileActionsView.Action.STOP);
+            }
+            if (user != null && !isSettings() && !UserObject.isUserSelf(user)) {
+                out.add(ProfileActionsView.Action.REPORT);
+            }
         });
         if (menuHandler != null) {
             menuHandler.toggleMainMenuSubItem(AB_GROUP_LEAVE_ID, !actions.containsAction(ProfileActionsView.Action.LEAVE));
             menuHandler.toggleMainMenuSubItem(AB_SHARE_ID, !actions.containsAction(ProfileActionsView.Action.SHARE));
+            menuHandler.toggleMainMenuSubItem(AB_REPORT_ID, !actions.containsAction(ProfileActionsView.Action.REPORT));
+            menuHandler.toggleMainMenuSubItem(AB_BOT_BLOCK_ID, !actions.containsAction(ProfileActionsView.Action.STOP));
+
         }
     }
 
@@ -725,7 +743,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
             if (userId != 0) {
                 TLRPC.User user = getMessagesController().getUser(userId);
-                if (UserObject.isUserSelf(user) && !isMyProfile) {
+                if (isSettings()) {
                     /* WIP: if (avatarBig == null && (user.photo == null || !(user.photo.photo_big instanceof TLRPC.TL_fileLocation_layer97) && !(user.photo.photo_big instanceof TLRPC.TL_fileLocationToBeDeprecated)) && (avatarsViewPager == null || avatarsViewPager.getRealCount() == 0)) {
                         Rows.SetAvatar = rowCount++;
                         Rows.SetAvatarSection = rowCount++;
@@ -870,11 +888,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     if (divider) rows.append(Rows.ActionsShadow);
 
                     hasMedia = hasMedia || (user != null && user.bot && user.bot_can_edit) || userInfo != null && userInfo.common_chats_count != 0 || isMyProfile;
-                    /* WIP moving to header: else if (!rows.has(Rows.LastSection) && needSendMessage) {
-                        rows.append(Rows.SendMessage);
-                        rows.append(Rows.Report);
-                        rows.append(Rows.LastSection);
-                    } */
                 }
             } else if (isTopic()) {
                 rows.append(Rows.InfoHeader);
@@ -1783,6 +1796,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
         };
 
+        // Actions
+        ProfileActionsView actions = headerView.getActions();
+        actions.listener = this;
+
         // List
         listView = new ProfileContentView(actionBar, sharedMediaLayout, getNotificationCenter());
         listView.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -2347,19 +2364,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             getMessagesController().unblockPeer(userId, ()-> getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of("/start", userId, null, null, null, false, null, null, null, true, 0, null, false)));
             finishFragment();
         } else if (id == AB_BOT_BLOCK_ID) {
-            TLRPC.User user = getMessagesController().getUser(userId);
-            if (user == null) return;
-            AlertsCreator.createClearOrDeleteDialogAlert(ProfileActivityReplacement.this, false, chat, user, chatEncrypted != null, true, true, (param) -> {
-                if (getParentLayout() != null) {
-                    List<BaseFragment> fragmentStack = getParentLayout().getFragmentStack();
-                    BaseFragment prevFragment = fragmentStack == null || fragmentStack.size() < 2 ? null : fragmentStack.get(fragmentStack.size() - 2);
-                    if (prevFragment instanceof ChatActivity) {
-                        getParentLayout().removeFragmentFromStack(fragmentStack.size() - 2);
-                    }
-                }
-                finishFragment();
-                getNotificationCenter().postNotificationName(NotificationCenter.needDeleteDialog, dialogId, user, chat, param);
-            }, getResourceProvider());
+            handleBlockBot();
         } else if (id == AB_USER_UNBLOCK_ID) {
             handleUnblockUser();
         } else if (id == AB_USER_BLOCK_ID) {
@@ -4321,6 +4326,98 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 handleShareProfile();
                 break;
             }
+            case REPORT: {
+                ReportBottomSheet.openChat(this, getDialogId());
+                break;
+            }
+            case STOP: {
+                handleBlockBot();
+                break;
+            }
+            case CALL:
+            case VIDEO: {
+                TLRPC.User user = getMessagesController().getUser(userId);
+                if (user == null || userInfo == null) return;
+                if (!userInfo.phone_calls_available || !userInfo.video_calls_available && action == ProfileActionsView.Action.VIDEO) {
+                    // WIP: Launch the bottom sheet.
+                } else {
+                    VoIPHelper.startCall(user, action == ProfileActionsView.Action.VIDEO, userInfo.video_calls_available, getParentActivity(), userInfo, getAccountInstance());
+                }
+            }
+            case MUTE:
+            case UNMUTE: {
+                long did = getDialogId();
+                ChatNotificationsPopupWrapper chatNotificationsPopupWrapper = new ChatNotificationsPopupWrapper(getContext(), currentAccount, null, true, true, new ChatNotificationsPopupWrapper.Callback() {
+                    @Override
+                    public void toggleSound() {
+                        SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
+                        boolean enabled = !preferences.getBoolean("sound_enabled_" + NotificationsController.getSharedPrefKey(did, topicId), true);
+                        preferences.edit().putBoolean("sound_enabled_" + NotificationsController.getSharedPrefKey(did, topicId), enabled).apply();
+                        if (BulletinFactory.canShowBulletin(ProfileActivityReplacement.this)) {
+                            BulletinFactory.createSoundEnabledBulletin(ProfileActivityReplacement.this, enabled ? NotificationsController.SETTING_SOUND_ON : NotificationsController.SETTING_SOUND_OFF, getResourceProvider()).show();
+                        }
+                        updateActionsData();
+                    }
+
+                    @Override
+                    public void muteFor(int timeInSeconds) {
+                        if (timeInSeconds == 0) {
+                            if (getMessagesController().isDialogMuted(did, topicId)) {
+                                toggleMute();
+                            }
+                            if (BulletinFactory.canShowBulletin(ProfileActivityReplacement.this)) {
+                                BulletinFactory.createMuteBulletin(ProfileActivityReplacement.this, NotificationsController.SETTING_MUTE_UNMUTE, timeInSeconds, getResourceProvider()).show();
+                            }
+                        } else {
+                            getNotificationsController().muteUntil(did, topicId, timeInSeconds);
+                            if (BulletinFactory.canShowBulletin(ProfileActivityReplacement.this)) {
+                                BulletinFactory.createMuteBulletin(ProfileActivityReplacement.this, NotificationsController.SETTING_MUTE_CUSTOM, timeInSeconds, getResourceProvider()).show();
+                            }
+                            updateNotificationExceptionsData();
+                        }
+                        updateActionsData();
+                    }
+
+                    @Override
+                    public void showCustomize() {
+                        if (did != 0) {
+                            Bundle args = new Bundle();
+                            args.putLong("dialog_id", did);
+                            args.putLong("topic_id", topicId);
+                            presentFragment(new ProfileNotificationsActivity(args, getResourceProvider()));
+                        }
+                    }
+
+                    @Override
+                    public void toggleMute() {
+                        boolean muted = getMessagesController().isDialogMuted(did, topicId);
+                        getNotificationsController().muteDialog(did, topicId, !muted);
+                        if (ProfileActivityReplacement.this.fragmentView != null) {
+                            BulletinFactory.createMuteBulletin(ProfileActivityReplacement.this, !muted, null).show();
+                        }
+                        updateNotificationExceptionsData();
+                        updateActionsData();
+                    }
+
+                    @Override
+                    public void openExceptions() {
+                        Bundle bundle = new Bundle();
+                        bundle.putLong("dialog_id", did);
+                        TopicsNotifySettingsFragments notifySettings = new TopicsNotifySettingsFragments(bundle);
+                        notifySettings.setExceptions(notificationsExceptions);
+                        presentFragment(notifySettings);
+                    }
+
+                    @Override
+                    public void dismiss() {
+                        updateActionsData();
+                    }
+                }, getResourceProvider());
+                chatNotificationsPopupWrapper.update(did, topicId, notificationsExceptions);
+                if (rootLayout == null) return;
+                chatNotificationsPopupWrapper.popupWindow = RoundRectPopup.showGeneric(chatNotificationsPopupWrapper.windowLayout,ProfileActivityReplacement.this, rootLayout, view, view.getWidth()/2F, view.getHeight()/2F);
+                break;
+            }
             case JOIN: {
                 if (chat == null) return;
                 getMessagesController().addUserToChat(chat.id, getUserConfig().getCurrentUser(), 0, null, this, true, this::updateActionsData, err -> {
@@ -4377,6 +4474,22 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
     }
 
+    private void handleBlockBot() {
+        TLRPC.User user = getMessagesController().getUser(userId);
+        if (user == null) return;
+        AlertsCreator.createClearOrDeleteDialogAlert(ProfileActivityReplacement.this, false, chat, user, chatEncrypted != null, true, true, (param) -> {
+            if (getParentLayout() != null) {
+                List<BaseFragment> fragmentStack = getParentLayout().getFragmentStack();
+                BaseFragment prevFragment = fragmentStack == null || fragmentStack.size() < 2 ? null : fragmentStack.get(fragmentStack.size() - 2);
+                if (prevFragment instanceof ChatActivity) {
+                    getParentLayout().removeFragmentFromStack(fragmentStack.size() - 2);
+                }
+            }
+            finishFragment();
+            getNotificationCenter().postNotificationName(NotificationCenter.needDeleteDialog, dialogId, user, chat, param);
+        }, getResourceProvider());
+    }
+
     private static class RoundRectPopup extends ActionBarPopupWindow.ActionBarPopupWindowLayout {
 
         public RoundRectPopup(Context context, Theme.ResourcesProvider resourcesProvider) {
@@ -4399,14 +4512,18 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
 
         private ActionBarPopupWindow show(BaseFragment fragment, View container, View anchor, float x, float y) {
-            ActionBarPopupWindow popupWindow = new ActionBarPopupWindow(this, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT);
+            return RoundRectPopup.showGeneric(this, fragment, container, anchor, x, y);
+        }
+
+        public static ActionBarPopupWindow showGeneric(ActionBarPopupWindow.ActionBarPopupWindowLayout layout, BaseFragment fragment, View container, View anchor, float x, float y) {
+            ActionBarPopupWindow popupWindow = new ActionBarPopupWindow(layout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT);
             popupWindow.setPauseNotifications(true);
             popupWindow.setDismissAnimationDuration(220);
             popupWindow.setOutsideTouchable(true);
             popupWindow.setClippingEnabled(true);
             popupWindow.setAnimationStyle(R.style.PopupContextAnimation);
             popupWindow.setFocusable(true);
-            this.measure(View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST), View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST));
+            layout.measure(View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST), View.MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(1000), View.MeasureSpec.AT_MOST));
             popupWindow.setInputMethodMode(ActionBarPopupWindow.INPUT_METHOD_NOT_NEEDED);
             popupWindow.getContentView().setFocusableInTouchMode(true);
 
@@ -4424,7 +4541,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     py += pv.getY() + pv.getPaddingTop();
                 }
             }
-            px -= getMeasuredWidth() / 2f;
+            px -= layout.getMeasuredWidth() / 2f;
             popupWindow.showAtLocation(container, 0, (int) px, (int) py);
             popupWindow.dimBehind();
             return popupWindow;

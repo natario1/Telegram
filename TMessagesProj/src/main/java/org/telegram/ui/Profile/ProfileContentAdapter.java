@@ -997,11 +997,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                     }
                     textCell.setColors(Theme.key_text_RedBold, Theme.key_text_RedRegular);
                     textCell.setColors(Theme.key_text_RedBold, Theme.key_text_RedRegular);
-                } else /* WIP: Moved to header if (kind == Rows.Report) {
-                    textCell.setText(LocaleController.getString(R.string.ReportUserLocation), false);
-                    textCell.setColors(-1, Theme.key_text_RedRegular);
-                    textCell.setColors(-1, Theme.key_text_RedRegular);
-                } else*/ if (kind == Rows.MySettingsLanguage) {
+                } else if (kind == Rows.MySettingsLanguage) {
                     textCell.setTextAndValueAndIcon(LocaleController.getString(R.string.Language), LocaleController.getCurrentLanguageName(), false, R.drawable.msg2_language, false);
                     textCell.setImageLeft(23);
                 } else if (kind == Rows.MySettingsNotification) {

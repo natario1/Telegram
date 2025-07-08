@@ -41,7 +41,7 @@ public class ProfileActivityMenus {
     public final static int AB_START_SECRET_CHAT_ID = 20;
     public final static int AB_VIEW_DISCUSSION_ID = 22; // TODO: move to header
     public final static int AB_DELETE_TOPIC_ID = 23;
-    public final static int AB_REPORT_ID = 24; // TODO: move to header (at least in some cases)
+    public final static int AB_REPORT_ID = 24;
     public final static int AB_EDIT_INFO_ID = 30;
     public final static int AB_LOGOUT_ID = 31;
     public final static int AB_ADD_PHOTO_ID = 36;

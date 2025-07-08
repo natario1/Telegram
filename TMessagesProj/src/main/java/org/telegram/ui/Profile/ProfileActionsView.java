@@ -32,17 +32,18 @@ public class ProfileActionsView extends LinearLayout {
         JOIN(R.string.ProfileJoinShort, R.drawable.profile_actions_join),
         LEAVE(R.string.LeaveChannelOrGroup, R.drawable.profile_actions_leave), // can be shown in action bar too
         SHARE(R.string.BotShare, R.drawable.profile_actions_share), // can be shown in action bar too
+        MUTE(R.string.ChatsMute, R.drawable.profile_actions_mute),
+        UNMUTE(R.string.ChatsUnmute, R.drawable.profile_actions_unmute),
+        REPORT(R.string.ReportChat, R.drawable.profile_actions_report), // can be shown in action bar too
+        STOP(R.string.BizBotStop, R.drawable.profile_actions_block), // can be shown in action bar too, but this is specific for bots
+        CALL(R.string.Call, R.drawable.profile_actions_call),
+        VIDEO(R.string.GroupCallCreateVideo, R.drawable.profile_actions_video),
 
         GIFT(R.string.ActionStarGift, R.drawable.profile_actions_gift),
         STORY(R.string.AddStory, R.drawable.profile_actions_story),
-        LIVESTREAM(R.string.StartVoipChannelTitle, R.drawable.profile_actions_livestream),
-        REPORT(R.string.ReportChat, R.drawable.profile_actions_report),
-        CALL(R.string.Call, R.drawable.profile_actions_call),
+        LIVESTREAM(R.string.StartVoipChannelTitle, R.drawable.profile_actions_livestream), // Also 'Voice chat' from groups, see call_item
         MESSAGE(R.string.Message, R.drawable.profile_actions_message), // "Discuss" in one of the mockups
-        VIDEO(R.string.GroupCallCreateVideo, R.drawable.profile_actions_video),
-        BLOCK(R.string.BizBotStop, R.drawable.profile_actions_block),
-        MUTE(R.string.ChatsMute, R.drawable.profile_actions_mute),
-        UNMUTE(R.string.ChatsUnmute, R.drawable.profile_actions_unmute);
+        ;
 
         private final int textResId;
         private final int drawableResId;
