@@ -18,6 +18,7 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
@@ -351,25 +352,125 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (userId != 0) {
             TLRPC.User user = getMessagesController().getUser(userId);
             if (user == null) return;
+
             peerColorEmojiStatus = user.emoji_status;
             peerColorFallbackId = UserObject.getProfileColorId(user);
             profileEmojiId = UserObject.getProfileEmojiId(user);
-            if (headerView != null) {
-                headerView.setAvatarUser(user, userInfo, uploadingFileLocationSmall, uploadingFileLocationBig);
+
+            boolean online = false;
+            String subtitle;
+            boolean hiddenStatusButton = false;
+            if (user.id == getUserConfig().getClientUserId()) {
+                if (UserObject.hasFallbackPhoto(userInfo)) {
+                    subtitle = "";
+                    /* WIP: hasFallbackPhoto = true;
+                    TLRPC.PhotoSize smallSize = FileLoader.getClosestPhotoSizeWithSize(getUserInfo().fallback_photo.sizes, 1000);
+                    if (smallSize != null) {
+                        fallbackImage.setImage(ImageLocation.getForPhoto(smallSize, getUserInfo().fallback_photo), "50_50", (Drawable) null, 0, null, UserConfig.getInstance(currentAccount).getCurrentUser(), 0);
+                    } */
+                } else {
+                    subtitle = LocaleController.getString(R.string.Online);
+                }
+                online = true;
+            } else if (user.id == UserObject.VERIFY) {
+                subtitle = LocaleController.getString(R.string.VerifyCodesNotifications);
+            } else if (user.id == 333000 || user.id == 777000 || user.id == 42777) {
+                subtitle = LocaleController.getString(R.string.ServiceNotifications);
+            } else if (MessagesController.isSupportUser(user)) {
+                subtitle = LocaleController.getString(R.string.SupportStatus);
+            } else if (user.bot) {
+                if (user.bot_active_users != 0) {
+                    subtitle = LocaleController.formatPluralStringComma("BotUsers", user.bot_active_users, ',');
+                } else {
+                    subtitle = LocaleController.getString(R.string.Bot);
+                }
+            } else {
+                boolean[] isOnline = new boolean[1];
+                boolean shortStatus = user.photo != null && user.photo.personal;
+                subtitle = LocaleController.formatUserStatus(currentAccount, user, isOnline, shortStatus ? new boolean[1] : null);
+                // WIP: hiddenStatusButton = !isOnline[0] && !getUserConfig().isPremium() && user.status != null && (user.status instanceof TLRPC.TL_userStatusRecently || user.status instanceof TLRPC.TL_userStatusLastMonth || user.status instanceof TLRPC.TL_userStatusLastWeek) && user.status.by_me;
+                online = isOnline[0];
             }
+
             if (menuHandler != null) {
                 menuHandler.updateUsernameRelatedItems(UserObject.getPublicUsername(user) != null);
+            }
+            if (headerView != null) {
+                headerView.setAvatarUser(user, userInfo, uploadingFileLocationSmall, uploadingFileLocationBig);
+                headerView.getTexts().updateTitle(UserObject.getUserName(user));
+                headerView.getTexts().updateSubtitle(subtitle, null);
+                headerView.getTexts().updateOnlineStatus(online);
             }
         } else if (chatId != 0) {
             TLRPC.Chat newChat = getMessagesController().getChat(chatId);
             chat = newChat != null ? newChat : chat;
             if (chat == null) return;
+
             peerColorEmojiStatus = chat.emoji_status;
             peerColorFallbackId = ChatObject.getProfileColorId(chat);
             profileEmojiId = ChatObject.getProfileEmojiId(chat);
-            headerView.setAvatarChat(chat, topicId, uploadingFileLocationBig);
 
+            CharSequence subtitleString; // profileStatusString
+            Runnable subtitleClickHandler = null;
+            if (ChatObject.isChannel(chat)) {
+                if (!isTopic() && (chatInfo == null || !chat.megagroup && (chatInfo.participants_count == 0 || ChatObject.hasAdminRights(chat) || chatInfo.can_view_participants))) {
+                    if (chat.megagroup) {
+                        subtitleString = LocaleController.getString(R.string.Loading).toLowerCase();
+                    } else if (ChatObject.isPublic(chat)) {
+                        subtitleString = LocaleController.getString(R.string.ChannelPublic).toLowerCase();
+                    } else {
+                        subtitleString = LocaleController.getString(R.string.ChannelPrivate).toLowerCase();
+                    }
+                } else if (isTopic()) {
+                    SpannableString arrowString = new SpannableString(">");
+                    arrowString.setSpan(new ColoredImageSpan(R.drawable.arrow_newchat), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    subtitleString = new SpannableStringBuilder(chat.title).append(' ').append(arrowString);
+                    subtitleClickHandler = this::handleOpenForum;
+                } else if (chat.megagroup) {
+                    if (chatMembersOnline > 1 && chatInfo.participants_count != 0) {
+                        subtitleString = String.format("%s, %s", LocaleController.formatPluralStringComma("Members", chatInfo.participants_count), LocaleController.formatPluralStringComma("OnlineCount", Math.min(chatMembersOnline, chatInfo.participants_count)));
+                    } else if (chatInfo.participants_count == 0) {
+                        int res = chat.has_geo ? R.string.MegaLocation : ChatObject.isPublic(chat) ? R.string.MegaPublic : R.string.MegaPrivate;
+                        subtitleString = LocaleController.getString(res).toLowerCase();
+                    } else {
+                        subtitleString = LocaleController.formatPluralStringComma("Members", chatInfo.participants_count);
+                    }
+                } else {
+                    subtitleString = LocaleController.formatPluralStringComma("Subscribers", chatInfo.participants_count);
+                }
+            } else {
+                if (ChatObject.isKickedFromChat(chat)) {
+                    subtitleString = LocaleController.getString(R.string.YouWereKicked);
+                } else if (ChatObject.isLeftFromChat(chat)) {
+                    subtitleString = LocaleController.getString(R.string.YouLeft);
+                } else {
+                    int count = chat.participants_count;
+                    if (chatInfo != null && chatInfo.participants != null) {
+                        count = chatInfo.participants.participants.size();
+                    }
+                    if (count != 0 && chatMembersOnline > 1) {
+                        subtitleString = String.format("%s, %s", LocaleController.formatPluralString("Members", count), LocaleController.formatPluralString("OnlineCount", chatMembersOnline));
+                    } else {
+                        subtitleString = LocaleController.formatPluralString("Members", count);
+                    }
+                }
+            }
+
+            if (headerView != null) {
+                if (isTopic()) {
+                    TLRPC.TL_forumTopic topic = getMessagesController().getTopicsController().findTopic(chatId, topicId);
+                    headerView.getTexts().updateTitle(topic == null ? "" : topic.title);
+                } else if (ChatObject.isMonoForum(chat)) {
+                    headerView.getTexts().updateTitle(getString(R.string.ChatMessageSuggestions));
+                } else {
+                    headerView.getTexts().updateTitle(chat.title != null ? chat.title : "");
+                }
+                headerView.getTexts().updateSubtitle(subtitleString, subtitleClickHandler);
+                headerView.getTexts().updateOnlineStatus(false);
+                headerView.setAvatarChat(chat, topicId, uploadingFileLocationBig);
+            }
         }
+
         if (flagSecure != null) {
             flagSecure.invalidate();
         }
@@ -400,7 +501,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             menuHandler.updateColors(peerColor, mediaHeaderAnimationProgress);
         }
         if (headerView != null) {
-            headerView.updateColors(peerColor, animated);
+            headerView.updateColors(peerColor, mediaHeaderAnimationProgress, animated);
         }
         if (sharedMediaLayout != null && sharedMediaLayout.scrollSlidingTextTabStrip != null) {
             sharedMediaLayout.scrollSlidingTextTabStrip.updateColors();
@@ -1279,6 +1380,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (uploader != null) {
             uploader.onResume();
             setParentActivityTitle(getString(R.string.Settings));
+        } else if (headerView != null) {
+            setParentActivityTitle(headerView.getTexts().getTitle());
         }
         checkMediaHeaderVisible();
         updateProfileData(true);
@@ -1483,8 +1586,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
         callbackAnimator.addUpdateListener(animation -> {
             // ACTIONBAR_HEADER_PROGRESS
             mediaHeaderAnimationProgress = (float) animation.getAnimatedValue();
-            if (headerView != null) headerView.setActionModeProgress(mediaHeaderAnimationProgress);
-            // WIP: if (storyView != null) storyView.setActionBarActionMode(value);
             updateColors(false);
         });
         animators.add(callbackAnimator);
@@ -1578,7 +1679,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
     @Override
     public void updateSelectedMediaTabText() {
-        // WIP
+        if (headerView == null || sharedMediaLayout == null || sharedMediaPreloader == null) return;
+        boolean isBot = getCurrentUser() != null && getCurrentUser().bot;
+        int commonChats = userInfo != null ? userInfo.common_chats_count : 0;
+        headerView.getTexts().updateMediaCounter(sharedMediaLayout, sharedMediaPreloader, isBot, commonChats);
     }
 
     @Override
@@ -1780,7 +1884,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             @Override public void onPageScrollStateChanged(int state) {}
             @Override public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {}
             @Override public void onPageSelected(int position) {
-                if (menuHandler == null) return;
+                if (menuHandler == null || headerView == null) return;
                 menuHandler.updateGalleryRelatedItems(gallery, headerView.isFullscreen());
             }
 
@@ -2180,6 +2284,41 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 }
             }
         }
+    }
+
+    private void handleOpenForum() {
+        if (getParentLayout() != null && getParentLayout().getFragmentStack() != null) {
+            for (int i = 0; i < getParentLayout().getFragmentStack().size(); ++i) {
+                BaseFragment fragment = getParentLayout().getFragmentStack().get(i);
+                if (fragment instanceof DialogsActivity) {
+                    if (((DialogsActivity) fragment).rightSlidingDialogContainer != null) {
+                        BaseFragment previewFragment = ((DialogsActivity) fragment).rightSlidingDialogContainer.getFragment();
+                        if (previewFragment instanceof TopicsFragment && ((TopicsFragment) previewFragment).getDialogId() == getDialogId()) {
+                            ((DialogsActivity) fragment).rightSlidingDialogContainer.finishPreview();
+                        }
+                    }
+                } else if (fragment instanceof ChatActivity) {
+                    if (((ChatActivity) fragment).getDialogId() == getDialogId()) {
+                        getParentLayout().removeFragmentFromStack(fragment);
+                        i--;
+                    }
+                } else if (fragment instanceof TopicsFragment) {
+                    if (((TopicsFragment) fragment).getDialogId() == getDialogId()) {
+                        getParentLayout().removeFragmentFromStack(fragment);
+                        i--;
+                    }
+                } else if (fragment instanceof ProfileActivityReplacement) {
+                    if (fragment != this && ((ProfileActivityReplacement) fragment).getDialogId() == getDialogId() && ((ProfileActivityReplacement) fragment).isTopic()) {
+                        getParentLayout().removeFragmentFromStack(fragment);
+                        i--;
+                    }
+                }
+            }
+        }
+        // WIP: playProfileAnimation = 0;
+        Bundle args = new Bundle();
+        args.putLong("chat_id", chatId);
+        presentFragment(TopicsFragment.getTopicsOrChat(this, args));
     }
 
     public void handleUsernameSpanClick(TLRPC.TL_username usernameObj, Runnable onDone) {

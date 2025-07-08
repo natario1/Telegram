@@ -574,7 +574,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                         value = "";
                         usernames = new ArrayList<>();
                     }
-                    boolean divider = (fragment.getTopicId() != 0 || (!rows.has(Rows.InfoBizHours) && rows.has(Rows.InfoBizLocation))) && !rows.has(Rows.InfoBirthday);
+                    boolean divider = (!rows.has(Rows.InfoBizHours) && rows.has(Rows.InfoBizLocation)) && !rows.has(Rows.InfoBirthday);
                     detailCell.setTextAndValue(text, alsoUsernamesString(username, usernames, value), divider);
                 } else if (kind == Rows.InfoLocation) {
                     TLRPC.ChatFull chatFull = fragment.getMessagesController().getChatFull(fragment.getChatId());

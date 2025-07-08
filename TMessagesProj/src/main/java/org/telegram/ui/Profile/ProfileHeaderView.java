@@ -128,9 +128,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private final ViewWithBlurredFooter galleryWrapper;
     private final ProfileOverlaysView overlaysView;
     private final ProfileActionsView actionsView;
+    private final ProfileTextsView textsView;
 
     private Point displaySize;
     public Callback callback;
+    private final boolean isTopic;
 
     public ProfileHeaderView(
             @NonNull Context context,
@@ -148,6 +150,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         this.root = root;
         this.actionBar = actionBar;
         this.resourcesProvider = resourcesProvider;
+        this.isTopic = isTopic;
 
         this.avatarView = new Avatar(context, currentAccount, dialogId, isTopic, resourcesProvider, this::updateRanges);
         this.avatarWrapper = new ViewWithBlurredFooter(avatarView, gallery, resourcesProvider);
@@ -156,6 +159,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         this.galleryWrapper = new ViewWithBlurredFooter(galleryView, gallery, resourcesProvider);
         this.overlaysView = new ProfileOverlaysView(context, gallery, galleryWrapper.clipper);
         this.actionsView = new ProfileActionsView(context);
+        this.textsView = new ProfileTextsView(context, resourcesProvider, actionBar, dialogId, currentAccount, isTopic);
 
         avatarDrawable.setProfile(true);
         galleryView.setParentAvatarImage(avatarView.image);
@@ -170,12 +174,18 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         addView(galleryWrapper, createFrame(MATCH_PARENT, WRAP_CONTENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
         addView(overlaysView, createFrame(MATCH_PARENT, WRAP_CONTENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
         addView(actionsView, createFrame(MATCH_PARENT, WRAP_CONTENT, Gravity.FILL_HORIZONTAL | Gravity.BOTTOM));
+        addView(textsView, createFrame(MATCH_PARENT, MATCH_PARENT));
+
         setWillNotDraw(false);
         setBackgroundColor(getThemedColor(Theme.key_avatar_backgroundActionBarBlue));
         updateGifts();
     }
 
     // MISC
+
+    public ProfileTextsView getTexts() {
+        return textsView;
+    }
 
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
@@ -186,12 +196,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         } else if (id == NotificationCenter.storiesUpdated || id == NotificationCenter.storiesReadUpdated) {
             avatarView.updateStoriesData();
         }
-    }
-
-    public void setActionModeProgress(float progress) {
-        actionModeProgress = progress;
-        avatarView.stories.setActionBarActionMode(progress);
-        invalidate();
     }
 
     public void setDisplaySize(Point size) {
@@ -239,13 +243,14 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             cutoutTop = cutout == null ? 0 : cutout.getSafeInsetTop();
         }
         int availableHeight = displaySize.y - baseHeight;
+        int avatarBottomPadding = AVATAR_BOTTOM_PADDING + (isTopic ? dp(30) : 0);
 
         // Configure growth
         int mid = HEIGHT_MID - ActionBar.getCurrentActionBarHeight() - statusBarHeight;
         int max = (getMeasuredWidth() == 0 ? displaySize.x : getMeasuredWidth()) - baseHeight + EXTRA_HEIGHT_FOOTER;
         if (actionBar.getOccupyStatusBar() && cutoutTop > 0) {
             // Not much room for the avatar. Ensure it's not clipped by cutouts.
-            int leftover = (baseHeight + mid) - (AVATAR_BOTTOM_PADDING + AVATAR_SIZE);
+            int leftover = (baseHeight + mid) - (avatarBottomPadding + AVATAR_SIZE);
             if (leftover < cutoutTop) mid += cutoutTop - leftover;
         }
         mid = Math.min((int) (.75F * (availableHeight - EXTRA_HEIGHT_OVERSCROLL)), mid);
@@ -254,7 +259,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         } else {
             configureGrowth(mid + EXTRA_HEIGHT_OVERSCROLL, new int[]{0, mid});
         }
-        attractorMaxY = baseHeight + mid - AVATAR_BOTTOM_PADDING - AVATAR_SIZE /2F;
+        attractorMaxY = baseHeight + mid - avatarBottomPadding - AVATAR_SIZE /2F;
     }
 
     @Override
@@ -305,6 +310,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         checkFullscreenAnimation(fullscreenTouchProgress, change, velocity);
 
         actionsView.setVisibleRoom(growth);
+        textsView.updateLayout(baseHeight, growth, attractorProgress, fullscreenProgress);
 
         invalidate();
     }
@@ -358,6 +364,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         // Misc
         avatarView.image.setForegroundAlpha(Math.min(1F, fullscreenProgress));
+        textsView.updateLayout(baseHeight, growth, attractorProgress, fullscreenProgress);
     }
 
     private void checkFullscreenAnimation(float touch, int change, float velocity) {
@@ -461,7 +468,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         return hasTheme ? ColorUtils.blendARGB(themeColor1, themeColor2, 0.25f) : plainColor;
     }
 
-    public void updateColors(MessagesController.PeerColor peerColor, boolean animated) {
+    public void updateColors(MessagesController.PeerColor peerColor, float actionModeProgress, boolean animated) {
         if (peerColor != null) {
             themeColor1 = peerColor.getBgColor1(Theme.isCurrentThemeDark());
             themeColor2 = peerColor.getStoryColor1(Theme.isCurrentThemeDark());
@@ -481,11 +488,13 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         }
         emoji.setColor(emojiColor);
         hasTheme = peerColor != null;
-        getAverageColor();
         if (!animated) {
             themeColor1Animated.set(themeColor1, true);
             themeColor2Animated.set(themeColor2, true);
         }
+        this.actionModeProgress = actionModeProgress;
+        avatarView.stories.setActionBarActionMode(actionModeProgress);
+        textsView.updateColors(peerColor, actionModeProgress);
         invalidate();
         updateGifts();
     }
