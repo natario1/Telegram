@@ -120,7 +120,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private boolean isFullscreenAnimatorExpanding;
     private float fullscreenProgress;
     private boolean fullscreenProgressDrivenByTouch = true;
-    private boolean discardGalleryImageOnFullscreenCollapse = false; // 'doNotSetForeground'
+    public boolean discardGalleryImageOnFullscreenCollapse = false; // 'doNotSetForeground'
 
     private final AbsorbAnimation absorbAnimation = new AbsorbAnimation();
 
@@ -392,11 +392,11 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             galleryView.setCreateThumbFromParent(true);
             galleryView.getAdapter().notifyDataSetChanged();
             galleryView.setAnimatedFileMaybe(avatarView.getImageReceiver().getAnimation());
-            updateFullscreenImageFromGallery(false, false);
+            updateAvatarImageFromGallery(false, false);
         } else {
             avatarView.getImageReceiver().setAllowStartAnimation(true);
             avatarView.getImageReceiver().startAnimation();
-            updateFullscreenImageFromGallery(true, false);
+            updateAvatarImageFromGallery(true, false);
             avatarView.image.setForegroundAlpha(1F);
             galleryWrapper.setVisibility(View.INVISIBLE);
             avatarWrapper.setVisibility(View.VISIBLE);
@@ -435,36 +435,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         });
         fullscreenAnimator.start();
         isFullscreenAnimatorExpanding = expand;
-    }
-
-    private void updateFullscreenImageFromGallery(boolean isCollapse, boolean addSecondParent) {
-        if (isCollapse) {
-            if (discardGalleryImageOnFullscreenCollapse) return;
-            BackupImageView imageView = galleryView.getCurrentItemView();
-            if (imageView != null) {
-                if (imageView.getImageReceiver().getDrawable() instanceof VectorAvatarThumbDrawable) {
-                    avatarView.image.drawForeground(false);
-                } else {
-                    avatarView.image.drawForeground(true);
-                    avatarView.image.setForegroundImage(imageView.getImageReceiver().getDrawableSafe());
-                }
-            }
-        } else {
-            // Formerly setForegroundImage(boolean secondParent)
-            Drawable drawable = avatarView.getImageReceiver().getDrawable();
-            if (drawable instanceof VectorAvatarThumbDrawable) {
-                avatarView.image.setForegroundImage(null, null, drawable);
-            } else if (drawable instanceof AnimatedFileDrawable) {
-                avatarView.image.setForegroundImage(null, null, drawable);
-                if (addSecondParent) {
-                    ((AnimatedFileDrawable) drawable).addSecondParentView(avatarView.image);
-                }
-            } else {
-                ImageLocation location = galleryView.getImageLocation(0);
-                String filter = location != null && location.imageType == FileLoader.IMAGE_TYPE_ANIMATION ? "avatar" : null;
-                avatarView.image.setForegroundImage(location, filter, drawable);
-            }
-        }
     }
 
     // THEME & COLORS
@@ -745,7 +715,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         avatarView.updateProgressBar(true, true);
     }
 
-    public void setUploadCompleted(ImageLocation big) {
+    public void setUploadCompletedOrCancelled(ImageLocation big) {
         galleryView.scrolledByUser = true;
         galleryView.removeUploadingImage(big);
         galleryView.setCreateThumbFromParent(false);
@@ -826,6 +796,36 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 !PhotoViewer.isShowingImage(photoBig), // WIP: && (getLastStoryViewer() == null || getLastStoryViewer().transitionViewHolder.view != avatarImage),
                 true
         );
+    }
+
+    public void updateAvatarImageFromGallery(boolean isCollapse, boolean addSecondParent) {
+        if (isCollapse) {
+            if (discardGalleryImageOnFullscreenCollapse) return;
+            BackupImageView imageView = galleryView.getCurrentItemView();
+            if (imageView != null) {
+                if (imageView.getImageReceiver().getDrawable() instanceof VectorAvatarThumbDrawable) {
+                    avatarView.image.drawForeground(false);
+                } else {
+                    avatarView.image.drawForeground(true);
+                    avatarView.image.setForegroundImage(imageView.getImageReceiver().getDrawableSafe());
+                }
+            }
+        } else {
+            // Formerly setForegroundImage(boolean secondParent)
+            Drawable drawable = avatarView.getImageReceiver().getDrawable();
+            if (drawable instanceof VectorAvatarThumbDrawable) {
+                avatarView.image.setForegroundImage(null, null, drawable);
+            } else if (drawable instanceof AnimatedFileDrawable) {
+                avatarView.image.setForegroundImage(null, null, drawable);
+                if (addSecondParent) {
+                    ((AnimatedFileDrawable) drawable).addSecondParentView(avatarView.image);
+                }
+            } else {
+                ImageLocation location = galleryView.getImageLocation(0);
+                String filter = location != null && location.imageType == FileLoader.IMAGE_TYPE_ANIMATION ? "avatar" : null;
+                avatarView.image.setForegroundImage(location, filter, drawable);
+            }
+        }
     }
 
     public static class Avatar extends FrameLayout {

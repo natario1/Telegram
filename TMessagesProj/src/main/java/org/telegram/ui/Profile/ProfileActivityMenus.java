@@ -44,7 +44,6 @@ public class ProfileActivityMenus {
     public final static int AB_REPORT_ID = 24;
     public final static int AB_EDIT_INFO_ID = 30;
     public final static int AB_LOGOUT_ID = 31;
-    public final static int AB_ADD_PHOTO_ID = 36;
     public final static int AB_QR_ID = 37;
     public final static int AB_SEND_GIFTS_ID = 38;
     public final static int AB_CHANNEL_STORIES_ID = 39;
@@ -57,6 +56,10 @@ public class ProfileActivityMenus {
     public final static int AB_BOT_UNBLOCK_ID = 51;
     public final static int AB_USER_BLOCK_ID = 52;
     public final static int AB_USER_UNBLOCK_ID = 53;
+    public final static int AB_AVATAR_DELETE_ID = 54;
+    public final static int AB_AVATAR_DOWNLOAD_ID = 55;
+    public final static int AB_AVATAR_MAKE_MAIN_ID = 56;
+    public final static int AB_AVATAR_ADD_ID = 57;
     public final static int AB_MAIN_ID = 999;
 
     private final static boolean QR = false; // removed in new design
@@ -313,15 +316,17 @@ public class ProfileActivityMenus {
         }
     }
 
-    public void updateGalleryRelatedItems(ProfileGalleryView galleryView) {
+    public void updateGalleryRelatedItems(ProfileGalleryView galleryView, boolean fullscreen) {
         if (mainMenuItem == null) return;
         if (mainMenuItem.isSubMenuShowing()) {
-            AndroidUtilities.runOnUIThread(() -> updateGalleryRelatedItems(galleryView), 500);
+            AndroidUtilities.runOnUIThread(() -> updateGalleryRelatedItems(galleryView, fullscreen), 500);
             return;
         }
         boolean first = galleryView.getRealPosition() == 0;
-        mainMenuItem.setSubItemShown(AB_ADD_PHOTO_ID, first);
-        // WIP: mainMenuItem.setSubItemShown(AB_SET_AS_MAIN_ID, !first);
+        toggleMainMenuSubItem(AB_AVATAR_ADD_ID, !fullscreen || first);
+        toggleMainMenuSubItem(AB_AVATAR_MAKE_MAIN_ID, fullscreen && !first);
+        toggleMainMenuSubItem(AB_AVATAR_DELETE_ID, fullscreen);
+        toggleMainMenuSubItem(AB_AVATAR_DOWNLOAD_ID, fullscreen);
     }
 
     public void clearMainMenu() {
@@ -348,7 +353,7 @@ public class ProfileActivityMenus {
             mainMenuItem.addSubItem(id, R.drawable.msg_edit, LocaleController.getString(R.string.EditContact));
         } else if (id == AB_EDIT_INFO_ID) {
             mainMenuItem.addSubItem(id, R.drawable.msg_edit, LocaleController.getString(R.string.EditInfo));
-        } else if (id == AB_ADD_PHOTO_ID) {
+        } else if (id == AB_AVATAR_ADD_ID) {
             mainMenuItem.addSubItem(id, R.drawable.msg_addphoto, LocaleController.getString(R.string.AddPhoto));
         } else if (id == AB_LOGOUT_ID) {
             mainMenuItem.addSubItem(id, R.drawable.msg_leave, LocaleController.getString(R.string.LogOut));
@@ -381,6 +386,12 @@ public class ProfileActivityMenus {
             mainMenuItem.addSubItem(id, R.drawable.msg_archive, LocaleController.getString(R.string.OpenChannelArchiveStories));
         } else if (id == AB_SEARCH_MEMBERS_ID) {
             mainMenuItem.addSubItem(id, R.drawable.msg_search, LocaleController.getString(R.string.SearchMembers));
+        } else if (id == AB_AVATAR_DELETE_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_delete, LocaleController.getString(R.string.Delete));
+        } else if (id == AB_AVATAR_MAKE_MAIN_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_openprofile, LocaleController.getString(R.string.SetAsMain));
+        } else if (id == AB_AVATAR_DOWNLOAD_ID) {
+            mainMenuItem.addSubItem(id, R.drawable.msg_gallery, LocaleController.getString(R.string.SaveToGallery));
         }
     }
 

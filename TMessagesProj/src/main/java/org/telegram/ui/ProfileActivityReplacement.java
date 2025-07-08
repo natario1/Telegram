@@ -1,5 +1,6 @@
 package org.telegram.ui;
 
+import android.Manifest;
 import android.animation.*;
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -40,6 +41,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.ViewPager;
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.*;
+import org.telegram.messenger.MediaController;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
@@ -420,7 +422,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 editMenuItemNeeded = isMyProfile;
                 appendLogout = !isMyProfile;
                 menuHandler.appendMainMenuSubItem(AB_EDIT_INFO_ID);
-                if (uploader != null) menuHandler.appendMainMenuSubItem(AB_ADD_PHOTO_ID);
+                if (uploader != null) menuHandler.appendMainMenuSubItem(AB_AVATAR_ADD_ID);
                 menuHandler.appendMainMenuSubItem(AB_EDIT_COLOR_ID);
                 updatePremiumData(); // AB_EDIT_COLOR_ID has different icons
                 if (isMyProfile) {
@@ -525,6 +527,15 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 menuHandler.appendMainMenuSubItem(AB_SHORTCUT_ID);
             }
         }
+
+        if (uploader != null) {
+            menuHandler.appendMainMenuSubItem(AB_AVATAR_MAKE_MAIN_ID);
+            if (!getMessagesController().isChatNoForwards(chat)) {
+                menuHandler.appendMainMenuSubItem(AB_AVATAR_DOWNLOAD_ID);
+            }
+            menuHandler.appendMainMenuSubItem(AB_AVATAR_DELETE_ID);
+        }
+
         menuHandler.setEditItemNeeded(editMenuItemNeeded, animated);
         if (appendLogout) {
             menuHandler.appendMainMenuSubItem(AB_LOGOUT_ID);
@@ -1761,8 +1772,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
         gallery.getAdapter().registerDataSetObserver(new DataSetObserver() {
             @Override
             public void onChanged() {
-                if (menuHandler == null) return;
-                menuHandler.updateGalleryRelatedItems(gallery);
+                if (menuHandler == null || headerView == null) return;
+                menuHandler.updateGalleryRelatedItems(gallery, headerView.isFullscreen());
             }
         });
         gallery.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
@@ -1770,7 +1781,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             @Override public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {}
             @Override public void onPageSelected(int position) {
                 if (menuHandler == null) return;
-                menuHandler.updateGalleryRelatedItems(gallery);
+                menuHandler.updateGalleryRelatedItems(gallery, headerView.isFullscreen());
             }
 
         });
@@ -1780,37 +1791,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
         headerView.callback = new ProfileHeaderView.Callback() {
             @Override
             public void onFullscreenAnimationStarted(boolean fullscreen) {
-                if (fullscreen) {
-                    /* WIP: if (otherItem != null) {
-                        if (!getMessagesController().isChatNoForwards(currentChat)) {
-                            otherItem.showSubItem(gallery_menu_save);
-                        } else {
-                            otherItem.hideSubItem(gallery_menu_save);
-                        }
-                        if (imageUpdater != null) {
-                            otherItem.showSubItem(add_photo);
-                            otherItem.showSubItem(delete_avatar);
-                            otherItem.hideSubItem(set_as_main);
-                            otherItem.hideSubItem(logout);
-                        }
-                    }
-                    if (searchItem != null) {
-                        searchItem.setEnabled(false);
-                    } */
-                } else {
-                    /* WIP: if (otherItem != null) {
-                        otherItem.hideSubItem(gallery_menu_save);
-                        if (imageUpdater != null) {
-                            otherItem.hideSubItem(set_as_main);
-                            otherItem.hideSubItem(delete_avatar);
-                            otherItem.showSubItem(add_photo);
-                            otherItem.showSubItem(logout);
-                        }
-                    }
-                    if (searchItem != null) {
-                        searchItem.setEnabled(!scrolling);
-                    } */
-                }
+                if (menuHandler == null) return;
+                menuHandler.toggleMainMenuSubItem(AB_LOGOUT_ID, !fullscreen);
+                menuHandler.updateGalleryRelatedItems(gallery, fullscreen);
+                // searchItem.setEnabled(!fullscreen);
             }
 
             @Override
@@ -1901,6 +1885,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         updateMenuData(false);
         updateSelectedMediaTabText();
 
+        fragmentView = rootLayout;
         return rootLayout;
     }
 
@@ -2360,8 +2345,14 @@ public class ProfileActivityReplacement extends BaseFragment implements
             finishFragment();
         } else if (id == AB_EDIT_INFO_ID) {
             presentFragment(new UserInfoActivity());
-        } else if (id == AB_ADD_PHOTO_ID) {
+        } else if (id == AB_AVATAR_ADD_ID) {
             handleUploadRequest();
+        } else if (id == AB_AVATAR_DELETE_ID) {
+            handleDeleteImage();
+        } else if (id == AB_AVATAR_DOWNLOAD_ID) {
+            handleDownloadImage();
+        } else if (id == AB_AVATAR_MAKE_MAIN_ID) {
+            handleMakeMainImage();
         } else if (id == AB_EDIT_ID) {
             handleEditProfileClick();
         } else if (id == AB_QR_ID) {
@@ -4335,7 +4326,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
         }
 
-        if (headerView != null) headerView.setUploadCompleted(uploadingImageLocationBig);
+        if (headerView != null) headerView.setUploadCompletedOrCancelled(uploadingImageLocationBig);
         uploadingFileLocationSmall = null;
         uploadingFileLocationBig = null;
         uploadingImageLocationBig = null;
@@ -4448,8 +4439,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 }
             }, getResourceProvider());
             chatNotificationsPopupWrapper.update(did, topicId, notificationsExceptions);
-            if (rootLayout == null) return;
-            chatNotificationsPopupWrapper.popupWindow = RoundRectPopup.showGeneric(chatNotificationsPopupWrapper.windowLayout,ProfileActivityReplacement.this, rootLayout, view, view.getWidth()/2F, view.getHeight()/2F);
+            chatNotificationsPopupWrapper.showAsOptions(this, view, view.getWidth(), view.getHeight());
         } else if (action == Action.JOIN) {
             if (chat == null) return;
             getMessagesController().addUserToChat(chat.id, getUserConfig().getCurrentUser(), 0, null, this, true, this::updateActionsData, err -> {
@@ -4585,6 +4575,164 @@ public class ProfileActivityReplacement extends BaseFragment implements
         presentFragment(chatActivity, removeFragment);
         if (AndroidUtilities.isTablet()) {
             finishFragment();
+        }
+    }
+
+    private void handleMakeMainImage() {
+        if (headerView == null) return;
+        ProfileGalleryView gallery = headerView.getGallery();
+
+        int position = gallery.getRealPosition();
+        TLRPC.Photo photo = gallery.getPhoto(position);
+        if (photo == null) return;
+        gallery.startMovePhotoToBegin(position);
+
+        TLRPC.TL_photos_updateProfilePhoto req = new TLRPC.TL_photos_updateProfilePhoto();
+        req.id = new TLRPC.TL_inputPhoto();
+        req.id.id = photo.id;
+        req.id.access_hash = photo.access_hash;
+        req.id.file_reference = photo.file_reference;
+        UserConfig userConfig = getUserConfig();
+        getConnectionsManager().sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
+            gallery.finishSettingMainPhoto();
+            if (response instanceof TLRPC.TL_photos_photo) {
+                TLRPC.TL_photos_photo photos_photo = (TLRPC.TL_photos_photo) response;
+                getMessagesController().putUsers(photos_photo.users, false);
+                TLRPC.User user = getMessagesController().getUser(userConfig.clientUserId);
+                if (photos_photo.photo instanceof TLRPC.TL_photo) {
+                    gallery.replaceFirstPhoto(photo, photos_photo.photo);
+                    if (user != null) {
+                        user.photo.photo_id = photos_photo.photo.id;
+                        userConfig.setCurrentUser(user);
+                        userConfig.saveConfig(true);
+                    }
+                }
+            }
+        }));
+        UndoView undoView = getUndoView();
+        if (undoView != null) {
+            undoView.showWithAction(userId, UndoView.ACTION_PROFILE_PHOTO_CHANGED, photo.video_sizes.isEmpty() ? null : 1);
+        }
+        TLRPC.User user = getMessagesController().getUser(userConfig.clientUserId);
+
+        TLRPC.PhotoSize bigSize = FileLoader.getClosestPhotoSizeWithSize(photo.sizes, 800);
+        if (user != null) {
+            TLRPC.PhotoSize smallSize = FileLoader.getClosestPhotoSizeWithSize(photo.sizes, 90);
+            user.photo.photo_id = photo.id;
+            user.photo.photo_small = smallSize.location;
+            user.photo.photo_big = bigSize.location;
+            userConfig.setCurrentUser(user);
+            userConfig.saveConfig(true);
+            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.mainUserInfoChanged);
+            updateProfileData(true);
+        }
+        gallery.commitMoveToBegin();
+    }
+
+    private void handleDeleteImage() {
+        if (headerView == null) return;
+        ProfileGalleryView gallery = headerView.getGallery();
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), getResourceProvider());
+        ImageLocation location = gallery.getImageLocation(gallery.getRealPosition());
+        if (location == null) return;
+
+        if (location.imageType == FileLoader.IMAGE_TYPE_ANIMATION) {
+            builder.setTitle(LocaleController.getString(R.string.AreYouSureDeleteVideoTitle));
+            builder.setMessage(getString(R.string.AreYouSureDeleteVideo));
+        } else {
+            builder.setTitle(LocaleController.getString(R.string.AreYouSureDeletePhotoTitle));
+            builder.setMessage(getString(R.string.AreYouSureDeletePhoto));
+        }
+        builder.setPositiveButton(LocaleController.getString(R.string.Delete), (dialogInterface, i) -> {
+            int position = gallery.getRealPosition();
+            TLRPC.Photo photo = gallery.getPhoto(position);
+            TLRPC.UserFull userFull = userInfo;
+            if (uploadingFileLocationSmall != null && position == 0) {
+                uploader.cancel();
+                if (uploadRequest != 0) {
+                    getConnectionsManager().cancelRequest(uploadRequest, true);
+                }
+                headerView.setUploadCompletedOrCancelled(uploadingImageLocationBig);
+                uploadingFileLocationSmall = null;
+                uploadingFileLocationBig = null;
+                uploadingImageLocationBig = null;
+                updateProfileData(true);
+                getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, MessagesController.UPDATE_MASK_ALL);
+                getNotificationCenter().postNotificationName(NotificationCenter.mainUserInfoChanged);
+                getUserConfig().saveConfig(true);
+                return;
+            }
+            if (UserObject.hasFallbackPhoto(userFull) && photo != null && userFull.fallback_photo.id == photo.id) {
+                userFull.fallback_photo = null;
+                userFull.flags &= ~4194304;
+                getMessagesStorage().updateUserInfo(userFull, true);
+                updateProfileData(false);
+            }
+            if (gallery.getRealCount() == 1) {
+                headerView.updateAvatarImageFromGallery(false, true);
+            }
+            if (photo == null || gallery.getRealPosition() == 0) {
+                TLRPC.Photo nextPhoto = gallery.getPhoto(1);
+                if (nextPhoto != null) {
+                    getUserConfig().getCurrentUser().photo =new TLRPC.TL_userProfilePhoto();
+                    TLRPC.PhotoSize smallSize = FileLoader.getClosestPhotoSizeWithSize(nextPhoto.sizes, 90);
+                    TLRPC.PhotoSize bigSize = FileLoader.getClosestPhotoSizeWithSize(nextPhoto.sizes, 1000);
+                    if (smallSize != null && bigSize != null) {
+                        getUserConfig().getCurrentUser().photo.photo_small = smallSize.location;
+                        getUserConfig().getCurrentUser().photo.photo_big = bigSize.location;
+                    }
+                } else {
+                    getUserConfig().getCurrentUser().photo = new TLRPC.TL_userProfilePhotoEmpty();
+                }
+                getMessagesController().deleteUserPhoto(null);
+            } else {
+                TLRPC.TL_inputPhoto inputPhoto = new TLRPC.TL_inputPhoto();
+                inputPhoto.id = photo.id;
+                inputPhoto.access_hash = photo.access_hash;
+                inputPhoto.file_reference = photo.file_reference;
+                if (inputPhoto.file_reference == null) {
+                    inputPhoto.file_reference = new byte[0];
+                }
+                getMessagesController().deleteUserPhoto(inputPhoto);
+                getMessagesStorage().clearUserPhoto(userId, photo.id);
+            }
+            if (gallery.removePhotoAtIndex(position) || gallery.getRealCount() <= 0) {
+                headerView.discardGalleryImageOnFullscreenCollapse = true;
+                headerView.setCollapsed(false, true);
+            }
+        });
+        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        AlertDialog alertDialog = builder.create();
+        showDialog(alertDialog);
+        TextView button = (TextView) alertDialog.getButton(DialogInterface.BUTTON_POSITIVE);
+        if (button != null) {
+            button.setTextColor(getThemedColor(Theme.key_text_RedBold));
+        }
+    }
+
+    private void handleDownloadImage() {
+        if (getParentActivity() == null || headerView == null) return;
+        ProfileGalleryView gallery = headerView.getGallery();
+
+        if (Build.VERSION.SDK_INT >= 23 && (Build.VERSION.SDK_INT <= 28 || BuildVars.NO_SCOPED_STORAGE) && getParentActivity().checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            getParentActivity().requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, BasePermissionsActivity.REQUEST_CODE_EXTERNAL_STORAGE);
+            return;
+        }
+        ImageLocation location = gallery.getImageLocation(gallery.getRealPosition());
+        if (location == null) {
+            return;
+        }
+        final boolean isVideo = location.imageType == FileLoader.IMAGE_TYPE_ANIMATION;
+        File f = FileLoader.getInstance(currentAccount).getPathToAttach(location.location, isVideo ? "mp4" : null, true);
+        if (isVideo && !f.exists()) {
+            f = new File(FileLoader.getDirectory(FileLoader.MEDIA_DIR_IMAGE), FileLoader.getAttachFileName(location.location, "mp4"));
+        }
+        if (f.exists()) {
+            MediaController.saveFile(f.toString(), getParentActivity(), 0, null, null, uri -> {
+                if (getParentActivity() == null) return;
+                BulletinFactory.createSaveToGalleryBulletin(this, isVideo, getResourceProvider()).show();
+            });
         }
     }
 

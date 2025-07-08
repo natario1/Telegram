@@ -36,7 +36,7 @@ public class ChatNotificationsPopupWrapper {
     ActionBarMenuSubItem muteForLastSelected2;
     public ActionBarPopupWindow.ActionBarPopupWindowLayout windowLayout;
     int currentAccount;
-    public ActionBarPopupWindow popupWindow;
+    ActionBarPopupWindow popupWindow;
     Callback callback;
     long lastDismissTime;
 

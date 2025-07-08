@@ -59,10 +59,10 @@ public class ProfileActionsView extends LinearLayout {
     private final static float HORIZONTAL_INSET = dpf2(12);
     private final static int ITEM_HEIGHT = dp(54);
     private final static float ITEM_PADDING_X = HORIZONTAL_GAP / 2F;
-    private final static float ITEM_PADDING_TOP = dpf2(10.33F);
+    private final static float ITEM_PADDING_TOP = dpf2(7.33F);
     private final static float ITEM_PADDING_BOTTOM = dpf2(9.67F);
     private final static int PADDING_Y = dp(12);
-    private final static float ICON_SIZE = dpf2(19.33F);
+    private final static float ICON_SIZE = dpf2(24F);
     private final static float TEXT_SIZE = dpf2(10.9F);
 
     private final Button[] buttons = new Button[4];
