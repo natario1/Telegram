@@ -440,7 +440,7 @@ public class ProfileTextsView extends FrameLayout {
 
         {
             int subtitleFrom = lastPeerColor != null
-                    ? Theme.adaptHSV(lastPeerColor.getBgColor1(Theme.isCurrentThemeDark()), -.2f, +.2f)
+                    ? Theme.adaptHSV(lastPeerColor.getBgColor1(Theme.isCurrentThemeDark()), -.2f, +.25f)
                     : lastIsOnline ? Theme.getColor(Theme.key_profile_status, resourcesProvider)
                     : Theme.getColor(Theme.key_avatar_subtitleInProfileBlue, resourcesProvider);
             smallSubtitle.setTextColor(ColorUtils.blendARGB(subtitleFrom, 0xB3FFFFFF, expansion));

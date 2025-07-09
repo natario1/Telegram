@@ -57,7 +57,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     };
 
     private final static int AVATAR_SIZE = dp(90);
-    private final static int AVATAR_BOTTOM_PADDING = dp(140);
+    private final static int AVATAR_BOTTOM_PADDING = dp(142);
 
     private final static int ATTRACTOR_HIDDEN_Y = dp(16);
     private final static float FULLSCREEN_EXPAND_TRIGGER = .25F;
@@ -1103,7 +1103,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
                 // Gradient: as the header collapses, it translates, shrinks and fades
                 float shrink = lerp(.75F, 1F, attractorProgress);
-                float alpha = lerp(.25F, .5F, attractorProgress);
+                float alpha = lerp(.2F, .4F, attractorProgress);
                 float size = Math.min(width - dp(72), dp(398));
                 gradientMatrix.setScale(size, size);
                 gradientMatrix.postTranslate((width - size) / 2F, attractorY - size / 2F);
@@ -1115,7 +1115,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
             // Emoji pattern
             if (hasEmoji && isEmojiLoaded() && attractorProgress > 0F) {
-                float alpha = lerp(.2F, .5F, attractorProgress);
+                float alpha = lerp(.1F, .35F, attractorProgress);
                 float progress = emojiFadeIn.set(isEmojiLoaded) * attractorProgress;
                 float overscroll = clamp(fullscreenProgress / FULLSCREEN_EXPAND_TRIGGER, 1, 0);
                 StarGiftPatterns.drawRadialPattern(canvas, emoji, width / 2F, attractorY, attractorMaxY, alpha, progress, overscroll);
