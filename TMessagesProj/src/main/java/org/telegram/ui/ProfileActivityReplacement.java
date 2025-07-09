@@ -1244,7 +1244,6 @@ public class ProfileActivityReplacement extends BaseFragment implements
         reportReactionMessageId = arguments.getInt("report_reaction_message_id", 0);
         reportReactionFromDialogId = arguments.getLong("report_reaction_from_dialog_id", 0);
         banGroupId = arguments.getLong("ban_chat_id", 0);
-        // WIP: Expand photo and other vars
 
         if (userId != 0) {
             dialogId = arguments.getLong("dialog_id", 0);
@@ -2087,8 +2086,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
         // Animations
         if (openSimilar || openGifts || openCommonChats) {
             listView.scrollToRow(Rows.SharedMedia, false);
+        } else if (arguments.getBoolean("expandPhoto", false)) {
+            headerView.post(() -> headerView.setExpanded(true, true));
+        } else {
+            headerView.post(() -> headerView.setExpanded(false, true));
         }
-
         fragmentView = rootLayout;
         return rootLayout;
     }
