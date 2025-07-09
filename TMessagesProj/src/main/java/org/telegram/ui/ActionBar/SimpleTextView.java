@@ -386,17 +386,17 @@ public class SimpleTextView extends View implements Drawable.Callback {
                     width -= leftDrawable.getIntrinsicWidth();
                     width -= drawablePadding;
                 }
-                int rightDrawableWidth = 0;
+                int rightDrawablesWidth = 0;
                 if (!rightDrawableInside) {
                     if (rightDrawable != null && !rightDrawableOutside) {
-                        rightDrawableWidth += (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
-                        width -= rightDrawableWidth;
-                        width -= drawablePadding;
+                        int w = drawablePadding + (int) (rightDrawable.getIntrinsicWidth() * rightDrawableScale);
+                        rightDrawablesWidth += w;
+                        width -= w;
                     }
                     if (rightDrawable2 != null && !rightDrawableOutside) {
-                        rightDrawableWidth += (int) (rightDrawable2.getIntrinsicWidth() * rightDrawableScale);
-                        width -= rightDrawableWidth;
-                        width -= drawablePadding;
+                        int w = drawablePadding + (int) (rightDrawable2.getIntrinsicWidth() * rightDrawableScale);
+                        rightDrawablesWidth += w;
+                        width -= w;
                     }
                 }
                 if (replacedText != null && replacedDrawable != null) {
@@ -410,12 +410,11 @@ public class SimpleTextView extends View implements Drawable.Callback {
                         width -= drawablePadding;
                     }
                 }
-                if (canHideRightDrawable && rightDrawableWidth != 0 && !rightDrawableOutside) {
+                if (canHideRightDrawable && rightDrawablesWidth != 0 && !rightDrawableOutside) {
                     CharSequence string = TextUtils.ellipsize(text, textPaint, width, TextUtils.TruncateAt.END);
                     if (!text.equals(string)) {
                         rightDrawableHidden = true;
-                        width += rightDrawableWidth;
-                        width += drawablePadding;
+                        width += rightDrawablesWidth;
                     }
                 }
                 if (buildFullLayout) {
@@ -826,6 +825,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+
         int textOffsetX = 0;
         layoutX = 0;
         layoutY = 0;
@@ -969,7 +969,7 @@ public class SimpleTextView extends View implements Drawable.Callback {
         if (layout != null) {
             if (leftDrawableOutside || rightDrawableOutside || ellipsizeByGradient || paddingRight > 0) {
                 canvas.save();
-                canvas.clipRect(textOffsetX, 0, getMaxTextWidth() - paddingRight - dp(rightDrawable != null && !(rightDrawable instanceof AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable) && rightDrawableOutside ? 2 : 0), getMeasuredHeight());
+                canvas.clipRect(textOffsetX, 0, getMaxTextWidth() - paddingRight, getMeasuredHeight());
             }
             Emoji.emojiDrawingUseAlpha = usaAlphaForEmoji;
             if (wrapBackgroundDrawable != null) {

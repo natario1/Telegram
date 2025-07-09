@@ -14,8 +14,8 @@ import org.telegram.messenger.AndroidUtilities;
 
 public class CrossfadeDrawable extends Drawable {
 
-    private final Drawable topDrawable;
-    private final Drawable bottomDrawable;
+    public final Drawable topDrawable;
+    public final Drawable bottomDrawable;
 
     private float progress;
     float globalAlpha = 255f;

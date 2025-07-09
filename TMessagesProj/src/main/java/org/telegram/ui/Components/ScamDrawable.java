@@ -41,6 +41,14 @@ public class ScamDrawable extends Drawable {
         textWidth = (int) Math.ceil(textPaint.measureText(text));
     }
 
+    public void setCurrentType(int type) {
+        if (type != currentType) {
+            currentType = type;
+            checkText();
+            invalidateSelf();
+        }
+    }
+
     public void checkText() {
         String newText;
         if (currentType == 0) {
@@ -82,8 +90,9 @@ public class ScamDrawable extends Drawable {
     @Override
     public void draw(Canvas canvas) {
         rect.set(getBounds());
-        canvas.drawRoundRect(rect, AndroidUtilities.dp(2), AndroidUtilities.dp(2), paint);
         canvas.drawText(text, rect.left + AndroidUtilities.dp(5), rect.top + AndroidUtilities.dp(12), textPaint);
+        rect.inset(paint.getStrokeWidth() / 2F, paint.getStrokeWidth() / 2F);
+        canvas.drawRoundRect(rect, AndroidUtilities.dp(2), AndroidUtilities.dp(2), paint);
     }
 
     @Override
