@@ -201,7 +201,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     public void setDisplaySize(Point size) {
         this.displaySize = size;
         updateRanges();
-        changeGrowth(snapGrowths[1], true);
     }
 
     public boolean setExpanded(boolean fullscreen, boolean animated) {
@@ -260,6 +259,9 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             configureGrowth(mid + EXTRA_HEIGHT_OVERSCROLL, new int[]{0, mid});
         }
         attractorMaxY = baseHeight + mid - avatarBottomPadding - AVATAR_SIZE /2F;
+        if (growth > snapGrowths[snapGrowths.length - 1]) {
+            changeGrowth(snapGrowths[snapGrowths.length - 1], false);
+        }
     }
 
     @Override

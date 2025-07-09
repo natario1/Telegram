@@ -177,6 +177,10 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
     }
 
     public void scrollToRow(int rowKind, boolean animated) {
+        if (!isLaidOut()) {
+            post(() -> scrollToRow(rowKind, animated));
+            return;
+        }
         LinearLayoutManager layoutManager = (LinearLayoutManager) getLayoutManager();
         int position = getRowPosition(rowKind);
         if (layoutManager == null || position < 0) return;

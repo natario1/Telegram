@@ -1777,8 +1777,22 @@ public class ProfileActivityReplacement extends BaseFragment implements
         menuHandler = new ProfileActivityMenus(context, resourceProvider, actionBar);
 
         // Shared media
-        int initialTab = -1; // WIP
-        sharedMediaLayout = new SharedMediaLayout(context, getDialogId(), sharedMediaPreloader, userInfo != null ? userInfo.common_chats_count : 0, sortMembers(), chatInfo, userInfo, initialTab, this, this, SharedMediaLayout.VIEW_TYPE_PROFILE_ACTIVITY, getResourceProvider()) {
+        boolean openGifts = arguments.getBoolean("open_gifts", false);
+        boolean openCommonChats = arguments.getBoolean("open_common", false);
+        boolean openSimilar = arguments.getBoolean("similar", false);
+        int sharedMediaInitialTab = -1;
+        if (openCommonChats) {
+            sharedMediaInitialTab = SharedMediaLayout.TAB_COMMON_GROUPS;
+        } else if (openGifts && (userInfo != null && userInfo.stargifts_count > 0 || chatInfo != null && chatInfo.stargifts_count > 0)) {
+            sharedMediaInitialTab = SharedMediaLayout.TAB_GIFTS;
+        } else if (openSimilar) {
+            sharedMediaInitialTab = SharedMediaLayout.TAB_RECOMMENDED_CHANNELS;
+        } else if (chatInfo != null && chatInfo.participants != null && chatInfo.participants.participants.size() > 5) {
+            sharedMediaInitialTab = SharedMediaLayout.TAB_GROUPUSERS;
+        }
+        final boolean[] sharedMediaIsWaitingForGiftsTab = new boolean[]{ openGifts && sharedMediaInitialTab != SharedMediaLayout.TAB_GIFTS };
+
+        sharedMediaLayout = new SharedMediaLayout(context, getDialogId(), sharedMediaPreloader, userInfo != null ? userInfo.common_chats_count : 0, sortMembers(), chatInfo, userInfo, sharedMediaInitialTab, this, this, SharedMediaLayout.VIEW_TYPE_PROFILE_ACTIVITY, getResourceProvider()) {
             @Override
             protected boolean isSelf() {
                 return isMyProfile;
@@ -1792,6 +1806,15 @@ public class ProfileActivityReplacement extends BaseFragment implements
             @Override
             protected void onSelectedTabChanged() {
                 updateSelectedMediaTabText();
+            }
+
+            @Override
+            public void updateTabs(boolean animated) {
+                super.updateTabs(animated);
+                if (sharedMediaIsWaitingForGiftsTab[0] && scrollSlidingTextTabStrip.hasTab(TAB_GIFTS)) {
+                    sharedMediaIsWaitingForGiftsTab[0] = false;
+                    scrollToPage(TAB_GIFTS);
+                }
             }
 
             @Override
@@ -1997,6 +2020,11 @@ public class ProfileActivityReplacement extends BaseFragment implements
         updateProfileData(true);
         updateMenuData(false);
         updateSelectedMediaTabText();
+
+        // Animations
+        if (openSimilar || openGifts || openCommonChats) {
+            listView.scrollToRow(Rows.SharedMedia, false);
+        }
 
         fragmentView = rootLayout;
         return rootLayout;
