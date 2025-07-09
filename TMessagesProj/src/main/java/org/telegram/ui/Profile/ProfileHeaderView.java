@@ -303,7 +303,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         avatarWrapper.translateContentCenter(hidden + cy);
         float gt = galleryWrapper.translateContentCenter(hidden + cy);
         overlaysView.setTranslationY(gt);
-        overlaysView.setTopInsets(actionBar.getOccupyStatusBar() ? statusBarHeight : 0, ActionBar.getCurrentActionBarHeight());
+        overlaysView.setLayoutInsets(actionBar.getOccupyStatusBar() ? statusBarHeight : 0, EXTRA_HEIGHT_FOOTER);
 
         float shrinkInset = avatarView.updateAttractor(attractorProgress);
         avatarWrapper.clipper.setInset(shrinkInset);
@@ -406,7 +406,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             updateAvatarImageFromGallery(true, false);
             avatarView.image.setForegroundAlpha(1F);
             galleryWrapper.setVisibility(View.INVISIBLE);
-            avatarWrapper.setVisibility(View.VISIBLE);
         }
         if (callback != null) {
             callback.onFullscreenAnimationStarted(expand);
@@ -426,7 +425,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 }
                 if (expand) {
                     galleryWrapper.setVisibility(View.VISIBLE);
-                    avatarWrapper.setVisibility(View.INVISIBLE);
                     avatarView.image.clearForeground();
                 } else {
                     galleryView.resetCurrentItem();

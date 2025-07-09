@@ -77,18 +77,19 @@ class ProfileOverlaysView extends FrameLayout {
         shadows.updateVisibility(progress);
     }
 
-    public void setTopInsets(int statusBar, int actionBar) {
+    public void setLayoutInsets(int statusBar, int bottomActionsBar) {
         simpleIndicator.setTranslationY(statusBar);
         detailedIndicator.setTranslationY(statusBar);
-        shadows.setInsets(statusBar, actionBar);
+        shadows.setLayoutInsets(statusBar, bottomActionsBar);
     }
 
     private static class Shadows extends View {
 
-        private final RadialGradient vignetteGradient = new RadialGradient(.5F, .5F, .5F, new int[]{ 0, ColorUtils.setAlphaComponent(Color.BLACK, 42) }, new float[]{ 0.7F, 1F }, Shader.TileMode.CLAMP);
+        private final RadialGradient vignetteGradient = new RadialGradient(.5F, .5F, .5F, new int[]{ 0, ColorUtils.setAlphaComponent(Color.BLACK, 54) }, new float[]{ 0.7F, 1F }, Shader.TileMode.CLAMP);
         private final Matrix vignetteMatrix = new Matrix();
         private final Paint vignettePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private int vignetteTop = 0;
+        private int vignetteBottom = 0;
         private final GradientDrawable[] pressedGradients = new GradientDrawable[2];
         private final boolean[] pressedVisible = new boolean[2];
         private final float[] pressedAlpha = new float[2];
@@ -125,8 +126,9 @@ class ProfileOverlaysView extends FrameLayout {
             setVisibility(progress > 0F ? View.VISIBLE : View.INVISIBLE);
         }
 
-        private void setInsets(int statusBar, int actionBar) {
-            this.vignetteTop = statusBar / 2;
+        private void setLayoutInsets(int statusBar, int bottomActionsBar) {
+            this.vignetteTop = 0;
+            this.vignetteBottom = (int) (1F * bottomActionsBar);
             refreshRects();
         }
 
@@ -142,7 +144,7 @@ class ProfileOverlaysView extends FrameLayout {
             pressedGradients[1].setBounds(w - (w / 5), 0, w, h);
 
             float vw = w*1.35F;
-            vignetteMatrix.setScale(vw, h- vignetteTop);
+            vignetteMatrix.setScale(vw, h - vignetteTop - vignetteBottom);
             vignetteMatrix.postTranslate(-(vw-w)/2F, vignetteTop);
             vignetteGradient.setLocalMatrix(vignetteMatrix);
             invalidate();

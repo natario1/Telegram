@@ -37,6 +37,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.collection.LongSparseArray;
 import androidx.core.graphics.ColorUtils;
+import androidx.core.math.MathUtils;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.ViewPager;
@@ -50,6 +51,7 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.tgnet.tl.TL_bots;
 import org.telegram.tgnet.tl.TL_fragment;
+import org.telegram.tgnet.tl.TL_stars;
 import org.telegram.ui.ActionBar.*;
 import org.telegram.ui.Business.OpeningHoursActivity;
 import org.telegram.ui.Business.ProfileHoursCell;
@@ -58,14 +60,12 @@ import org.telegram.ui.Components.*;
 import org.telegram.ui.Components.FloatingDebug.FloatingDebugController;
 import org.telegram.ui.Components.Paint.PersistColorPalette;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
+import org.telegram.ui.Components.Premium.PremiumPreviewBottomSheet;
 import org.telegram.ui.Components.Premium.boosts.UserSelectorBottomSheet;
 import org.telegram.ui.Components.voip.VoIPHelper;
 import org.telegram.ui.Gifts.GiftSheet;
 import org.telegram.ui.Profile.*;
-import org.telegram.ui.Stars.BotStarsActivity;
-import org.telegram.ui.Stars.BotStarsController;
-import org.telegram.ui.Stars.StarsController;
-import org.telegram.ui.Stars.StarsIntroActivity;
+import org.telegram.ui.Stars.*;
 import org.telegram.ui.Stories.StoriesController;
 import org.telegram.ui.Stories.StoryViewer;
 import org.telegram.ui.Stories.recorder.DualCameraView;
@@ -157,6 +157,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private int versionClickCount = 0;
     private int botPermissionEmojiStatusReqId;
     public final HashSet<Integer> notificationsExceptions = new HashSet<>();
+    private SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow selectAnimatedEmojiDialog;
     private final PhotoViewer.PhotoViewerProvider photoViewerProvider = new PhotoViewer.EmptyPhotoViewerProvider() {
         @Override
         public PhotoViewer.PlaceProviderObject getPlaceForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index, boolean needPreview, boolean closing) {
@@ -388,7 +389,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 boolean[] isOnline = new boolean[1];
                 boolean shortStatus = user.photo != null && user.photo.personal;
                 subtitle = LocaleController.formatUserStatus(currentAccount, user, isOnline, shortStatus ? new boolean[1] : null);
-                // WIP: hiddenStatusButton = !isOnline[0] && !getUserConfig().isPremium() && user.status != null && (user.status instanceof TLRPC.TL_userStatusRecently || user.status instanceof TLRPC.TL_userStatusLastMonth || user.status instanceof TLRPC.TL_userStatusLastWeek) && user.status.by_me;
+                hiddenStatusButton = !isOnline[0] && !getUserConfig().isPremium() && user.status != null && (user.status instanceof TLRPC.TL_userStatusRecently || user.status instanceof TLRPC.TL_userStatusLastMonth || user.status instanceof TLRPC.TL_userStatusLastWeek) && user.status.by_me;
                 online = isOnline[0];
             }
 
@@ -399,7 +400,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 headerView.setAvatarUser(user, userInfo, uploadingFileLocationSmall, uploadingFileLocationBig);
                 headerView.getTexts().updateTitle(UserObject.getUserName(user));
                 headerView.getTexts().updateSubtitle(subtitle, null);
+                headerView.getTexts().updateSubtitleRightDrawable(!hiddenStatusButton ? null : () -> MessagePrivateSeenView
+                        .showSheet(getContext(), currentAccount, getDialogId(), true, null, () -> getMessagesController().reloadUser(getDialogId()), getResourceProvider()));
                 headerView.getTexts().updateOnlineStatus(online);
+                headerView.getTexts().updateTitleRightDrawable(user, null, this::handleEmojiStatusClick);
+                headerView.getTexts().updateTitleRightDrawable2(user, null);
+                headerView.getTexts().updateTitleLeftDrawable(user, null, chatEncrypted != null);
             }
         } else if (chatId != 0) {
             TLRPC.Chat newChat = getMessagesController().getChat(chatId);
@@ -465,6 +471,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 } else {
                     headerView.getTexts().updateTitle(chat.title != null ? chat.title : "");
                 }
+                headerView.getTexts().updateTitleRightDrawable(null, chat, this::handleEmojiStatusClick);
+                headerView.getTexts().updateTitleRightDrawable2(null, chat);
+                headerView.getTexts().updateTitleLeftDrawable(null, chat, chatEncrypted != null);
                 headerView.getTexts().updateSubtitle(subtitleString, subtitleClickHandler);
                 headerView.getTexts().updateOnlineStatus(false);
                 headerView.setAvatarChat(chat, topicId, uploadingFileLocationBig);
@@ -4873,6 +4882,112 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 BulletinFactory.createSaveToGalleryBulletin(this, isVideo, getResourceProvider()).show();
             });
         }
+    }
+
+    private void handleEmojiStatusClick(TLRPC.User user) {
+        if (user.self) {
+            handleEmojiStatusSelection();
+            return;
+        }
+        if (user.emoji_status instanceof TLRPC.TL_emojiStatusCollectible) {
+            TLRPC.TL_emojiStatusCollectible status = (TLRPC.TL_emojiStatusCollectible) user.emoji_status;
+            Browser.openUrl(getContext(), "https://" + getMessagesController().linkPrefix + "/nft/" + status.slug);
+            return;
+        }
+        PremiumPreviewBottomSheet premiumPreviewBottomSheet = new PremiumPreviewBottomSheet(this, currentAccount, user, getResourceProvider());
+        if (headerView != null) {
+            ProfileTextsView texts = headerView.getTexts();
+            texts.preparePremiumBottomSheet(premiumPreviewBottomSheet);
+        }
+        showDialog(premiumPreviewBottomSheet);
+    }
+
+    private void handleEmojiStatusSelection() {
+        if (selectAnimatedEmojiDialog != null || headerView == null) return;
+        ProfileTextsView texts = headerView.getTexts();
+
+        final SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow[] popup = new SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow[1];
+
+        texts.getEmojiStatusLocation(AndroidUtilities.rectTmp2, rootLayout);
+        int popupWidth = (int) Math.min(AndroidUtilities.dp(340 - 16), AndroidUtilities.displaySize.x * .95f);
+        int emojiCenterX = AndroidUtilities.rectTmp2.centerX();
+        int offsetX = MathUtils.clamp(emojiCenterX - popupWidth / 2, 0, AndroidUtilities.displaySize.x - popupWidth);
+        int offsetY = AndroidUtilities.rectTmp2.centerY();
+        int emojiCenterXInPopup = emojiCenterX - offsetX;
+
+        SelectAnimatedEmojiDialog popupLayout = new SelectAnimatedEmojiDialog(this, getContext(), true, Math.max(0, emojiCenterXInPopup), chat == null ? SelectAnimatedEmojiDialog.TYPE_EMOJI_STATUS : SelectAnimatedEmojiDialog.TYPE_EMOJI_STATUS_CHANNEL, true, getResourceProvider(), 0) {
+            @Override
+            protected boolean willApplyEmoji(View view, Long documentId, TLRPC.Document document, TL_stars.TL_starGiftUnique gift, Integer until) {
+                if (gift != null) {
+                    final TL_stars.SavedStarGift savedStarGift = StarsController.getInstance(currentAccount).findUserStarGift(gift.id);
+                    return savedStarGift == null || MessagesController.getGlobalMainSettings().getInt("statusgiftpage", 0) >= 2;
+                }
+                return true;
+            }
+
+            @Override
+            public long getDialogId() {
+                return ProfileActivityReplacement.this.getDialogId();
+            }
+
+            @Override
+            protected void onEmojiSelected(View emojiView, Long documentId, TLRPC.Document document, TL_stars.TL_starGiftUnique gift, Integer until) {
+                final TLRPC.EmojiStatus emojiStatus;
+                if (gift != null) {
+                    final TL_stars.SavedStarGift savedStarGift = StarsController.getInstance(currentAccount).findUserStarGift(gift.id);
+                    if (savedStarGift != null && MessagesController.getGlobalMainSettings().getInt("statusgiftpage", 0) < 2) {
+                        MessagesController.getGlobalMainSettings().edit().putInt("statusgiftpage", MessagesController.getGlobalMainSettings().getInt("statusgiftpage", 0) + 1).apply();
+                        new StarGiftSheet(getContext(), currentAccount, UserConfig.getInstance(currentAccount).getClientUserId(), getResourceProvider())
+                                .set(savedStarGift, null)
+                                .setupWearPage()
+                                .show();
+                        if (popup[0] != null) {
+                            selectAnimatedEmojiDialog = null;
+                            popup[0].dismiss();
+                        }
+                        return;
+                    }
+                    final TLRPC.TL_inputEmojiStatusCollectible status = new TLRPC.TL_inputEmojiStatusCollectible();
+                    status.collectible_id = gift.id;
+                    if (until != null) {
+                        status.flags |= 1;
+                        status.until = until;
+                    }
+                    emojiStatus = status;
+                } else if (documentId == null) {
+                    emojiStatus = new TLRPC.TL_emojiStatusEmpty();
+                } else {
+                    final TLRPC.TL_emojiStatus status = new TLRPC.TL_emojiStatus();
+                    status.document_id = documentId;
+                    if (until != null) {
+                        status.flags |= 1;
+                        status.until = until;
+                    }
+                    emojiStatus = status;
+                }
+                getMessagesController().updateEmojiStatus(chat == null ? 0 : -chat.id, emojiStatus, gift);
+                texts.updateEmojiStatusSelection(gift, documentId, chat);
+                if (popup[0] != null) {
+                    selectAnimatedEmojiDialog = null;
+                    popup[0].dismiss();
+                }
+            }
+        };
+        TLRPC.User user = getMessagesController().getUser(userId);
+        if (user != null) {
+            popupLayout.setExpireDateHint(DialogObject.getEmojiStatusUntil(user.emoji_status));
+        }
+        texts.prepareEmojiSelectionPopup(popupLayout);
+        popupLayout.setSaveState(3);
+        popup[0] = selectAnimatedEmojiDialog = new SelectAnimatedEmojiDialog.SelectAnimatedEmojiDialogWindow(popupLayout, LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT) {
+            @Override
+            public void dismiss() {
+                super.dismiss();
+                selectAnimatedEmojiDialog = null;
+            }
+        };
+        popup[0].showAsDropDown(rootLayout, offsetX, offsetY, Gravity.TOP | Gravity.LEFT);
+        popup[0].dimBehind();
     }
 
     private static class RoundRectPopup extends ActionBarPopupWindow.ActionBarPopupWindowLayout {
