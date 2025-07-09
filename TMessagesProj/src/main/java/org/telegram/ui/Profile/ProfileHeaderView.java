@@ -15,6 +15,7 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.graphics.ColorUtils;
+import androidx.core.math.MathUtils;
 import org.telegram.messenger.*;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.TLRPC;
@@ -158,7 +159,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         this.galleryView = gallery;
         this.galleryWrapper = new ViewWithBlurredFooter(galleryView, gallery, resourcesProvider);
         this.overlaysView = new ProfileOverlaysView(context, gallery, galleryWrapper.clipper);
-        this.actionsView = new ProfileActionsView(context);
+        this.actionsView = new ProfileActionsView(context, gallery);
         this.textsView = new ProfileTextsView(context, resourcesProvider, actionBar, dialogId, currentAccount, isTopic);
 
         avatarDrawable.setProfile(true);
@@ -367,6 +368,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         // Misc
         avatarView.image.setForegroundAlpha(Math.min(1F, fullscreenProgress));
         textsView.updateLayout(baseHeight, growth, attractorProgress, fullscreenProgress);
+        actionsView.updateFullscreen(fullscreenProgress);
     }
 
     private void checkFullscreenAnimation(float touch, int change, float velocity) {
@@ -494,7 +496,16 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         }
         this.actionModeProgress = actionModeProgress;
         avatarView.stories.setActionBarActionMode(actionModeProgress);
-        textsView.updateColors(peerColor, actionModeProgress);
+
+        int suggestedOverlayColor = peerColor != null ? peerColor.getBgColor1(Theme.isCurrentThemeDark()) : Theme.getColor(Theme.key_avatar_backgroundActionBarBlue, resourcesProvider);
+        float suggestedBrightness = AndroidUtilities.computePerceivedBrightness(suggestedOverlayColor);
+        float saturationChange = peerColor != null || !Theme.isCurrentThemeDark() ? +0.09F : 0F;
+        float brightnessChange = MathUtils.clamp(suggestedBrightness - 0.06F, 0.28F, 0.5F) - suggestedBrightness;
+        suggestedOverlayColor = Theme.adaptHSV(suggestedOverlayColor, saturationChange, brightnessChange);
+
+        actionsView.updateColors(peerColor, suggestedOverlayColor);
+        textsView.updateColors(peerColor, actionModeProgress, suggestedOverlayColor);
+
         invalidate();
         updateGifts();
     }
@@ -1068,13 +1079,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     // PINCH
 
     public void handlePinchStarted(ImageReceiver receiver) {
-        if (receiver != null) {
-            int average;
-            if (receiver.getDrawable() instanceof VectorAvatarThumbDrawable) {
-                average = ((VectorAvatarThumbDrawable) receiver.getDrawable()).gradientTools.getAverageColor();
-            } else {
-                average = AndroidUtilities.calcBitmapColor(receiver.getBitmap());
-            }
+        int average = AndroidUtilities.calcReceiverColor(receiver);
+        if (average != 0) {
             setBackgroundColor(ColorUtils.blendARGB(average, getThemedColor(Theme.key_windowBackgroundWhite), 0.1f));
         }
         avatarWrapper.setAlpha(0F);

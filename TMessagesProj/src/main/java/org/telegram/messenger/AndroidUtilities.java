@@ -152,24 +152,7 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.TextDetailSettingsCell;
 import org.telegram.ui.ChatActivity;
 import org.telegram.ui.ChatBackgroundDrawable;
-import org.telegram.ui.Components.AlertsCreator;
-import org.telegram.ui.Components.BackgroundGradientDrawable;
-import org.telegram.ui.Components.Bulletin;
-import org.telegram.ui.Components.ColoredImageSpan;
-import org.telegram.ui.Components.CubicBezierInterpolator;
-import org.telegram.ui.Components.EllipsizeSpanAnimator;
-import org.telegram.ui.Components.ForegroundColorSpanThemable;
-import org.telegram.ui.Components.ForegroundDetector;
-import org.telegram.ui.Components.HideViewAfterAnimation;
-import org.telegram.ui.Components.LayoutHelper;
-import org.telegram.ui.Components.MotionBackgroundDrawable;
-import org.telegram.ui.Components.PickerBottomLayout;
-import org.telegram.ui.Components.PipRoundVideoView;
-import org.telegram.ui.Components.RecyclerListView;
-import org.telegram.ui.Components.ShareAlert;
-import org.telegram.ui.Components.TypefaceSpan;
-import org.telegram.ui.Components.URLSpanReplacement;
-import org.telegram.ui.Components.UndoView;
+import org.telegram.ui.Components.*;
 import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.Stories.PeerStoriesView;
 import org.telegram.ui.Stories.StoryMediaAreasView;
@@ -1411,6 +1394,15 @@ public class AndroidUtilities {
             FileLog.e(e);
         }
         return 0;
+    }
+
+    public static int calcReceiverColor(ImageReceiver receiver) {
+        if (receiver == null) return 0;
+        if (receiver.getDrawable() instanceof VectorAvatarThumbDrawable) {
+            return ((VectorAvatarThumbDrawable) receiver.getDrawable()).gradientTools.getAverageColor();
+        } else {
+            return calcBitmapColor(receiver.getBitmap());
+        }
     }
 
     public static int[] calcDrawableColor(Drawable drawable) {

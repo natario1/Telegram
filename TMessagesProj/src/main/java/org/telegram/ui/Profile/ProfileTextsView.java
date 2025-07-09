@@ -65,6 +65,7 @@ public class ProfileTextsView extends FrameLayout {
     private final int currentAccount;
     private final boolean isTopic;
     private boolean hasButton;
+    private int lastOverlayColor;
 
     private Drawable lockDrawable;
     private ScamDrawable scamDrawable;
@@ -164,7 +165,7 @@ public class ProfileTextsView extends FrameLayout {
         if (fullscreenProgress > 0F) {
             progress = fullscreenProgress;
         } else {
-            progress = attractorProgress - 1F;
+            progress = CubicBezierInterpolator.EASE_OUT.getInterpolation(attractorProgress) - 1F;
         }
         this.baseHeight = base;
         this.currentGrowth = growth;
@@ -243,8 +244,8 @@ public class ProfileTextsView extends FrameLayout {
             if (title.isInLayout()) title.post(title::requestLayout);
         }
 
-        smallSubtitle.setVisibility(hasButton && progress >= 0F ? View.GONE : View.VISIBLE);
-        buttonSubtitle.setVisibility(hasButton && progress >= 0F ? View.VISIBLE : View.GONE);
+        smallSubtitle.setVisibility(hasButton && progress >= 0F ? View.INVISIBLE : View.VISIBLE);
+        buttonSubtitle.setVisibility(hasButton && progress >= 0F ? View.VISIBLE : View.INVISIBLE);
     }
 
     public CharSequence getTitle() {
@@ -351,9 +352,10 @@ public class ProfileTextsView extends FrameLayout {
         adjustLayout();
     }
 
-    public void updateColors(MessagesController.PeerColor peerColor, float mediaHeaderProgress) {
+    public void updateColors(MessagesController.PeerColor peerColor, float mediaHeaderProgress, int suggestedOverlayColor) {
         lastPeerColor = peerColor;
         lastActionModeProgress = mediaHeaderProgress;
+        lastOverlayColor = suggestedOverlayColor;
         adjustColors();
     }
 
@@ -375,8 +377,6 @@ public class ProfileTextsView extends FrameLayout {
         } else {
             title.setTextColor(ColorUtils.blendARGB(collapsedColor, expandedColor, Utilities.clamp(progress, 1F, 0F)));
         }
-        int overlayBackgroundColor = lastPeerColor != null ? lastPeerColor.getBgColor1(Theme.isCurrentThemeDark()) : Theme.getColor(Theme.key_avatar_backgroundActionBarBlue, resourcesProvider);
-        overlayBackgroundColor = Theme.multAlpha(Theme.adaptHSV(overlayBackgroundColor, +0.18f, -0.15f), 0.5f);
 
         float expansion = Utilities.clamp(progress, 1F, 0F);
 
@@ -425,7 +425,7 @@ public class ProfileTextsView extends FrameLayout {
         if (showDrawable != null) {
             showDrawable.setAlpha2(1F - lastActionModeProgress);
             showDrawable.setTextColor(0x88FFFFFF);
-            showDrawable.setBackgroundColor(ColorUtils.blendARGB(overlayBackgroundColor, 0x23ffffff, expansion));
+            showDrawable.setBackgroundColor(ColorUtils.blendARGB(lastOverlayColor, 0x23ffffff, expansion));
         }
 
         if (premiumDrawable != null) {
@@ -444,7 +444,7 @@ public class ProfileTextsView extends FrameLayout {
                     : lastIsOnline ? Theme.getColor(Theme.key_profile_status, resourcesProvider)
                     : Theme.getColor(Theme.key_avatar_subtitleInProfileBlue, resourcesProvider);
             smallSubtitle.setTextColor(ColorUtils.blendARGB(subtitleFrom, 0xB3FFFFFF, expansion));
-            buttonSubtitlePaint.setColor(overlayBackgroundColor);
+            buttonSubtitlePaint.setColor(lastOverlayColor);
             buttonSubtitle.invalidate();
         }
     }

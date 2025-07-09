@@ -2,6 +2,7 @@ package org.telegram.ui.Profile;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.database.DataSetObserver;
 import android.graphics.*;
 import android.graphics.drawable.Drawable;
 import android.text.TextPaint;
@@ -11,12 +12,18 @@ import android.widget.LinearLayout;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.StringRes;
 import androidx.core.content.ContextCompat;
-import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.R;
+import androidx.core.graphics.ColorUtils;
+import androidx.core.math.MathUtils;
+import androidx.viewpager.widget.ViewPager;
+import org.telegram.messenger.*;
+import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.BackupImageView;
+import org.telegram.ui.Components.ProfileGalleryView;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import static org.telegram.messenger.AndroidUtilities.*;
@@ -67,9 +74,14 @@ public class ProfileActionsView extends LinearLayout {
 
     private final Button[] buttons = new Button[4];
     private final List<Action> actions = new ArrayList<>();
-    public OnActionClickListener listener = null;
+    public OnActionClickListener listener;
 
-    public ProfileActionsView(Context context) {
+    private final Map<Integer, Integer> galleryColors = new HashMap<>();
+    private int galleryCurrentColor;
+    private int lastSuggestedOverlayColor;
+    private float lastFullscreenProgress;
+
+    public ProfileActionsView(Context context, ProfileGalleryView gallery) {
         super(context);
         setOrientation(HORIZONTAL);
         int px = (int) (HORIZONTAL_INSET - ITEM_PADDING_X);
@@ -83,7 +95,20 @@ public class ProfileActionsView extends LinearLayout {
             });
             addView(button);
         }
+
+
+        gallery.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {}
+            @Override public void onPageScrollStateChanged(int state) {}
+            @Override public void onPageSelected(int position) { extractGalleryColor(gallery); }
+        });
+        gallery.getAdapter().registerDataSetObserver(new DataSetObserver() {
+            @Override public void onChanged() { extractGalleryColor(gallery); }
+        });
+
+        extractGalleryColor(gallery);
         setVisibleRoom(0F);
+        adjustColors();
     }
 
     @Override
@@ -117,9 +142,54 @@ public class ProfileActionsView extends LinearLayout {
         setVisibility(progress > 0F ? View.VISIBLE : View.GONE);
     }
 
+    private void extractGalleryColor(ProfileGalleryView gallery) {
+        BackupImageView imageView = gallery.getCurrentItemView();
+        ImageReceiver receiver = imageView == null ? null : imageView.getImageReceiver();
+        Bitmap bitmap = receiver == null ? null : receiver.getBitmap();
+        if (bitmap == null || bitmap.isRecycled()) {
+            galleryCurrentColor = 0;
+            if (isAttachedToWindow()) postDelayed(() -> extractGalleryColor(gallery), 500);
+            return;
+        }
+        int key = System.identityHashCode(bitmap);
+        Integer cached = galleryColors.get(key);
+        if (cached != null) {
+            galleryCurrentColor = cached;
+        } else {
+            galleryCurrentColor = AndroidUtilities.calcBitmapColor(bitmap);
+            if (galleryCurrentColor != 0) galleryColors.put(key, galleryCurrentColor);
+        }
+        adjustColors();
+    }
+
+    void updateColors(MessagesController.PeerColor peerColor, int suggestedOverlayColor) {
+        lastSuggestedOverlayColor = suggestedOverlayColor;
+        adjustColors();
+    }
+
+    void updateFullscreen(float fullscreenProgress) {
+        lastFullscreenProgress = fullscreenProgress;
+        adjustColors();
+    }
+
+    private void adjustColors() {
+        int expanded = 0x20000000;
+        if (galleryCurrentColor != 0) {
+            float bright = AndroidUtilities.computePerceivedBrightness(galleryCurrentColor);
+            float change = MathUtils.clamp(bright, 0.1F, 0.3F) - bright;
+            expanded = Theme.multAlpha(Theme.adaptHSV(galleryCurrentColor, 0.1F, change), 0.25F);
+        }
+        int result = ColorUtils.blendARGB(lastSuggestedOverlayColor, expanded, Math.min(1F, lastFullscreenProgress*lastFullscreenProgress));
+        for (int b = 0; b < buttons.length; b++) {
+            buttons[b].fallbackPaint.setColor(result);
+            buttons[b].invalidate();
+        }
+    }
+
     private static class Button extends View {
         private final ViewClipper clipper = new ViewClipper(this);
         private final Paint fallbackPaint = new Paint();
+        private float fallbackAlpha = 1F;
         private final BlurBehindDrawable blurDrawable;
         private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private String text = "";
@@ -130,7 +200,6 @@ public class ProfileActionsView extends LinearLayout {
         private Button(Context context, Action data) {
             super(context);
             clipper.setRoundRadius(dpf2(8.33F));
-            fallbackPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.MULTIPLY));
             textPaint.setColor(Color.WHITE);
             textPaint.setTypeface(AndroidUtilities.bold());
             textPaint.setTextAlign(Paint.Align.CENTER);
@@ -168,8 +237,7 @@ public class ProfileActionsView extends LinearLayout {
             textPaint.setTextSize(lerp(0.6F * TEXT_SIZE, TEXT_SIZE, progress));
             if (icon != null) icon.setAlpha(alpha);
             iconScale = Math.max(0F, lerp(-0.6F, 1F, progress));
-            int bg = lerp(255, 218, progress);
-            fallbackPaint.setColor(Color.rgb(bg, bg, bg));
+            fallbackAlpha = progress;
             clipper.setInsets(ITEM_PADDING_X, lerp(ITEM_HEIGHT, 0, progress), ITEM_PADDING_X, 0);
             invalidate();
         }
@@ -190,7 +258,10 @@ public class ProfileActionsView extends LinearLayout {
                 blurDrawable.refresh(0, 0);
                 blurDrawable.draw(canvas);
             } else {
+                int alpha = fallbackPaint.getAlpha();
+                fallbackPaint.setAlpha((int) (alpha * fallbackAlpha));
                 canvas.drawRect(0F, 0F, getWidth(), getHeight(), fallbackPaint);
+                fallbackPaint.setAlpha(alpha);
             }
             float cx = getWidth() / 2F;
             float is = iconScale * ICON_SIZE / 2F;
