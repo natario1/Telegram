@@ -25,10 +25,7 @@ import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.Display;
-import android.view.Gravity;
-import android.view.MotionEvent;
-import android.view.View;
+import android.view.*;
 import android.webkit.CookieManager;
 import android.webkit.WebStorage;
 import android.webkit.WebView;
@@ -131,6 +128,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
     private ProfileActivityMenus menuHandler;
     private ProfileHeaderView headerView;
     private ProfileContentView listView;
+    private PinchToZoomHelper pinchToZoomHelper;
 
     private float mediaHeaderAnimationProgress = 0F;
     private boolean mediaHeaderVisible = false;
@@ -1353,7 +1351,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
         Bulletin.removeDelegate(this);
-        
+
+        if (pinchToZoomHelper != null) {
+            pinchToZoomHelper.clear();
+        }
         if (sharedMediaLayout != null) {
             sharedMediaLayout.onDestroy();
         }
@@ -1429,6 +1430,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
     @Override
     public boolean canBeginSlide() {
         if (!sharedMediaLayout.isSwipeBackEnabled()) return false;
+        if (pinchToZoomHelper.isInOverlayMode()) return false;
         return super.canBeginSlide();
     }
 
@@ -1875,7 +1877,9 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
             @Override
             public boolean dispatchTouchEvent(MotionEvent ev) {
-                // WIP: if (pinchToZoomHelper.isInOverlayMode()) return pinchToZoomHelper.onTouchEvent(ev);
+                if (pinchToZoomHelper.isInOverlayMode()) {
+                    return pinchToZoomHelper.onTouchEvent(ev);
+                }
                 if (sharedMediaLayout.isInFastScroll() && sharedMediaLayout.isPinnedToTop()) {
                     return sharedMediaLayout.dispatchFastScrollEvent(ev);
                 }
@@ -1883,6 +1887,14 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     return true;
                 }
                 return super.dispatchTouchEvent(ev);
+            }
+
+            @Override
+            protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+                if (pinchToZoomHelper.isInOverlayMode() && (child == actionBar)) {
+                    return true;
+                }
+                return super.drawChild(canvas, child, drawingTime);
             }
 
             @Override
@@ -2006,6 +2018,57 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 listView.setBottomGlowOffset(height);
             }
         }
+
+        // Pinch to zoom
+        ViewGroup pinchToZoomDecor = Build.VERSION.SDK_INT >= 21 ? (ViewGroup) getParentActivity().getWindow().getDecorView() : rootLayout;
+        pinchToZoomHelper = new PinchToZoomHelper(pinchToZoomDecor, rootLayout) {
+            private final Paint statusBarPaint = new Paint();
+
+            @Override
+            protected void invalidateViews() {
+                super.invalidateViews();
+                fragmentView.invalidate();
+                for (int i = 0; i < gallery.getChildCount(); i++) {
+                    gallery.getChildAt(i).invalidate();
+                }
+            }
+
+            @Override
+            protected void drawOverlays(Canvas canvas, float alpha, float parentOffsetX, float parentOffsetY, float clipTop, float clipBottom) {
+                if (alpha <= 0F) return;
+                AndroidUtilities.rectTmp.set(0, 0, gallery.getMeasuredWidth(), gallery.getMeasuredHeight());
+                canvas.saveLayerAlpha(AndroidUtilities.rectTmp, (int) (255 * alpha), Canvas.ALL_SAVE_FLAG);
+                gallery.draw(canvas);
+                if (actionBar.getOccupyStatusBar() && !SharedConfig.noStatusBar) {
+                    statusBarPaint.setColor(ColorUtils.setAlphaComponent(Color.BLACK, (int) (255 * 0.2f)));
+                    canvas.drawRect(actionBar.getX(), actionBar.getY(), actionBar.getX() + actionBar.getMeasuredWidth(), actionBar.getY() + AndroidUtilities.statusBarHeight, statusBarPaint);
+                }
+                canvas.translate(actionBar.getX(), actionBar.getY());
+                actionBar.draw(canvas);
+                canvas.restore();
+            }
+
+            @Override
+            protected boolean zoomEnabled(View child, ImageReceiver receiver) {
+                if (!super.zoomEnabled(child, receiver)) return false;
+                return listView.getScrollState() != RecyclerView.SCROLL_STATE_DRAGGING;
+            }
+        };
+        pinchToZoomHelper.setCallback(new PinchToZoomHelper.Callback() {
+            @Override
+            public void onZoomStarted(MessageObject messageObject) {
+                listView.cancelClickRunnables(true);
+                if (sharedMediaLayout != null && sharedMediaLayout.getCurrentListView() != null) {
+                    sharedMediaLayout.getCurrentListView().cancelClickRunnables(true);
+                }
+                headerView.handlePinchStarted(pinchToZoomHelper.getPhotoImage());
+            }
+            @Override
+            public void onZoomFinished(MessageObject messageObject) {
+                headerView.handlePinchFinished();
+            }
+        });
+        gallery.setPinchToZoomHelper(pinchToZoomHelper);
 
         // Decorations
         rootLayout.blurBehindViews.add(sharedMediaLayout);

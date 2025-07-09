@@ -1061,9 +1061,32 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
     // ACTIONS
 
-
     public ProfileActionsView getActions() {
         return actionsView;
+    }
+
+    // PINCH
+
+    public void handlePinchStarted(ImageReceiver receiver) {
+        if (receiver != null) {
+            int average;
+            if (receiver.getDrawable() instanceof VectorAvatarThumbDrawable) {
+                average = ((VectorAvatarThumbDrawable) receiver.getDrawable()).gradientTools.getAverageColor();
+            } else {
+                average = AndroidUtilities.calcBitmapColor(receiver.getBitmap());
+            }
+            setBackgroundColor(ColorUtils.blendARGB(average, getThemedColor(Theme.key_windowBackgroundWhite), 0.1f));
+        }
+        avatarWrapper.setAlpha(0F);
+        overlaysView.setAlpha(0F);
+        textsView.setAlpha(0F);
+    }
+
+    public void handlePinchFinished() {
+        setBackgroundColor(getThemedColor(Theme.key_avatar_backgroundActionBarBlue));
+        avatarWrapper.animate().alpha(1F).setDuration(220).start();
+        overlaysView.animate().alpha(1F).setDuration(220).start();
+        textsView.animate().alpha(1F).setDuration(220).start();
     }
 
     // DRAW
