@@ -4514,7 +4514,8 @@ public class ProfileActivityReplacement extends BaseFragment implements
             TLRPC.User user = getMessagesController().getUser(userId);
             if (user == null || userInfo == null) return;
             if (!userInfo.phone_calls_available || !userInfo.video_calls_available && action == ProfileActionsView.Action.VIDEO) {
-                // WIP: Launch the bottom sheet.
+                CallForbiddenSheet inviteSheet = new CallForbiddenSheet(getContext(), user, null);
+                inviteSheet.show();
             } else {
                 VoIPHelper.startCall(user, action == ProfileActionsView.Action.VIDEO, userInfo.video_calls_available, getParentActivity(), userInfo, getAccountInstance());
             }

@@ -106,6 +106,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import androidx.collection.LongSparseArray;
@@ -1906,7 +1907,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		presentFragment(fragment);
 	}
 
-	public static void createCallLink(Context context, int currentAccount, Theme.ResourcesProvider resourceProvider, Runnable done) {
+	public static void createCallLink(Context context, int currentAccount, Theme.ResourcesProvider resourceProvider, boolean openLinkSheet, Consumer<String> done) {
 		final AlertDialog progressDialog = new AlertDialog(context, AlertDialog.ALERT_TYPE_SPINNER);
 		progressDialog.showDelayed(500);
 
@@ -1924,12 +1925,16 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 				}
 				progressDialog.dismiss();
 				if (groupCall != null) {
-					final TLRPC.TL_inputGroupCall inputGroupCall = new TLRPC.TL_inputGroupCall();
-					inputGroupCall.id = groupCall.id;
-					inputGroupCall.access_hash = groupCall.access_hash;
-					showCallLinkSheet(context, currentAccount, inputGroupCall, groupCall.invite_link, resourceProvider, true, true);
-
-					AndroidUtilities.runOnUIThread(done);
+					if (openLinkSheet) {
+						final TLRPC.TL_inputGroupCall inputGroupCall = new TLRPC.TL_inputGroupCall();
+						inputGroupCall.id = groupCall.id;
+						inputGroupCall.access_hash = groupCall.access_hash;
+						showCallLinkSheet(context, currentAccount, inputGroupCall, groupCall.invite_link, resourceProvider, true, true);
+					}
+					final String link = groupCall.invite_link;
+					AndroidUtilities.runOnUIThread(() -> done.accept(link));
+				} else {
+					AndroidUtilities.runOnUIThread(() -> done.accept(null));
 				}
 			} else if (res instanceof TL_phone.groupCall) {
 				final TL_phone.groupCall r = (TL_phone.groupCall) res;
@@ -1941,20 +1946,20 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 				req2.call.id = r.call.id;
 				req2.call.access_hash = r.call.access_hash;
 				ConnectionsManager.getInstance(currentAccount).sendRequest(req2, (res2, err2) -> AndroidUtilities.runOnUIThread(() -> {
+					progressDialog.dismiss();
 					if (res2 instanceof TL_phone.exportedGroupCallInvite) {
-						progressDialog.dismiss();
-
 						final TL_phone.exportedGroupCallInvite r2 = (TL_phone.exportedGroupCallInvite) res2;
-						showCallLinkSheet(context, currentAccount, req2.call, r2.link, resourceProvider, true, true);
+						if (openLinkSheet) {
+							showCallLinkSheet(context, currentAccount, req2.call, r2.link, resourceProvider, true, true);
+						}
+						AndroidUtilities.runOnUIThread(() -> done.accept(r2.link));
 					} else {
-						progressDialog.dismiss();
+						AndroidUtilities.runOnUIThread(() -> done.accept(null));
 					}
-
-					AndroidUtilities.runOnUIThread(done);
 				}));
 			} else {
 				progressDialog.dismiss();
-				AndroidUtilities.runOnUIThread(done);
+				AndroidUtilities.runOnUIThread(() -> done.accept(null));
 			}
 		}));
 	}

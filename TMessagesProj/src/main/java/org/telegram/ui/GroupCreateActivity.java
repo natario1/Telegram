@@ -860,7 +860,7 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
         frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL, 0, 0, 0, isCall ? 14 + 48 + 14 : 0));
         listView.setOnItemClickListener((view, position) -> {
             if (position == adapter.createCallLinkRow) {
-                CallLogActivity.createCallLink(context, currentAccount, resourceProvider, this::finishFragment);
+                CallLogActivity.createCallLink(context, currentAccount, resourceProvider, true, (link) -> finishFragment());
             } else if (position == 0 && adapter.inviteViaLink != 0 && !adapter.searching) {
                 sharedLinkBottomSheet = new PermanentLinkBottomSheet(context, false, this, info, chatId, channelId != 0);
                 showDialog(sharedLinkBottomSheet);
