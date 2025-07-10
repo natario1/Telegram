@@ -11163,7 +11163,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                     view.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
                     break;
                 case VIEW_TYPE_CHANNEL:
-                    view = new ProfileChannelCell(ProfileActivity.this) {
+                    view = new ProfileChannelCell(ProfileActivity.this, false) {
                         @Override
                         public int processColor(int color) {
                             return dontApplyPeerColor(color);

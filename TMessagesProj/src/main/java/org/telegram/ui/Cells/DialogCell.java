@@ -190,6 +190,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     public boolean isSavedDialog;
     public boolean isSavedDialogCell;
     public DialogCellTags tags;
+    public Drawable extraDrawable; // Between title and time
 
     public final StoriesUtilities.AvatarStoryParams storyParams = new StoriesUtilities.AvatarStoryParams(false) {
         @Override
@@ -3755,6 +3756,22 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 canvas.translate(timeLeft, timeTop);
                 SpoilerEffect.layoutDrawMaybe(timeLayout, canvas);
                 canvas.restore();
+            }
+
+            if (extraDrawable != null && nameLayout != null) {
+                int right, left;
+                if (!LocaleController.isRTL) {
+                    left = nameLeft + (int) nameLayout.getLineWidth(0);
+                    right = timeLayout != null ? timeLeft : getWidth();
+                } else {
+                    left = timeLayout != null ? timeLeft + (int) timeLayout.getLineWidth(0) : 0;
+                    right = nameLeft;
+                }
+                if (right - left > dp(10)) {
+                    extraDrawable.setBounds(left + dp(5), nameTop, right - dp(5), nameTop + nameLayout.getHeight());
+                    extraDrawable.draw(canvas);
+
+                }
             }
 
             if (drawLock2()) {

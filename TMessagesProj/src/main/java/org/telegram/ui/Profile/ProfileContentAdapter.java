@@ -395,7 +395,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                 break;
             }
             case VIEW_TYPE_CHANNEL: {
-                view = new ProfileChannelCell(fragment);
+                view = new ProfileChannelCell(fragment, true);
                 view.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
                 break;
             }
