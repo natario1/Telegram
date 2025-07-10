@@ -516,6 +516,10 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (sharedMediaLayout != null && sharedMediaLayout.giftsContainer != null) {
             sharedMediaLayout.giftsContainer.updateColors();
         }
+        if (listView != null) {
+            ProfileContentAdapter adapter = (ProfileContentAdapter) listView.getAdapter();
+            adapter.updateColors();
+        }
     }
 
     private void updateMenuData(boolean animated) {

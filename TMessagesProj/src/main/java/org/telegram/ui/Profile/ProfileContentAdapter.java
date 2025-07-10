@@ -270,6 +270,27 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
         return Theme.getColor(key, resourcesProvider);
     }
 
+    public void updateColors() {
+        if (owner == null) return;
+        AndroidUtilities.forEachViews(owner, view -> {
+            if (view instanceof HeaderCell) {
+                ((HeaderCell) view).setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueHeader));
+            } else if (view instanceof TextDetailCell) {
+                ((TextDetailCell) view).updateColors();
+            } else if (view instanceof TextCell) {
+                ((TextCell) view).updateColors();
+            } else if (view instanceof AboutLinkCell) {
+                ((AboutLinkCell) view).updateColors();
+            } else if (view instanceof NotificationsCheckCell) {
+                ((NotificationsCheckCell) view).getCheckBox().invalidate();
+            } else if (view instanceof ProfileHoursCell) {
+                ((ProfileHoursCell) view).updateColors();
+            } else if (view instanceof ProfileChannelCell) {
+                ((ProfileChannelCell) view).updateColors();
+            }
+        });
+    }
+
     @NonNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -567,7 +588,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                         String prefix = fragment.getMessagesController().linkPrefix;
                         String suffix = fragment.getTopicId() != 0 ? "/" + fragment.getTopicId() : "";
                         if (ChatObject.isPublic(chat)) {
-                            containsQr = true;
+                            containsQr = fragment.getTopicId() == 0;
                             text = prefix + "/" + username + suffix;
                             value = LocaleController.getString(R.string.InviteLink);
                         } else {
