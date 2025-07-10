@@ -327,7 +327,9 @@ public class ProfileTextsView extends FrameLayout {
 
     public void updateSubtitle(CharSequence text, Runnable click) {
         smallSubtitle.setText(text);
+        smallSubtitle.requestLayout();
         buttonSubtitle.setText(text);
+        buttonSubtitle.requestLayout();
         if (click != null) {
             smallSubtitle.setOnClickListener(v -> click.run());
             buttonSubtitle.setOnClickListener(v -> click.run());
@@ -349,6 +351,7 @@ public class ProfileTextsView extends FrameLayout {
             smallSubtitle.setRightDrawable(null);
             smallSubtitle.setRightDrawableOnClick(null);
         }
+        smallSubtitle.requestLayout();
         adjustLayout();
     }
 

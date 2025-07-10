@@ -107,25 +107,30 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
     }
 
     @SuppressLint("NotifyDataSetChanged")
-    public void setRows(Rows newRows, boolean reload) {
+    public void setRows(Rows newRows, ProfileCoordinatorLayout.TopPreservingLayoutManager layoutManager, boolean reload) {
         if (newRows == rows) return;
         if (owner != null && owner.isComputingLayout()) {
-            owner.post(() -> setRows(newRows, reload));
+            owner.post(() -> setRows(newRows, layoutManager, reload));
             return;
         }
         if (reload || rows.count() == 0 || newRows.count() == 0 || owner == null) {
             this.rows = newRows;
-            if (owner != null) notifyDataSetChanged();
-        } else {
-            RowDiffer differ = new RowDiffer(rows, newRows);
-            this.rows = newRows;
-            try {
-                DiffUtil.calculateDiff(differ).dispatchUpdatesTo(this);
-            } catch (Exception e) {
-                FileLog.e(e);
-                notifyDataSetChanged();
-            }
+            if (owner == null) return;
+            layoutManager.saveTop();
+            notifyDataSetChanged();
+            layoutManager.restoreTop();
+            return;
         }
+        layoutManager.saveTop();
+        RowDiffer differ = new RowDiffer(rows, newRows);
+        this.rows = newRows;
+        try {
+            DiffUtil.calculateDiff(differ).dispatchUpdatesTo(this);
+        } catch (Exception e) {
+            FileLog.e(e);
+            notifyDataSetChanged();
+        }
+        layoutManager.restoreTop();
     }
 
     @Override

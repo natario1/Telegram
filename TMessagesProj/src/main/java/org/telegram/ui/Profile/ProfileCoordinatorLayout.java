@@ -131,7 +131,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
                 // Called only once
                 content.setPadding(content.getPaddingLeft(), header.maxGrowth, content.getPaddingRight(), content.getPaddingBottom());
                 LinearLayoutManager manager = (LinearLayoutManager) content.getLayoutManager();
-                if (manager != null) manager.scrollToPositionWithOffset(0, -header.maxGrowth + header.growth);
+                if (manager != null) manager.scrollToPositionWithOffset(0, header.growth - content.getPaddingTop());
             }
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
@@ -175,7 +175,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
     public boolean onNestedPreFling(@NonNull View target, float velocityX, float velocityY) {
         // If fling is not that fast, abort the default recycler fling and snap ourselves
         // If it's fast enough, we'll snap after the default fling ends
-        return Math.abs(velocityY / AndroidUtilities.density) < 1000 && snapContentOffset();
+        return Math.abs(velocityY / AndroidUtilities.density) < 2400 && snapContentOffset();
     }
 
     @Override
@@ -192,17 +192,38 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
 
     private boolean snapContentOffset() {
         if (content == null || header.snapGrowths.length == 0) return false;
-        int distance = header.growth - header.snapGrowths[0];
-        boolean last = false;
-        for (int s = 1; s < header.snapGrowths.length; s++) {
-            int delta = header.growth - header.snapGrowths[s];
-            if (Math.abs(delta) < Math.abs(distance)) {
-                distance = delta;
-                last = s == header.snapGrowths.length - 1;
+        boolean strong = Math.abs(lastVelocity / AndroidUtilities.density) > 700;
+        if (!strong) {
+            int index = 0;
+            int minDelta = Integer.MAX_VALUE;
+            for (int i = 0; i < header.snapGrowths.length; i++) {
+                int delta = Math.abs(header.growth - header.snapGrowths[i]);
+                if (delta < minDelta) {
+                    minDelta = delta;
+                    index = i;
+                }
             }
+            return snapContentOffset(index);
+        } else if (lastVelocity > 0F) {
+            for (int i = 0; i < header.snapGrowths.length; i++) {
+                if (header.snapGrowths[i] >= header.growth) {
+                    return snapContentOffset(i);
+                }
+            }
+            return snapContentOffset(header.snapGrowths.length - 1);
+        } else {
+            for (int i = header.snapGrowths.length - 1; i >= 0; i--) {
+                if (header.snapGrowths[i] <= header.growth) {
+                    return snapContentOffset(i);
+                }
+            }
+            return snapContentOffset(0);
         }
-        boolean overscroll = last && distance > 0; // snap to legit position faster in this case
-        return changeContentOffset(header.growth - distance, true, overscroll);
+    }
+
+    private boolean snapContentOffset(int index) {
+        boolean overscroll = index == header.snapGrowths.length - 1 && header.growth > header.snapGrowths[index]; // snap to legit position faster in this case
+        return changeContentOffset(header.snapGrowths[index], true, overscroll);
     }
 
     private boolean changeContentOffset(int targetGrowth, boolean animated, boolean fast) {
@@ -298,5 +319,35 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
             interceptState = 0;
         }
         return interceptState > 0;
+    }
+
+    /**
+     * We use Recycler's paddingTop to make room for the header, but when items are dynamically inserted or removed,
+     * RecyclerView doesn't preserve the topmost item position, preferring to place items inside the padded area.
+     * To address this, one can use this layout manager and wrap changes with saveTop and restoreTop.
+     */
+    public static class TopPreservingLayoutManager extends LinearLayoutManager {
+        private int pendingAnchorPosition = RecyclerView.NO_POSITION;
+        private int pendingAnchorTop = 0;
+        private final RecyclerView owner;
+
+        public TopPreservingLayoutManager(Context context, RecyclerView owner) {
+            super(context);
+            this.owner = owner;
+            setOrientation(LinearLayoutManager.VERTICAL);
+            mIgnoreTopPadding = false;
+        }
+
+        public void saveTop() {
+            View debug = findViewByPosition(0);
+            pendingAnchorPosition = debug != null ? 0 : RecyclerView.NO_POSITION;
+            pendingAnchorTop = debug != null ? debug.getTop() : 0;
+        }
+
+        public void restoreTop() {
+            if (pendingAnchorPosition == RecyclerView.NO_POSITION) return;
+            scrollToPositionWithOffset(pendingAnchorPosition, pendingAnchorTop - owner.getPaddingTop());
+            pendingAnchorPosition = RecyclerView.NO_POSITION;
+        }
     }
 }

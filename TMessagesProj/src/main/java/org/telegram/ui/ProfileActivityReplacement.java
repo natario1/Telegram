@@ -1970,7 +1970,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         actions.listener = this;
 
         // List
-        listView = new ProfileContentView(actionBar, sharedMediaLayout, getNotificationCenter());
+        listView = new ProfileContentView(actionBar, sharedMediaLayout, getNotificationCenter(), new ProfileContentAdapter(this));
         listView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
@@ -1986,18 +1986,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         });
         listView.setOnItemLongClickListener(this::handleListLongClick);
         listView.setOnItemClickListener(this::handleListClick);
-        LinearLayoutManager listLayoutManager = new LinearLayoutManager(context) {
-            @Override
-            public boolean supportsPredictiveItemAnimations() {
-                return uploader != null;
-            }
-        };
-        listLayoutManager.setOrientation(LinearLayoutManager.VERTICAL);
-        listLayoutManager.mIgnoreTopPadding = false;
-        listView.setLayoutManager(listLayoutManager);
         coordinator.addContent(listView);
-        ProfileContentAdapter listAdapter = new ProfileContentAdapter(this);
-        listView.setAdapter(listAdapter);
 
         // Ban from group
         if (banGroupId != 0) {

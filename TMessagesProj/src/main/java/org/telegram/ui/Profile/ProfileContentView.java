@@ -27,15 +27,22 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
 
     private final ActionBar actionBar;
     private final SharedMediaLayout sharedMediaLayout;
+    private final ProfileCoordinatorLayout.TopPreservingLayoutManager layoutManager;
+    private final ProfileContentAdapter adapter;
 
     public ProfileContentView(
             @NonNull ActionBar actionBar,
             @NonNull SharedMediaLayout sharedMediaLayout,
-            @NonNull NotificationCenter notificationCenter
+            @NonNull NotificationCenter notificationCenter,
+            @NonNull ProfileContentAdapter adapter
             ) {
         super(actionBar.getContext());
+        this.adapter = adapter;
         this.actionBar = actionBar;
         this.sharedMediaLayout = sharedMediaLayout;
+        this.layoutManager = new ProfileCoordinatorLayout.TopPreservingLayoutManager(actionBar.getContext(), this);
+        setLayoutManager(layoutManager);
+        setAdapter(adapter);
         setVerticalScrollBarEnabled(false);
         setItemAnimator(new ItemAnimator(notificationCenter));
         setClipToPadding(false);
@@ -171,8 +178,6 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
     // ROW APIS
 
     public int getRowPosition(int rowKind) {
-        ProfileContentAdapter adapter = (ProfileContentAdapter) getAdapter();
-        if (adapter == null) return -1;
         return adapter.getRows().position(rowKind);
     }
 
@@ -181,9 +186,8 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
             post(() -> scrollToRow(rowKind, animated));
             return;
         }
-        LinearLayoutManager layoutManager = (LinearLayoutManager) getLayoutManager();
         int position = getRowPosition(rowKind);
-        if (layoutManager == null || position < 0) return;
+        if (position < 0) return;
         if (animated) {
             LinearSmoothScrollerCustom linearSmoothScroller = new LinearSmoothScrollerCustom(getContext(), LinearSmoothScrollerCustom.POSITION_TOP, .6f);
             linearSmoothScroller.setTargetPosition(position);
@@ -196,28 +200,20 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
 
     public void notifyRowChange(int rowKind) {
         int position = getRowPosition(rowKind);
-        if (position >= 0 && getAdapter() != null) {
-            getAdapter().notifyItemChanged(position);
-        }
+        if (position >= 0) adapter.notifyItemChanged(position);
     }
 
     /** @noinspection unchecked*/
     public <T extends View> T findRowView(int rowKind) {
         int position = getRowPosition(rowKind);
-        if (position >= 0 && getLayoutManager() != null) {
-            return (T) getLayoutManager().findViewByPosition(position);
-        }
+        if (position >= 0) return (T) layoutManager.findViewByPosition(position);
         return null;
     }
 
     public void updateRows(Function<Rows, Rows> updater) {
-        ProfileContentAdapter adapter = (ProfileContentAdapter) getAdapter();
-        if (adapter == null) return;
         Rows rows = adapter.getRows();
-        // WIP: keepingScrollPosition { ... }
         Rows newRows = updater.apply(rows);
-        if (newRows != null) adapter.setRows(newRows, false);
-        // WIP: AndroidUtilities.updateVisibleRows(listView);
+        if (newRows != null) adapter.setRows(newRows, layoutManager, false);
     }
 
     public static class Rows {
