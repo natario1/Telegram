@@ -339,6 +339,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
         }
 
         public void saveTop() {
+            if (owner.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) return;
             View debug = findViewByPosition(0);
             pendingAnchorPosition = debug != null ? 0 : RecyclerView.NO_POSITION;
             pendingAnchorTop = debug != null ? debug.getTop() : 0;

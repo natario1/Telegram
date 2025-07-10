@@ -1123,6 +1123,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 } else if (chatInfo != null) {
                     // Groups
                     if (!isTopic() && chatInfo.participants != null && chatInfo.participants.participants != null && !(chatInfo.participants instanceof TLRPC.TL_chatParticipantsForbidden)) {
+                        int index = rows.count();
                         if (chat != null && (ChatObject.canAddUsers(chat) || chat.default_banned_rights == null || !chat.default_banned_rights.invite_users)) {
                             rows.append(Rows.MembersAdd);
                         }
@@ -1133,10 +1134,12 @@ public class ProfileActivityReplacement extends BaseFragment implements
                                 sharedMediaLayout.setChatUsers(null, null);
                             }
                         } else {
-                            if (!rows.has(Rows.MembersAdd)) rows.append(Rows.MembersShadow);
                             if (sharedMediaLayout != null) {
                                 sharedMediaLayout.setChatUsers(sortMembers(), chatInfo);
                             }
+                        }
+                        if (index != rows.count()) {
+                            rows.append(Rows.MembersShadow);
                         }
                     } else {
                         if (!ChatObject.isNotInChat(chat) && ChatObject.canAddUsers(chat) && chatInfo.participants_hidden) {

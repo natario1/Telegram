@@ -68,6 +68,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private final static int EXTRA_HEIGHT_OVERSCROLL = dp(48F);
     public final static int EXTRA_HEIGHT_FOOTER = dp(62F);
 
+    private final static String DEFAULT_FILTER = "50_50";
+
     public interface Callback {
         void onFullscreenAnimationStarted(boolean fullscreen);
         void onFullscreenAnimationEnded(boolean fullscreen);
@@ -730,7 +732,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     }
 
     public void setUploadStarted(ImageLocation big, ImageLocation small) {
-        avatarView.image.setImage(small, "50_50", avatarDrawable, null);
+        avatarView.image.setImage(small, DEFAULT_FILTER, avatarDrawable, null);
         galleryView.addUploadingImage(big, small);
         avatarView.updateProgressBar(true, true);
     }
@@ -769,9 +771,9 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 avatarView.image.setImageDrawable(vectorAvatarThumbDrawable);
             } else if (videoThumbLocation != null && !user.photo.personal) {
                 avatarView.image.getImageReceiver().setVideoThumbIsSame(true);
-                avatarView.image.setImage(videoThumbLocation, "avatar", thumbLocation, "50_50", avatarDrawable, user);
+                avatarView.image.setImage(videoThumbLocation, "avatar", thumbLocation, DEFAULT_FILTER, avatarDrawable, user);
             } else {
-                avatarView.image.setImage(videoLocation, ImageLoader.AUTOPLAY_FILTER, thumbLocation, "50_50", avatarDrawable, user);
+                avatarView.image.setImage(videoLocation, ImageLoader.AUTOPLAY_FILTER, thumbLocation, DEFAULT_FILTER, avatarDrawable, user);
             }
         }
         onAvatarChanged(user, imageLocation, user.photo != null ? user.photo.photo_big : null);
@@ -797,7 +799,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         galleryView.initIfEmpty(null, imageLocation, thumbLocation, true);
         if (uploadingBig == null) {
             String filter = videoLocation != null && videoLocation.imageType == FileLoader.IMAGE_TYPE_ANIMATION ? ImageLoader.AUTOPLAY_FILTER : null;
-            avatarView.image.setImage(videoLocation, filter, thumbLocation, "50_50", avatarDrawable, chat);
+            avatarView.image.setImage(videoLocation, filter, thumbLocation, DEFAULT_FILTER, avatarDrawable, chat);
         }
         onAvatarChanged(chat, imageLocation, chat.photo != null && topicId == 0 ? chat.photo.photo_big : null);
     }
