@@ -369,7 +369,6 @@ public class AboutLinkCell extends FrameLayout {
             lastMaxWidth = AndroidUtilities.displaySize.x - AndroidUtilities.dp(23 + 23);
         }
         checkTextLayout(lastMaxWidth, true);
-        updateHeight();
         int wasValueVisibility = valueTextView.getVisibility();
         if (TextUtils.isEmpty(value)) {
             valueTextView.setVisibility(GONE);
@@ -615,7 +614,7 @@ public class AboutLinkCell extends FrameLayout {
                 showMoreTextBackgroundView.setAlpha(1f - expandT);
                 bottomShadow.setAlpha((float) Math.pow(1f - expandT, 2f));
 
-                updateHeight();
+                requestLayout();
                 container.invalidate();
             });
             collapseAnimator.addListener(new AnimatorListenerAdapter() {
@@ -647,26 +646,7 @@ public class AboutLinkCell extends FrameLayout {
     private int updateHeight() {
         int textHeight = textHeight();
         float fromHeight = fromHeight();
-        int height = shouldExpand ? (int) AndroidUtilities.lerp(fromHeight, textHeight, expandT) : textHeight;
-        setHeight(height);
-        return height;
-    }
-    private void setHeight(int height) {
-        RecyclerView.LayoutParams lp = (RecyclerView.LayoutParams) getLayoutParams();
-        int wasHeight;
-        boolean newHeight;
-        if (lp == null) {
-            newHeight = true;
-            wasHeight = (getMinimumHeight() == 0 ? getHeight() : getMinimumHeight());
-            lp = new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height);
-        } else {
-            wasHeight = lp.height;
-            newHeight = wasHeight != height;
-            lp.height = height;
-        }
-        if (newHeight) {
-            setLayoutParams(lp);
-        }
+        return shouldExpand ? (int) AndroidUtilities.lerp(fromHeight, textHeight, expandT) : textHeight;
     }
 
     private static final int MOST_SPEC = View.MeasureSpec.makeMeasureSpec(999999, View.MeasureSpec.AT_MOST);

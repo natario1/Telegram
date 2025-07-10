@@ -660,6 +660,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                     TLRPC.User user = rows.payload(kind);
                     boolean addlinks = user != null && (user.bot || (user.premium && userFull.about != null));
                     aboutLinkCell.setTextAndValue(userFull.about, LocaleController.getString(R.string.UserBio), addlinks);
+                    aboutLinkCell.setMoreButtonDisabled(false);
                 } else if (kind == Rows.InfoChatAbout) {
                     TLRPC.ChatFull chatFull = fragment.getMessagesController().getChatFull(fragment.getChatId());
                     TLRPC.Chat chat = rows.payload(kind);
@@ -668,6 +669,7 @@ public class ProfileContentAdapter extends RecyclerListView.SelectionAdapter {
                         text = text.replace("\n\n\n", "\n\n");
                     }
                     aboutLinkCell.setTextAndValue(text, LocaleController.getString(R.string.ReportChatDescription), ChatObject.isChannel(chat) && !chat.megagroup);
+                    aboutLinkCell.setMoreButtonDisabled(false);
                 } else if (kind == Rows.MyBio) {
                     TLRPC.UserFull userFull = fragment.getMessagesController().getUserFull(fragment.getUserId());
                     String value;

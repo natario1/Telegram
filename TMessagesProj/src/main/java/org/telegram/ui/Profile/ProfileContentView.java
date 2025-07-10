@@ -40,7 +40,12 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         this.adapter = adapter;
         this.actionBar = actionBar;
         this.sharedMediaLayout = sharedMediaLayout;
-        this.layoutManager = new ProfileCoordinatorLayout.TopPreservingLayoutManager(actionBar.getContext(), this);
+        this.layoutManager = new ProfileCoordinatorLayout.TopPreservingLayoutManager(actionBar.getContext(), this) {
+            @Override
+            public boolean supportsPredictiveItemAnimations() {
+                return false;
+            }
+        };
         setLayoutManager(layoutManager);
         setAdapter(adapter);
         setVerticalScrollBarEnabled(false);
@@ -92,12 +97,6 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
             return false;
         }
         return super.onInterceptTouchEvent(e);
-    }
-
-    @Override
-    protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        super.onLayout(changed, l, t, r, b);
-        // WIP: updateBottomButtonY();
     }
 
     // SHARED MEDIA SCROLL
@@ -420,7 +419,6 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
             setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
         }
 
-
         @Override
         protected void onAllAnimationsDone() {
             super.onAllAnimationsDone();
@@ -448,12 +446,6 @@ public class ProfileContentView extends RecyclerListView implements StoriesListP
         @Override
         protected long getAddAnimationDelay(long removeDuration, long moveDuration, long changeDuration) {
             return 0;
-        }
-
-        @Override
-        protected void onMoveAnimationUpdate(RecyclerView.ViewHolder holder) {
-            super.onMoveAnimationUpdate(holder);
-            // WIP: updateBottomButtonY();
         }
     }
 
