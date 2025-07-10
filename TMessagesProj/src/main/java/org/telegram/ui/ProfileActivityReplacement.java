@@ -1910,6 +1910,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
         // Gallery
         ProfileGalleryView gallery = new ProfileGalleryView(context, userId != 0 ? userId : -chatId, actionBar, null);
+        gallery.setSquare(true);
         gallery.addCallback(new ProfileGalleryView.Callback() {
             @Override
             public void onPhotosLoaded() {

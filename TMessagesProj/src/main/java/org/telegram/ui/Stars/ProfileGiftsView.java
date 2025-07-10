@@ -35,19 +35,14 @@ public class ProfileGiftsView extends View implements NotificationCenter.Notific
     private final int currentAccount;
     private final long dialogId;
     private final View avatarContainer;
-    private final AvatarImageView avatarImage;
-    private final Theme.ResourcesProvider resourcesProvider;
 
-    public ProfileGiftsView(Context context, int currentAccount, long dialogId, @NonNull View avatarContainer, AvatarImageView avatarImage, Theme.ResourcesProvider resourcesProvider) {
+    public ProfileGiftsView(Context context, int currentAccount, long dialogId, @NonNull View avatarContainer) {
         super(context);
 
         this.currentAccount = currentAccount;
         this.dialogId = dialogId;
 
         this.avatarContainer = avatarContainer;
-        this.avatarImage = avatarImage;
-
-        this.resourcesProvider = resourcesProvider;
 
     }
 

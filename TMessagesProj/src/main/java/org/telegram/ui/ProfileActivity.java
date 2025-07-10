@@ -207,10 +207,7 @@ import org.telegram.ui.Stars.StarGiftPatterns;
 import org.telegram.ui.Stars.StarGiftSheet;
 import org.telegram.ui.Stars.StarsController;
 import org.telegram.ui.Stars.StarsIntroActivity;
-import org.telegram.ui.Stories.ProfileStoriesView;
-import org.telegram.ui.Stories.StoriesController;
-import org.telegram.ui.Stories.StoriesListPlaceProvider;
-import org.telegram.ui.Stories.StoryViewer;
+import org.telegram.ui.Stories.*;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 import org.telegram.ui.Stories.recorder.DualCameraView;
 import org.telegram.ui.Stories.recorder.HintView2;
@@ -301,7 +298,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
     private ImageUpdater imageUpdater;
     private int avatarColor;
     TimerDrawable autoDeleteItemDrawable;
-    private ProfileStoriesView storyView;
+    private ProfileStoriesLegacyView storyView;
     public ProfileGiftsView giftsView;
 
     private View scrimView = null;
@@ -3025,7 +3022,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                                             return null;
                                         }
                                         updateAvatarRoundRadius();
-                                        return StoryRecorder.SourceView.fromAvatarImage(avatarImage, ChatObject.isForum(currentChat));
+                                        return StoryRecorder.SourceView.fromLegacyAvatarImage(avatarImage, ChatObject.isForum(currentChat));
                                     }
                                 })
                                 .open(null);
@@ -3111,7 +3108,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
         } else if (users != null) {
             initialTab = SharedMediaLayout.TAB_GROUPUSERS;
         }
-        sharedMediaLayout = new SharedMediaLayout(context, did, sharedMediaPreloader, userInfo != null ? userInfo.common_chats_count : 0, null, chatInfo, userInfo, initialTab, this, this, SharedMediaLayout.VIEW_TYPE_PROFILE_ACTIVITY, resourcesProvider) {
+        sharedMediaLayout = new SharedMediaLayout(context, did, sharedMediaPreloader, userInfo != null ? userInfo.common_chats_count : 0, Collections.emptyList(), chatInfo, userInfo, initialTab, this, this, SharedMediaLayout.VIEW_TYPE_PROFILE_ACTIVITY, resourcesProvider) {
             @Override
             protected int processColor(int color) {
                 return dontApplyPeerColor(color);
@@ -3240,7 +3237,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                                 return null;
                             }
                             updateAvatarRoundRadius();
-                            return StoryRecorder.SourceView.fromAvatarImage(avatarImage, ChatObject.isForum(currentChat));
+                            return StoryRecorder.SourceView.fromLegacyAvatarImage(avatarImage, ChatObject.isForum(currentChat));
                         }
                     })
                     .open(StoryRecorder.SourceView.fromFloatingButton(floatingButtonContainer), true);
@@ -4760,6 +4757,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                 checkPhotoDescriptionAlpha();
             }
         };
+        avatarsViewPager.setParentListView(listView);
         avatarsViewPager.addCallback(overlaysView);
         if (userId != getUserConfig().clientUserId && userInfo != null) {
             customAvatarProgress = userInfo.profile_photo == null ? 0 : 1;
@@ -4769,6 +4767,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
         }
         avatarContainer2.addView(avatarsViewPager);
         avatarContainer2.addView(overlaysView);
+        avatarImage.setAvatarsViewPager(avatarsViewPager);
 
         avatarsViewPagerIndicatorView = new PagerIndicatorView(context);
         avatarContainer2.addView(avatarsViewPagerIndicatorView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
@@ -4914,7 +4913,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
         };
         mediaCounterTextView.setAlpha(0.0f);
         avatarContainer2.addView(mediaCounterTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 118.33f, -2, 8, 0));
-        storyView = new ProfileStoriesView(context, currentAccount, getDialogId(), isTopic, avatarImage, resourcesProvider) {
+        storyView = new ProfileStoriesLegacyView(context, currentAccount, getDialogId(), isTopic, avatarContainer, avatarImage, resourcesProvider) {
             @Override
             protected void onTap(StoryViewer.PlaceProvider provider) {
                 long did = getDialogId();
@@ -4936,12 +4935,12 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
             }
         };
         updateStoriesViewBounds(false);
-        storyView.updateStories();
+        storyView.updateStories(true, false);
         if (avatarImage != null) {
             avatarImage.setHasStories(needInsetForStories());
         }
         avatarContainer2.addView(storyView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-        giftsView = new ProfileGiftsView(context, currentAccount, getDialogId(), avatarContainer, avatarImage, resourcesProvider);
+        giftsView = new ProfileGiftsView(context, currentAccount, getDialogId(), avatarContainer);
         avatarContainer2.addView(giftsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         updateProfileData(true);
 
@@ -5260,7 +5259,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                                 return null;
                             }
                             updateAvatarRoundRadius();
-                            return StoryRecorder.SourceView.fromAvatarImage(avatarImage, ChatObject.isForum(currentChat));
+                            return StoryRecorder.SourceView.fromLegacyAvatarImage(avatarImage, ChatObject.isForum(currentChat));
                         }
                     });
             recorder.open(StoryRecorder.SourceView.fromFloatingButton(floatingButtonContainer), true);
@@ -7161,7 +7160,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                                     avatarImage.drawForeground(false);
                                 } else {
                                     avatarImage.drawForeground(true);
-                                    avatarImage.setForegroundImage(imageView.getImageReceiver().getDrawableSafe());
+                                    avatarImage.setForegroundImageDrawable(imageView.getImageReceiver().getDrawableSafe());
                                 }
                             }
                         }
@@ -7596,7 +7595,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                     createActionBarMenu(false);
                 }
                 if (storyView != null) {
-                    storyView.updateStories();
+                    storyView.updateStories(true, false);
                 }
                 if (giftsView != null) {
                     giftsView.update();
@@ -7643,7 +7642,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                 updateAutoDeleteItem();
                 updateTtlIcon();
                 if (storyView != null) {
-                    storyView.updateStories();
+                    storyView.updateStories(true, false);
                 }
                 if (giftsView != null) {
                     giftsView.update();
@@ -7668,7 +7667,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
             if (uid == userId) {
                 userInfo = (TLRPC.UserFull) args[1];
                 if (storyView != null) {
-                    storyView.updateStories();
+                    storyView.updateStories(true, false);
                 }
                 if (giftsView != null) {
                     giftsView.update();
@@ -7778,7 +7777,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                 updateAvatarRoundRadius();
             }
             if (storyView != null) {
-                storyView.updateStories();
+                storyView.updateStories(true, false);
             }
         } else if (id == NotificationCenter.userIsPremiumBlockedUpadted) {
             if (otherItem != null) {
@@ -8302,7 +8301,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                     } else {
                         storyView.setAlpha(1f);
                         storyView.setFragmentTransitionProgress(0);
-                        animators.add(ObjectAnimator.ofFloat(storyView, ProfileStoriesView.FRAGMENT_TRANSITION_PROPERTY, 1.0f));
+                        animators.add(ObjectAnimator.ofFloat(storyView, ProfileStoriesLegacyView.FRAGMENT_TRANSITION_PROPERTY, 1.0f));
                     }
                 }
                 if (giftsView != null) {
@@ -8390,7 +8389,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                     if (dialogId > 0) {
                         animators.add(ObjectAnimator.ofFloat(storyView, View.ALPHA, 0.0f));
                     } else {
-                        animators.add(ObjectAnimator.ofFloat(storyView, ProfileStoriesView.FRAGMENT_TRANSITION_PROPERTY, 0.0f));
+                        animators.add(ObjectAnimator.ofFloat(storyView, ProfileStoriesLegacyView.FRAGMENT_TRANSITION_PROPERTY, 0.0f));
                     }
                 }
                 if (giftsView != null) {
@@ -8574,7 +8573,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
             avatarsViewPager.setChatInfo(chatInfo);
         }
         if (storyView != null) {
-            storyView.updateStories();
+            storyView.updateStories(true, false);
         }
         if (giftsView != null) {
             giftsView.update();
@@ -8599,7 +8598,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
     ) {
         userInfo = value;
         if (storyView != null) {
-            storyView.updateStories();
+            storyView.updateStories(true, false);
         }
         if (giftsView != null) {
             giftsView.update();
@@ -9488,7 +9487,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
             if (copyFromChatActivity) {
                 ChatActivity chatActivity = (ChatActivity) prevFragment;
                 BackupImageView fromAvatarImage = chatActivity.avatarContainer.getAvatarImageView();
-                avatarImage.setCrossfadeImage(fromAvatarImage.getImageReceiver());
+                avatarImage.setAnimateFromImageReceiver(fromAvatarImage.getImageReceiver());
             }
             for (int a = 0; a < 2; a++) {
                 if (nameTextView[a] == null) {
@@ -9798,7 +9797,7 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                     statusString = ((AnimatedTextView) chatActivity.avatarContainer.getSubtitleTextView()).getText();
                 }
                 BackupImageView fromAvatarImage = chatActivity.avatarContainer.getAvatarImageView();
-                avatarImage.setCrossfadeImage(fromAvatarImage.getImageReceiver());
+                avatarImage.setAnimateFromImageReceiver(fromAvatarImage.getImageReceiver());
             }
 
             boolean changed = false;
@@ -13494,6 +13493,9 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                 }
             }
         }
+        if (storyView != null) {
+            storyView.setBounds(aleft, aright, atop + (actionBar.getHeight() - atop) / 2f, !animated);
+        }
         if (giftsView != null) {
             giftsView.setBounds(aleft, aright, atop + (actionBar.getHeight() - atop) / 2f, !animated);
         }
@@ -14052,6 +14054,212 @@ public class ProfileActivity extends BaseFragment implements ProfileBirthdayEffe
                 );
                 return;
             }
+        }
+    }
+
+    public static class AvatarImageView extends BackupImageView {
+
+        private final RectF rect = new RectF();
+        private final Paint placeholderPaint;
+        public boolean drawAvatar = true;
+        public float bounceScale = 1f;
+
+        private float crossfadeProgress;
+        private ImageReceiver animateFromImageReceiver;
+
+        private ImageReceiver foregroundImageReceiver;
+        private float foregroundAlpha;
+        private ImageReceiver.BitmapHolder drawableHolder;
+        boolean drawForeground = true;
+        float progressToExpand;
+
+        ProfileGalleryView avatarsViewPager;
+        private boolean hasStories;
+        private float progressToInsets = 1f;
+
+        public void setAvatarsViewPager(ProfileGalleryView avatarsViewPager) {
+            this.avatarsViewPager = avatarsViewPager;
+        }
+
+        public AvatarImageView(Context context) {
+            super(context);
+            foregroundImageReceiver = new ImageReceiver(this);
+            placeholderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            placeholderPaint.setColor(Color.BLACK);
+        }
+
+        public void setAnimateFromImageReceiver(ImageReceiver imageReceiver) {
+            this.animateFromImageReceiver = imageReceiver;
+        }
+
+        public void setCrossfadeProgress(float crossfadeProgress) {
+            this.crossfadeProgress = crossfadeProgress;
+            invalidate();
+        }
+
+        public static Property<AvatarImageView, Float> CROSSFADE_PROGRESS = new AnimationProperties.FloatProperty<AvatarImageView>("crossfadeProgress") {
+            @Override
+            public void setValue(AvatarImageView object, float value) {
+                object.setCrossfadeProgress(value);
+            }
+            @Override
+            public Float get(AvatarImageView object) {
+                return object.crossfadeProgress;
+            }
+        };
+
+        public void setForegroundImage(ImageLocation imageLocation, String imageFilter, Drawable thumb) {
+            foregroundImageReceiver.setImage(imageLocation, imageFilter, thumb, 0, null, null, 0);
+            if (drawableHolder != null) {
+                drawableHolder.release();
+                drawableHolder = null;
+            }
+        }
+
+        public void setForegroundImageDrawable(ImageReceiver.BitmapHolder holder) {
+            if (holder != null) {
+                foregroundImageReceiver.setImageBitmap(holder.drawable);
+            }
+            if (drawableHolder != null) {
+                drawableHolder.release();
+                drawableHolder = null;
+            }
+            drawableHolder = holder;
+        }
+
+        public float getForegroundAlpha() {
+            return foregroundAlpha;
+        }
+
+        public void setForegroundAlpha(float value) {
+            foregroundAlpha = value;
+            invalidate();
+        }
+
+        public void clearForeground() {
+            AnimatedFileDrawable drawable = foregroundImageReceiver.getAnimation();
+            if (drawable != null) {
+                drawable.removeSecondParentView(this);
+            }
+            foregroundImageReceiver.clearImage();
+            if (drawableHolder != null) {
+                drawableHolder.release();
+                drawableHolder = null;
+            }
+            foregroundAlpha = 0f;
+            invalidate();
+        }
+
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            foregroundImageReceiver.onDetachedFromWindow();
+            if (drawableHolder != null) {
+                drawableHolder.release();
+                drawableHolder = null;
+            }
+        }
+
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            foregroundImageReceiver.onAttachedToWindow();
+        }
+
+        @Override
+        public void setRoundRadius(int value) {
+            super.setRoundRadius(value);
+            foregroundImageReceiver.setRoundRadius(value);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            ImageReceiver imageReceiver = animatedEmojiDrawable != null ? animatedEmojiDrawable.getImageReceiver() : this.imageReceiver;
+            canvas.save();
+            canvas.scale(bounceScale, bounceScale, getMeasuredWidth() / 2f, getMeasuredHeight() / 2f);
+            float inset = hasStories ? (int) AndroidUtilities.dpf2(3.5f) : 0;
+            inset *= (1f - progressToExpand);
+            inset *= progressToInsets * (1f - foregroundAlpha);
+            float alpha = 1.0f;
+            if (animateFromImageReceiver != null) {
+                alpha *= 1.0f - crossfadeProgress;
+                if (crossfadeProgress > 0.0f) {
+                    final float fromAlpha = crossfadeProgress;
+                    final float wasImageX = animateFromImageReceiver.getImageX();
+                    final float wasImageY = animateFromImageReceiver.getImageY();
+                    final float wasImageW = animateFromImageReceiver.getImageWidth();
+                    final float wasImageH = animateFromImageReceiver.getImageHeight();
+                    final float wasAlpha = animateFromImageReceiver.getAlpha();
+                    animateFromImageReceiver.setImageCoords(inset, inset, getMeasuredWidth() - inset * 2f, getMeasuredHeight() - inset * 2f);
+                    animateFromImageReceiver.setAlpha(fromAlpha);
+                    animateFromImageReceiver.draw(canvas);
+                    animateFromImageReceiver.setImageCoords(wasImageX, wasImageY, wasImageW, wasImageH);
+                    animateFromImageReceiver.setAlpha(wasAlpha);
+                }
+            }
+            if (imageReceiver != null && alpha > 0 && (foregroundAlpha < 1f || !drawForeground)) {
+                imageReceiver.setImageCoords(inset, inset, getMeasuredWidth() - inset * 2f, getMeasuredHeight() - inset * 2f);
+                final float wasAlpha = imageReceiver.getAlpha();
+                imageReceiver.setAlpha(wasAlpha * alpha);
+                if (drawAvatar) {
+                    imageReceiver.draw(canvas);
+                }
+                imageReceiver.setAlpha(wasAlpha);
+            }
+            if (foregroundAlpha > 0f && drawForeground && alpha > 0) {
+                if (foregroundImageReceiver.getDrawable() != null) {
+                    foregroundImageReceiver.setImageCoords(inset, inset, getMeasuredWidth() - inset * 2f, getMeasuredHeight() - inset * 2f);
+                    foregroundImageReceiver.setAlpha(alpha * foregroundAlpha);
+                    foregroundImageReceiver.draw(canvas);
+                } else {
+                    rect.set(0f, 0f, getMeasuredWidth(), getMeasuredHeight());
+                    placeholderPaint.setAlpha((int) (alpha * foregroundAlpha * 255f));
+                    final int radius = foregroundImageReceiver.getRoundRadius()[0];
+                    canvas.drawRoundRect(rect, radius, radius, placeholderPaint);
+                }
+            }
+            canvas.restore();
+        }
+
+        @Override
+        public void invalidate() {
+            super.invalidate();
+            if (avatarsViewPager != null) {
+                avatarsViewPager.invalidate();
+            }
+        }
+
+        public void setProgressToStoriesInsets(float progressToInsets) {
+            if (progressToInsets == this.progressToInsets) {
+                return;
+            }
+            this.progressToInsets = progressToInsets;
+            //if (hasStories) {
+            invalidate();
+            //}
+        }
+
+        public void drawForeground(boolean drawForeground) {
+            this.drawForeground = drawForeground;
+        }
+
+        public ChatActivityInterface getPrevFragment() {
+            return null;
+        }
+
+        public void setHasStories(boolean hasStories) {
+            if (this.hasStories == hasStories) {
+                return;
+            }
+            this.hasStories = hasStories;
+            invalidate();
+        }
+
+        public void setProgressToExpand(float animatedFracture) {
+            if (progressToExpand == animatedFracture) {
+                return;
+            }
+            progressToExpand = animatedFracture;
+            invalidate();
         }
     }
 }

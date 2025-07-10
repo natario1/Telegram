@@ -36320,7 +36320,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
                                                         CharSequence subtitle = AndroidUtilities.replaceSingleTag(LocaleController.getString(R.string.ApplyAvatarHint), () -> {
                                                             Bundle args = new Bundle();
                                                             args.putLong("user_id", UserConfig.getInstance(currentAccount).clientUserId);
-                                                            presentFragment(new ProfileActivityReplacement(args));
+                                                            presentFragment(new ProfileActivity(args));
                                                         });
                                                         BulletinFactory.of(ChatActivity.this).createUsersBulletin(Collections.singletonList(user), title, subtitle, null).show();
                                                     }

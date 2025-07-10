@@ -18,7 +18,7 @@ import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.ImageUpdater;
-import org.telegram.ui.ProfileActivityReplacement;
+import org.telegram.ui.ProfileActivity;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -101,7 +101,7 @@ public class PhotoUtilities {
                             CharSequence subtitle = AndroidUtilities.replaceSingleTag(LocaleController.getString(R.string.ApplyAvatarHint), () -> {
                                 Bundle args = new Bundle();
                                 args.putLong("user_id", UserConfig.getInstance(currentAccount).clientUserId);
-                                layout.getLastFragment().presentFragment(new ProfileActivityReplacement(args));
+                                layout.getLastFragment().presentFragment(new ProfileActivity(args));
                             });
                             BulletinFactory.of(layout.getLastFragment()).createUsersBulletin(Collections.singletonList(user), title, subtitle, null).show();
                         }
@@ -222,7 +222,7 @@ public class PhotoUtilities {
                         CharSequence subtitle = AndroidUtilities.replaceSingleTag(LocaleController.getString(R.string.ApplyAvatarHint), () -> {
                             Bundle args = new Bundle();
                             args.putLong("user_id", userId);
-                            chatActivity.presentFragment(new ProfileActivityReplacement(args));
+                            chatActivity.presentFragment(new ProfileActivity(args));
                         });
                         BulletinFactory.of(chatActivity).createUsersBulletin(Collections.singletonList(user), title, subtitle, null).show();
                     }

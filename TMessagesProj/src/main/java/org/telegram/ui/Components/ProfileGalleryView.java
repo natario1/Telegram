@@ -34,7 +34,6 @@ import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
-import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.PinchToZoomHelper;
@@ -57,6 +56,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
     public boolean scrolledByUser;
     private boolean isDownReleased;
+    private boolean isSquare;
     private final boolean isProfileFragment;
     private ImageLocation uploadingImageLocation;
 
@@ -142,7 +142,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
         this.isScrollingListView = parentListView != null;
         this.isProfileFragment = false;
-        this.parentListView = parentListView;
+        setParentListView(parentListView);
         this.parentActionBar = parentActionBar;
         this.touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
         if (callback != null) addCallback(callback);
@@ -262,7 +262,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         imagesLayerNum = value;
     }
 
-    public ProfileGalleryView(Context context, long dialogId, ActionBar parentActionBar, org.telegram.ui.Components.AvatarImageView parentAvatarImageView) {
+    public ProfileGalleryView(Context context, long dialogId, ActionBar parentActionBar, BackupImageView parentAvatarImageView) {
         super(context);
         setOverScrollMode(View.OVER_SCROLL_NEVER);
         setOffscreenPageLimit(2);
@@ -1104,7 +1104,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         private BackupImageView parentAvatarImageView;
         private final ActionBar parentActionBar;
 
-        public ViewPagerAdapter(Context context, org.telegram.ui.Components.AvatarImageView parentAvatarImageView, ActionBar parentActionBar) {
+        public ViewPagerAdapter(Context context, BackupImageView parentAvatarImageView, ActionBar parentActionBar) {
             this.context = context;
             this.parentAvatarImageView = parentAvatarImageView;
             this.parentActionBar = parentActionBar;
@@ -1350,6 +1350,16 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
         }
     }
 
+    public void setSquare(boolean square) {
+        if (square == isSquare) return;
+        this.isSquare = square;
+        this.requestLayout();
+    }
+
+    public void setParentListView(RecyclerListView recyclerView) {
+        this.parentListView = recyclerView;
+    }
+
     public void setParentAvatarImage(BackupImageView parentImageView) {
         if (adapter != null) {
             adapter.parentAvatarImageView = parentImageView;
@@ -1523,7 +1533,7 @@ public class ProfileGalleryView extends CircularViewPager implements Notificatio
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (isProfileFragment) {
+        if (isSquare) {
             int w = MeasureSpec.getSize(widthMeasureSpec);
             int spec = MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY);
             super.onMeasure(spec, spec);

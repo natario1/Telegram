@@ -842,7 +842,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                                 break;
                             case "settings": {
                                 args.putLong("user_id", UserConfig.getInstance(currentAccount).clientUserId);
-                                ProfileActivityReplacement settings = new ProfileActivityReplacement(args);
+                                ProfileActivity settings = new ProfileActivity(args);
                                 actionBarLayout.addFragmentToStack(settings);
                                 settings.restoreSelfArgs(savedInstanceState);
                                 break;
@@ -1356,7 +1356,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         if (expanded) {
             args.putBoolean("expandPhoto", true);
         }
-        ProfileActivityReplacement fragment = new ProfileActivityReplacement(args);
+        ProfileActivity fragment = new ProfileActivity(args);
         presentFragment(fragment);
         drawerLayoutContainer.closeDrawer(false);
     }
@@ -3221,7 +3221,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 if (open_settings == 1) {
                     Bundle args = new Bundle();
                     args.putLong("user_id", UserConfig.getInstance(currentAccount).clientUserId);
-                    fragment = new ProfileActivityReplacement(args);
+                    fragment = new ProfileActivity(args);
                 } else if (open_settings == 2) {
                     fragment = new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC);
                 } else if (open_settings == 3) {
