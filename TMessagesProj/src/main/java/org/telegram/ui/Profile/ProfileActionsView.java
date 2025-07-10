@@ -216,6 +216,12 @@ public class ProfileActionsView extends LinearLayout {
             setProgress(0F);
         }
 
+        @Override
+        protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+            super.onSizeChanged(w, h, oldw, oldh);
+            clipper.invalidate();
+        }
+
         private void setAction(Action data) {
             this.action = data;
             if (data != null) {
@@ -223,12 +229,12 @@ public class ProfileActionsView extends LinearLayout {
                 this.icon = ContextCompat.getDrawable(getContext(), data.drawableResId);
                 this.icon.setAlpha(textPaint.getAlpha());
                 setVisibility(View.VISIBLE);
-                invalidate();
             } else {
                 this.text = "";
                 this.icon = null;
                 setVisibility(View.GONE);
             }
+            clipper.invalidate();
         }
 
         private void setProgress(float progress) {

@@ -7696,6 +7696,7 @@
     <string name="EditProfileHours">Change Opening Hours</string>
     <string name="EditProfileLocation">Change Location</string>
     <string name="ProfileChannel">Channel</string>
+    <string name="ProfilePersonalChannel">personal channel</string>
     <string name="ProfileBirthdayValue">%1$s</string>
     <string name="ProfileBirthdayValueYear_other">%2$s (%1$d years old)</string>
     <string name="ProfileBirthdayTodayValue">🎂 %1$s</string>

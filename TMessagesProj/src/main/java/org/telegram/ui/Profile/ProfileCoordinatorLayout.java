@@ -34,13 +34,13 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
 
         public final void configureHeights(int baseHeight) {
             if (baseHeight >= 0) this.baseHeight = baseHeight;
-            if (getParent() != null) getParent().requestLayout();
+            requestLayout();
         }
 
         public final void configureGrowth(int maxGrowth, int[] snapGrowths) {
             if (maxGrowth >= 0) this.maxGrowth = maxGrowth;
-            if (snapGrowths != null) this.snapGrowths = snapGrowths;
-            if (getParent() != null) getParent().requestLayout();
+            applyGrowth(growth);
+            requestLayout();
         }
 
         private void applyGrowth(int growth) {

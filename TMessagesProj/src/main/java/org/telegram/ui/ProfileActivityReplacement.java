@@ -800,7 +800,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             TLRPC.User user = userId == 0 ? null : getMessagesController().getUser(userId);
             out.clear();
 
-            if (chatId != 0 && ChatObject.isChannel(chat) && chat.left && !chat.kicked) {
+            if (chatId != 0 && ChatObject.isChannel(chat) && chat.left && !chat.kicked && topicId == 0) {
                 long requestedTime = MessagesController.getNotificationsSettings(currentAccount).getLong("dialog_join_requested_time_" + dialogId, -1);
                 if (!(requestedTime > 0 && System.currentTimeMillis() - requestedTime < 1000 * 60 * 2)) {
                     out.add(Action.JOIN);
@@ -809,23 +809,22 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (chatId != 0 && ChatObject.isChannel(chat) && !chat.megagroup && chatInfo != null && chatInfo.linked_chat_id != 0) {
                 out.add(Action.DISCUSS);
             }
-            if (userId != 0 && !UserObject.isUserSelf(user)) {
+            if (userId != 0 && !UserObject.isUserSelf(user) || chat != null && !ChatObject.isChannel(chat) || chat != null && chat.forum) {
                 out.add(Action.MESSAGE);
             }
             if (chatId != 0 || userId != 0 && !isSettings() && !UserObject.isUserSelf(user)) {
                 boolean enabled = MessagesController.getInstance(currentAccount).isDialogNotificationsSoundEnabled(getDialogId(), topicId);
                 out.add(enabled ? Action.MUTE : Action.UNMUTE);
             }
-            if (user != null && !UserObject.isUserSelf(user)) {
+            if (user != null && !UserObject.isUserSelf(user) && !user.bot) {
                 out.add(Action.CALL);
                 if (userInfo != null && userInfo.video_calls_available) {
                     // Else leave room for the gift action
                     out.add(Action.VIDEO);
                 }
             }
-            if (chatId != 0 && ChatObject.isChannel(chat) && ChatObject.canManageCalls(chat) && chatInfo.call == null) {
-                boolean group = chat.megagroup && !chat.gigagroup;
-                if (group) {
+            if (chatId != 0 && ChatObject.canManageCalls(chat) && chatInfo.call == null) {
+                if (!ChatObject.isChannel(chat) || chat.megagroup && !chat.gigagroup) {
                     out.add(Action.VOICECHAT);
                 } else {
                     out.add(0, Action.LIVESTREAM);
@@ -847,7 +846,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (chatId != 0 && ChatObject.isChannel(chat) && (chat.creator || chat.admin_rights != null && chat.admin_rights.post_stories) && !chat.stories_unavailable) {
                 out.add(Action.STORY);
             }
-            if (chatId != 0 && ChatObject.isPublic(chat) || user != null && user.bot && getDialogId() != UserObject.VERIFY) {
+            if (chatId != 0 && ChatObject.isPublic(chat) && topicId == 0 || user != null && user.bot && getDialogId() != UserObject.VERIFY) {
                 out.add(Action.SHARE);
             }
             if (chatId != 0 && chat != null && (!ChatObject.isChannel(chat) || (!chat.creator && !chat.left && !chat.kicked && topicId == 0))) {
