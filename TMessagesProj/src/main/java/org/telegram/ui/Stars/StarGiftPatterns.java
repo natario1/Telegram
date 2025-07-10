@@ -259,9 +259,9 @@ public class StarGiftPatterns {
 
         // Progress animation
         float clip0 = .3F * (1F - friction);
-        float clip1 = 1F - .3F * friction;
+        float clip1 = 1F - .15F * friction;
         progress = Math.max(0F, Math.min(1F, (progress - clip0) / (clip1 - clip0)));
-        float shrink = (float) Math.pow(progress, lerp(3F, 0.33F, friction)); // ease in or out depending on friction
+        float shrink = (float) Math.pow(progress, lerp(3F, 0.2F, friction)); // ease in or out depending on friction
         x *= shrink;
         y *= shrink;
         if (progress == 1F && overscroll > 0F) {
