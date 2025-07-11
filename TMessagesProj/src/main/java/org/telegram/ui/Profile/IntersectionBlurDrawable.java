@@ -29,11 +29,11 @@ class IntersectionBlurDrawable extends Drawable {
     private final RectF intersectLocation = new RectF();
     private final float[] hostScale = new float[2];
     private final float[] behindScale = new float[2];
+    private final List<View> behindViews;
 
     private float extraX = 0F;
     private float extraY = 0F;
-
-    private final List<View> behindViews;
+    private boolean dirty = true;
 
     IntersectionBlurDrawable(View host, View... behind) {
         this.host = host;
@@ -45,6 +45,11 @@ class IntersectionBlurDrawable extends Drawable {
     void setOffset(float extraX, float extraY) {
         this.extraX = extraX;
         this.extraY = extraY;
+        this.dirty = true;
+    }
+
+    void setDirty() {
+        this.dirty = true;
     }
 
     private void findRect(View view, RectF rect, float[] scale, float extraX, float extraY) {
@@ -67,7 +72,7 @@ class IntersectionBlurDrawable extends Drawable {
         }
     }
 
-    void refresh() {
+    private void refresh() {
         Rect bounds = getBounds();
         if (bounds.isEmpty() || behindViews.isEmpty()) return;
         findRect(host, hostLocation, hostScale, extraX, extraY);
@@ -85,6 +90,7 @@ class IntersectionBlurDrawable extends Drawable {
             canvas.restore();
         }
         node.endRecording();
+        dirty = false;
     }
 
     @Override
@@ -92,6 +98,7 @@ class IntersectionBlurDrawable extends Drawable {
         if (canvas.isHardwareAccelerated()) {
             Rect bounds = getBounds();
             node.setPosition(bounds.left, bounds.top, bounds.right, bounds.bottom);
+            if (dirty) refresh();
             canvas.drawRenderNode(node);
         }
     }

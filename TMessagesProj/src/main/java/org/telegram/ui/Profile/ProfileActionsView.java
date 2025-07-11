@@ -261,7 +261,7 @@ public class ProfileActionsView extends LinearLayout {
             clipper.apply(canvas);
             if (blurDrawable != null && canvas.isHardwareAccelerated()) {
                 blurDrawable.setBounds(0, 0, getWidth(), getHeight());
-                blurDrawable.refresh();
+                blurDrawable.setDirty();
                 blurDrawable.draw(canvas);
             } else {
                 int alpha = fallbackPaint.getAlpha();

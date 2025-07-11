@@ -266,7 +266,13 @@ class ViewWithBlurredFooter extends FrameLayout {
         @Override
         protected void redraw(float contentOffset) {
             drawable.setOffset(0, (int) -contentOffset);
-            postInvalidate();
+            invalidate();
+        }
+
+        @Override
+        public void invalidate() {
+            super.invalidate();
+            drawable.setDirty();
         }
 
         @Override
@@ -282,7 +288,6 @@ class ViewWithBlurredFooter extends FrameLayout {
 
         @Override
         protected void drawContent(Canvas canvas) {
-            drawable.refresh();
             drawable.draw(canvas);
         }
     }
