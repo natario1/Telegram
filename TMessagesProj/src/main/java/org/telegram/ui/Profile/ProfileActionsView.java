@@ -190,7 +190,7 @@ public class ProfileActionsView extends LinearLayout {
         private final ViewClipper clipper = new ViewClipper(this);
         private final Paint fallbackPaint = new Paint();
         private float fallbackAlpha = 1F;
-        private final BlurBehindDrawable blurDrawable;
+        private final IntersectionBlurDrawable blurDrawable;
         private final TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         private String text = "";
         private Drawable icon;
@@ -261,7 +261,7 @@ public class ProfileActionsView extends LinearLayout {
             clipper.apply(canvas);
             if (blurDrawable != null && canvas.isHardwareAccelerated()) {
                 blurDrawable.setBounds(0, 0, getWidth(), getHeight());
-                blurDrawable.refresh(0, 0);
+                blurDrawable.refresh();
                 blurDrawable.draw(canvas);
             } else {
                 int alpha = fallbackPaint.getAlpha();

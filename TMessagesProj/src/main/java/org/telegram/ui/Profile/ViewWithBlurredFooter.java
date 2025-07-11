@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.viewpager.widget.ViewPager;
 import org.telegram.messenger.ImageReceiver;
+import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BackupImageView;
@@ -27,6 +28,7 @@ import static org.telegram.ui.Components.LayoutHelper.*;
 
 class ViewWithBlurredFooter extends FrameLayout {
 
+    private static final boolean DYNAMIC_BLUR_ALLOWED = true;
     private static final int FOOTER_GRADIENT_HEIGHT = dp(32);
     private static final int FOOTER_BLURRED_HEIGHT = dp(73.33F);
     private static final int FOOTER_HEIGHT = FOOTER_BLURRED_HEIGHT + FOOTER_GRADIENT_HEIGHT;
@@ -86,7 +88,13 @@ class ViewWithBlurredFooter extends FrameLayout {
         lastProgress = progress;
         footer.setAlpha(Math.min(1F, progress*3));
         updateInsets();
-        if (progress == 0F || progress == 1F) footer.invalidate();
+        if (progress == 0F || progress == 1F) footer.redraw(bottomRoom);
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        footer.redraw(bottomRoom);
     }
 
     private void updateInsets() {
@@ -103,10 +111,9 @@ class ViewWithBlurredFooter extends FrameLayout {
     private static abstract class Blur extends View {
 
         private static Blur create(Context context, ProfileGalleryView gallery, Theme.ResourcesProvider resourcesProvider) {
-            // Probably overkill.
-            // if (SharedConfig.canBlurChat() && SharedConfig.useNewBlur && Build.VERSION.SDK_INT >= 31) {
-            //     return new RenderNodeBlur(context, gallery, resourcesProvider);
-            // }
+            if (DYNAMIC_BLUR_ALLOWED && SharedConfig.canBlurChat() && SharedConfig.useNewBlur && Build.VERSION.SDK_INT >= 31) {
+                return new DynamicBlur(context, gallery, resourcesProvider);
+            }
             return new StaticBlur(context, gallery, resourcesProvider);
         }
 
@@ -128,6 +135,7 @@ class ViewWithBlurredFooter extends FrameLayout {
 
         protected abstract boolean canDrawContent(Canvas canvas);
         protected abstract void drawContent(Canvas canvas);
+        protected abstract void redraw(float contentOffset);
 
         @Override
         protected void onSizeChanged(int w, int h, int oldw, int oldh) {
@@ -206,6 +214,11 @@ class ViewWithBlurredFooter extends FrameLayout {
         }
 
         @Override
+        protected void redraw(float contentOffset) {
+            invalidate();
+        }
+
+        @Override
         protected boolean canDrawContent(Canvas canvas) {
             return currentInfo != null;
         }
@@ -233,28 +246,33 @@ class ViewWithBlurredFooter extends FrameLayout {
     }
 
     @RequiresApi(Build.VERSION_CODES.S)
-    private static class RenderNodeBlur extends Blur {
-        private final BlurBehindDrawable drawable;
+    private static class DynamicBlur extends Blur {
+        private final IntersectionBlurDrawable drawable;
 
-        private RenderNodeBlur(Context context, ProfileGalleryView gallery, Theme.ResourcesProvider resourcesProvider) {
+        private DynamicBlur(Context context, ProfileGalleryView gallery, Theme.ResourcesProvider resourcesProvider) {
             super(context, resourcesProvider);
-            this.drawable = new BlurBehindDrawable(this);
-            this.drawable.behindViews.add(gallery);
+            this.drawable = new IntersectionBlurDrawable(this, gallery);
             gallery.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
                 @Override public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) { invalidate(); }
                 @Override public void onPageSelected(int position) { invalidate(); }
                 @Override public void onPageScrollStateChanged(int state) { invalidate(); }
             });
             gallery.getAdapter().registerDataSetObserver(new DataSetObserver() {
-                @Override public void onChanged() { invalidate(); }
-                @Override public void onInvalidated() { invalidate(); }
+                @Override public void onChanged() { postInvalidate(); }
+                @Override public void onInvalidated() { postInvalidate(); }
             });
         }
 
         @Override
-        public void invalidate() {
-            super.invalidate();
-            drawable.refresh(0, FOOTER_ROOM);
+        protected void redraw(float contentOffset) {
+            drawable.setOffset(0, (int) -contentOffset);
+            postInvalidate();
+        }
+
+        @Override
+        protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+            super.onSizeChanged(w, h, oldw, oldh);
+            drawable.setBounds(0, 0, w, h);
         }
 
         @Override
@@ -264,7 +282,7 @@ class ViewWithBlurredFooter extends FrameLayout {
 
         @Override
         protected void drawContent(Canvas canvas) {
-            drawable.setBounds(0, 0, getWidth(), getHeight());
+            drawable.refresh();
             drawable.draw(canvas);
         }
     }

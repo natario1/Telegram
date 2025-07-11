@@ -38,6 +38,7 @@ public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrol
         }
 
         public final void configureGrowth(int maxGrowth, int[] snapGrowths) {
+            this.snapGrowths = snapGrowths;
             if (maxGrowth >= 0) this.maxGrowth = maxGrowth;
             applyGrowth(growth);
             requestLayout();
