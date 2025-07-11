@@ -73,6 +73,7 @@ import java.io.File;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.LocaleController.formatString;
@@ -1175,7 +1176,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             int index = chatMembersOrder.size() > i ? chatMembersOrder.get(i) : i;
             if (index >= 0 && index < count) sorted.set(index, chatMembers.valueAt(i));
         }
-        return sorted.stream().filter(Objects::nonNull).toList();
+        return sorted.stream().filter(Objects::nonNull).collect(Collectors.toList());
     }
 
     // Needed whenever chatMembers changes.
