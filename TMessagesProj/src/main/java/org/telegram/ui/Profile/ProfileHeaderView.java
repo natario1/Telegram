@@ -112,6 +112,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     private final AvatarDrawable avatarDrawable = new AvatarDrawable();
     private final Avatar avatarView;
     private final ViewWithBlurredFooter avatarWrapper;
+    private float avatarDefaultRoundRadius = AVATAR_SIZE / 2F;
     private ImageLocation avatarLoadedLocation;
 
     private final float attractorMinY = -ATTRACTOR_HIDDEN_Y;
@@ -261,7 +262,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         } else {
             configureGrowth(mid + EXTRA_HEIGHT_OVERSCROLL, new int[]{0, mid});
         }
-        attractorMaxY = baseHeight + mid - avatarBottomPadding - AVATAR_SIZE /2F;
+        attractorMaxY = baseHeight + mid - avatarBottomPadding - AVATAR_SIZE/2F;
         if (growth > snapGrowths[snapGrowths.length - 1]) {
             changeGrowth(snapGrowths[snapGrowths.length - 1], false);
         }
@@ -340,7 +341,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
 
         // Use first part for the stories ring to disappear
         float initial = Math.min(1F, fullscreenProgress / FULLSCREEN_EXPAND_TRIGGER);
-        avatarView.updateStoriesInsets(initial);
+        avatarView.updateStoriesInsets(initial, avatarDefaultRoundRadius);
 
         // Use the rest for blurred footer appearance
         float remaining = Math.max(0F, (fullscreenProgress - FULLSCREEN_EXPAND_TRIGGER) / (1F - FULLSCREEN_EXPAND_TRIGGER));
@@ -363,7 +364,8 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         overlaysView.setScaleY(targetWidth / fullscreenSize);
 
         // Update radius
-        float targetRadius = remaining == 0F ? targetWidth/2F : lerp(1.25F*AVATAR_SIZE/2F, 0, CubicBezierInterpolator.EASE_BOTH.getInterpolation(remaining));
+        float defaultRadius = avatarDefaultRoundRadius * (remaining == 0F ? avatarWrapper.getScaleX() : 1.25F);
+        float targetRadius = lerp(defaultRadius, 0, CubicBezierInterpolator.EASE_BOTH.getInterpolation(remaining));
         avatarWrapper.clipper.setRoundRadius(targetRadius);
         galleryWrapper.clipper.setRoundRadius(targetRadius);
 
@@ -749,6 +751,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     }
 
     public void setAvatarUser(@NonNull TLRPC.User user, TLRPC.UserFull userInfo, TLRPC.FileLocation uploadingSmall, TLRPC.FileLocation uploadingBig) {
+        avatarDefaultRoundRadius = Avatar.getDefaultRoundRadius(false);
         avatarDrawable.setInfo(currentAccount, user);
 
         final ImageLocation imageLocation = ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_BIG);
@@ -780,6 +783,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     }
 
     public void setAvatarChat(@NonNull TLRPC.Chat chat, long topicId, TLRPC.FileLocation uploadingBig) {
+        avatarDefaultRoundRadius = Avatar.getDefaultRoundRadius(chat.forum);
         MessagesController controller = MessagesController.getInstance(currentAccount);
         chat = ChatObject.isMonoForum(chat) ? controller.getMonoForumLinkedChat(chat.id) : chat;
 
@@ -851,8 +855,13 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
     }
 
     public static class Avatar extends FrameLayout {
-        private final static float MIN_RADIUS = ATTRACTOR_HIDDEN_Y;
-        private final static float MAX_INSET = AVATAR_SIZE/2F - MIN_RADIUS;
+        private final static float MIN_HALF_SIZE = ATTRACTOR_HIDDEN_Y;
+        private final static float MAX_INSET = AVATAR_SIZE/2F - MIN_HALF_SIZE;
+        private final static float FORUM_RADIUS = dpf2(25);
+
+        private static float getDefaultRoundRadius(boolean isForum) {
+            return isForum ? FORUM_RADIUS : AVATAR_SIZE/2F;
+        }
 
         private final AvatarImageView image;
         private final ProfileStoriesView stories;
@@ -928,7 +937,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             addView(stories, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT));
             addView(progressBar, LayoutHelper.createFrame(MATCH_PARENT, MATCH_PARENT));
             updateStoriesData();
-            updateStoriesInsets(0F);
+            updateStoriesInsets(0F, AVATAR_SIZE/2F);
             updateProgressBar(false, false);
             updateAttractor(0F);
         }
@@ -959,9 +968,9 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             return lerp(MAX_INSET, 0F, CubicBezierInterpolator.EASE_IN.getInterpolation(attractorProgress));
         }
 
-        private void updateStoriesInsets(float storiesDisappearProgress) {
+        private void updateStoriesInsets(float storiesDisappearProgress, float defaultRoundRadius) {
             image.setProgressToStoriesInsets(1F - storiesDisappearProgress);
-            image.setRoundRadius(storiesDisappearProgress == 1F ? 0 : AVATAR_SIZE/2);
+            image.setRoundRadius(storiesDisappearProgress == 1F ? 0 : (int) defaultRoundRadius);
             stories.setAlpha(1F - storiesDisappearProgress);
         }
 
@@ -1008,7 +1017,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             hasContact = avatarBox.top <= AVATAR_TOP_CONTACT;
             if (avatarBox.top > AVATAR_TOP_INITIAL) return false;
             if (hasContact) {
-                float avatarTopFinal = avatarMinCenterY - Avatar.MIN_RADIUS;
+                float avatarTopFinal = avatarMinCenterY - Avatar.MIN_HALF_SIZE;
                 progress = (AVATAR_TOP_CONTACT - avatarBox.top) / (AVATAR_TOP_CONTACT - avatarTopFinal);
             } else {
                 progress = (AVATAR_TOP_INITIAL - avatarBox.top) / (AVATAR_TOP_INITIAL - AVATAR_TOP_CONTACT);
