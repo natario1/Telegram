@@ -241,7 +241,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             if (!channelMessageFetcherSubscribed && userInfo != null) {
                 channelMessageFetcherSubscribed = true;
                 channelMessageFetcher.subscribe(() -> {
-                    updateListData("channelMessageFetcher");
+                    updateListData();
                     updateActionsData();
                 });
                 channelMessageFetcher.fetch(userInfo);
@@ -258,7 +258,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
         updateTtlData();
         updatePremiumData();
-        updateListData("setUserInfo");
+        updateListData();
         updateActionsData();
         updateMenuData(true);
     }
@@ -288,7 +288,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         }
         updateTtlData();
         updateOnlineData(false);
-        updateListData("setChatInfo");
+        updateListData();
         updateActionsData();
         updateMenuData(true);
         if (headerView != null) {
@@ -788,7 +788,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             }
             chatMembersLoading = false;
             updateOnlineData(false);
-            updateListData("updateChatMembersData");
+            updateListData();
         }), delay));
         getConnectionsManager().bindRequestToGuid(reqId, classGuid);
     }
@@ -873,7 +873,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         menuHandler.toggleMainMenuSubItem(AB_VIEW_DISCUSSION_ID, !actions.containsAction(Action.DISCUSS));
     }
 
-    private void updateListData(String reason) {
+    private void updateListData() {
         if (listView == null) return;
         listView.updateRows(old -> {
             Rows rows = new Rows();
@@ -1662,7 +1662,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
         if (sharedMediaLayout != null && sharedMediaPreloader != null) {
             sharedMediaLayout.setNewMediaCounts(sharedMediaPreloader.getLastMediaCount());
         }
-        updateListData("mediaCountUpdated");
+        updateListData();
         updateSelectedMediaTabText();
         if (userInfo != null) {
             resumeDelayedFragmentAnimation();
@@ -2073,7 +2073,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
 
         // Updates
         updateColors(false);
-        updateListData("createView");
+        updateListData();
         updateActionsData();
         updateProfileData(true);
         updateMenuData(false);
@@ -2237,7 +2237,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 if ((mask & MessagesController.UPDATE_MASK_CHAT) != 0 || (mask & MessagesController.UPDATE_MASK_CHAT_AVATAR) != 0 || (mask & MessagesController.UPDATE_MASK_CHAT_NAME) != 0 || (mask & MessagesController.UPDATE_MASK_CHAT_MEMBERS) != 0 || (mask & MessagesController.UPDATE_MASK_STATUS) != 0 || (mask & MessagesController.UPDATE_MASK_EMOJI_STATUS) != 0) {
                     if ((mask & MessagesController.UPDATE_MASK_CHAT) != 0) {
                         updateOnlineData(false);
-                        updateListData("NotificationCenter.updateInterfaces");
+                        updateListData();
                         updateActionsData();
                     } else {
                         updateOnlineData(true);
@@ -2302,7 +2302,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
             isUserBlocked = getMessagesController().blockePeers.indexOfKey(userId) >= 0;
             if (oldValue != isUserBlocked) {
                 updateMenuData(true);
-                updateListData("NotificationCenter.blockedUsersDidLoad");
+                updateListData();
             }
         } else if (id == NotificationCenter.encryptedChatCreated) {
             if (!isCreatingEncryptedChat) return;
@@ -2318,25 +2318,25 @@ public class ProfileActivityReplacement extends BaseFragment implements
             TLRPC.EncryptedChat chat = (TLRPC.EncryptedChat) args[0];
             if (chatEncrypted != null && chat.id == chatEncrypted.id) {
                 chatEncrypted = chat;
-                updateListData("NotificationCenter.encryptedChatUpdated");
+                updateListData();
                 if (flagSecure != null) {
                     flagSecure.invalidate();
                 }
             }
         } else if (id == NotificationCenter.reloadInterface) {
-            updateListData("NotificationCenter.reloadInterface");
+            updateListData();
             updateActionsData();
         } else if (id == NotificationCenter.starBalanceUpdated) {
-            updateListData("NotificationCenter.starBalanceUpdated");
+            updateListData();
         } else if (id == NotificationCenter.botStarsUpdated) {
-            updateListData("NotificationCenter.botStarsUpdated");
+            updateListData();
         } else if (id == NotificationCenter.botStarsTransactionsLoaded) {
-            updateListData("NotificationCenter.botStarsTransactionsLoaded");
+            updateListData();
         } else if (id == NotificationCenter.botInfoDidLoad) {
             final TL_bots.BotInfo info = (TL_bots.BotInfo) args[0];
             if (info.user_id == userId) {
                 isBotInfoLoaded = true;
-                updateListData("NotificationCenter.botInfoDidLoad");
+                updateListData();
                 updateActionsData();
             }
         } else if (id == NotificationCenter.emojiLoaded) {
@@ -2482,7 +2482,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     getMessagesController().removeSuggestion(0, type == SettingsSuggestionCell.TYPE_PHONE ? "VALIDATE_PHONE_NUMBER" : "VALIDATE_PASSWORD");
                 }
                 getNotificationCenter().addObserver(this, NotificationCenter.newSuggestionsAvailable);
-                updateListData("handleSuggestionClick");
+                updateListData();
             });
         } else {
             if (type == SettingsSuggestionCell.TYPE_PHONE) {
@@ -2612,7 +2612,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 ArrayList<TLRPC.User> list = new ArrayList<>(); list.add(user);
                 getContactsController().deleteContact(list, true);
                 user.contact = false;
-                updateListData("ActionBar.AB_CONTACT_DELETE_ID");
+                updateListData();
             });
             builder.setNegativeButton(getString(R.string.Cancel), null);
             AlertDialog dialog = builder.create();
@@ -2826,7 +2826,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                 }
 
                 reportReactionMessageId = 0;
-                updateListData("removeReportReaction");
+                updateListData();
                 BulletinFactory.of(this).createReportSent(getResourceProvider()).show();
             });
             builder.setNegativeButton(LocaleController.getString(R.string.Cancel), (dialog, which) -> {
@@ -3129,7 +3129,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                     BuildVars.LOGS_ENABLED = !BuildVars.LOGS_ENABLED;
                     SharedPreferences sharedPreferences = ApplicationLoader.applicationContext.getSharedPreferences("systemConfig", Context.MODE_PRIVATE);
                     sharedPreferences.edit().putBoolean("logsEnabled", BuildVars.LOGS_ENABLED).commit();
-                    updateListData("logs");
+                    updateListData();
                     updateActionsData();
                     if (BuildVars.LOGS_ENABLED) {
                         FileLog.d("app start time = " + ApplicationLoader.startTime);
@@ -4012,7 +4012,7 @@ public class ProfileActivityReplacement extends BaseFragment implements
                             BulletinFactory.of(this).createErrorBulletin(LocaleController.getString(R.string.UnknownError)).show();
                         }
                     }));
-                    updateListData("personal_channel_removed");
+                    updateListData();
                     getMessagesStorage().updateUserInfo(currUserFull, false);
                 });
                 builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
