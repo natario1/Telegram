@@ -34,7 +34,7 @@ import org.telegram.messenger.SecureDocument;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.TLObject;
 
-public class BackupImageView extends View {
+public class BackupImageView extends View implements ImageReceiver.ImageReceiverDelegate {
 
     protected ImageReceiver imageReceiver;
     protected ImageReceiver blurImageReceiver;
@@ -54,12 +54,16 @@ public class BackupImageView extends View {
         imageReceiver = createImageReciever();
         imageReceiver.setCrossfadeByScale(0);
         imageReceiver.setAllowLoadingOnAttachedOnly(true);
-        imageReceiver.setDelegate((imageReceiver1, set, thumb, memCache) -> {
-            if (set && !thumb) {
-                checkCreateBlurredImage();
-            }
-        });
+        imageReceiver.setDelegate(this);
     }
+
+    @Override
+    public void didSetImage(ImageReceiver imageReceiver, boolean set, boolean thumb, boolean memCache) {
+        if (set && !thumb) {
+            checkCreateBlurredImage();
+        }
+    }
+
 
     protected ImageReceiver createImageReciever() {
         return new ImageReceiver(this);

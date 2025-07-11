@@ -884,6 +884,12 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
                 }
 
                 @Override
+                public void onAnimationReady(ImageReceiver imageReceiver) {
+                    super.onAnimationReady(imageReceiver);
+                    imageReceiver.startAnimation();
+                }
+
+                @Override
                 public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
                     super.onInitializeAccessibilityNodeInfo(info);
                     if (getImageReceiver().hasNotThumb()) {
@@ -899,7 +905,6 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
             };
             image.getImageReceiver().setAllowDecodeSingleFrame(true);
             image.getImageReceiver().setAllowStartAnimation(true);
-            image.getImageReceiver().startAnimation();
             image.setOnClickListener(v -> { if (callback != null) callback.onAvatarClick(null); });
             image.setOnLongClickListener(v -> callback != null && callback.onAvatarLongClick());
 
