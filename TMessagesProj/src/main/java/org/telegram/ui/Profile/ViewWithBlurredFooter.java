@@ -26,6 +26,10 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.lerp;
 import static org.telegram.ui.Components.LayoutHelper.*;
 
+/**
+ * Lays out a square view and a blurred strip below it, which blurs the bottom part of the square view.
+ * Used to wrap both the avatar and the gallery viewpager in the {@link ProfileHeaderView} hierarchy.
+ */
 class ViewWithBlurredFooter extends FrameLayout {
 
     private static final boolean DYNAMIC_BLUR_ALLOWED = true;

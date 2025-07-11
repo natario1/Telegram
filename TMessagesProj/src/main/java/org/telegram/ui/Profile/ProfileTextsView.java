@@ -28,6 +28,9 @@ import java.util.function.Consumer;
 import static org.telegram.messenger.AndroidUtilities.*;
 import static org.telegram.ui.Components.LayoutHelper.WRAP_CONTENT;
 
+/**
+ * Displays title, subtitle, icons and animated emojis around them inside the {@link ProfileHeaderView} view.
+ */
 public class ProfileTextsView extends FrameLayout {
 
     private static final float COLLAPSED_LEFT = dpf2(72);

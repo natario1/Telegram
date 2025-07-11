@@ -23,6 +23,10 @@ import java.util.function.Function;
 
 import static org.telegram.ui.Profile.ProfileContentAdapter.*;
 
+
+/**
+ * The bottom half of the {@link org.telegram.ui.ProfileActivityReplacement} screen.
+ */
 public class ProfileContentView extends RecyclerListView implements StoriesListPlaceProvider.ClippedView {
 
     private final ActionBar actionBar;

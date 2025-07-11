@@ -16,6 +16,10 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.LayoutHelper;
 
+/**
+ * Generic class that lays out a header and a scrolling view, using padding and translation to look like a linear layout.
+ * It keeps the UI in sync and provides important scroll features like snapping, touch interception and scrol APIs.
+ */
 public class ProfileCoordinatorLayout extends FrameLayout implements NestedScrollingParent3 {
 
     public abstract static class Header extends FrameLayout {

@@ -42,6 +42,9 @@ import static org.telegram.ui.Components.LayoutHelper.MATCH_PARENT;
 import static org.telegram.ui.Components.LayoutHelper.createFrame;
 import static org.telegram.ui.Stars.StarsController.findAttribute;
 
+/**
+ * The top half of the {@link org.telegram.ui.ProfileActivityReplacement} screen.
+ */
 public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implements NotificationCenter.NotificationCenterDelegate {
 
     private final static float GIFT_LAYOUT_INSET = 1.37F; // makes room for the radial background

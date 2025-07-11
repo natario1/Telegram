@@ -81,6 +81,11 @@ import static org.telegram.ui.Profile.ProfileActivityMenus.*;
 import static org.telegram.ui.Profile.ProfileActionsView.*;
 import static org.telegram.ui.Profile.ProfileContentView.*;
 
+/**
+ * Displays user and chat profiles except current user settings, for which the former {@link ProfileActivity} is used.
+ * This class contains business logic like data requests and click handlers, while the actual appearance is defined in
+ * child views like {@link ProfileHeaderView} and {@link ProfileContentView}.
+ */
 public class ProfileActivityReplacement extends BaseFragment implements
         SharedMediaLayout.SharedMediaPreloaderDelegate,
         SharedMediaLayout.Delegate,

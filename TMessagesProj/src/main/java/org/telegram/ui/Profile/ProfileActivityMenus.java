@@ -26,7 +26,9 @@ import java.util.List;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
 
-
+/**
+ * Handles the action bar menu items in the {@link org.telegram.ui.ProfileActivityReplacement} screen.
+ */
 public class ProfileActivityMenus {
 
     public final static int AB_CONTACT_ADD_ID = 1;
