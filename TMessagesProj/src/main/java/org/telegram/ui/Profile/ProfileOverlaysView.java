@@ -51,8 +51,12 @@ class ProfileOverlaysView extends FrameLayout {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int h = MeasureSpec.getSize(widthMeasureSpec) + ProfileHeaderView.EXTRA_HEIGHT_FOOTER;
-        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
+        // Size and pivot just like ViewWithBlurredFooter, with which we share a ViewClipper
+        int w = MeasureSpec.getSize(widthMeasureSpec);
+        int h = w + ProfileHeaderView.EXTRA_HEIGHT_FOOTER;
+        super.onMeasure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
+        setPivotY(w / 2F);
+        setPivotX(w / 2F);
     }
 
     @Override

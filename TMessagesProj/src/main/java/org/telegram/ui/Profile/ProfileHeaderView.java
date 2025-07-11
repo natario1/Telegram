@@ -362,6 +362,7 @@ public class ProfileHeaderView extends ProfileCoordinatorLayout.Header implement
         galleryWrapper.clipper.invalidate();
         overlaysView.setScaleX(targetWidth / fullscreenSize);
         overlaysView.setScaleY(targetWidth / fullscreenSize);
+        overlaysView.invalidate(); // uses galleryWrapper clipper
 
         // Update radius
         float defaultRadius = avatarDefaultRoundRadius * (remaining == 0F ? avatarWrapper.getScaleX() : 1.25F);
